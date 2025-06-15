@@ -1,0 +1,50 @@
+# Ignorar arquivos do ambiente virtual
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# Ignorar arquivos de banco de dados
+*.db
+*.sqlite
+*.sqlite3
+
+# Ignorar arquivos de configuração local
+.env
+.venv
+ENV/
+env/
+VENV/
+
+# Ignorar arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Ignorar arquivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Ignorar arquivos temporários
+*.tmp
+*.temp
+
