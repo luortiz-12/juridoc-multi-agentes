@@ -1,2 +1,2 @@
-web: gunicorn --bind 0.0.0.0:5000 src.main:app
+web: python -c "import time; print("DEBUG: Hello from Python!"); time.sleep(3600)"
 
