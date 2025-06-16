@@ -12,7 +12,7 @@ command = ["gunicorn", "--bind", "0.0.0.0:5000", "src.main:app"]
 
 try:
     # Executa o comando Gunicorn
-    print(f"DEBUG: Executando comando: {" ".join(command)}")
+    print(f"DEBUG: Executando comando: {' '.join(command)}")
     subprocess.run(command, check=True)
 except subprocess.CalledProcessError as e:
     print(f"ERRO: Gunicorn falhou com código {e.returncode}")
@@ -22,3 +22,4 @@ except subprocess.CalledProcessError as e:
 except Exception as e:
     print(f"ERRO INESPERADO: {e}")
     sys.exit(1)
+
