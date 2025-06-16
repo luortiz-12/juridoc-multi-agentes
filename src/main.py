@@ -40,7 +40,3 @@ def serve(path):
             return send_from_directory(static_folder_path, 'index.html')
         else:
             return "index.html not found", 404
-
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
