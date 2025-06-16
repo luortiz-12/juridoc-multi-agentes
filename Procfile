@@ -1,2 +1,1 @@
-web: python -c 
-
+web: python start.py
