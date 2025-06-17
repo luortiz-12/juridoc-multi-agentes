@@ -8,6 +8,7 @@ fundamentos legais, artigos e jurisprudência com base nos dados coletados.
 import os # Importar os para acessar variáveis de ambiente
 import json
 import requests
+import sys # Importar sys para sys.exit()
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
@@ -117,12 +118,12 @@ class AgenteJuridicoTecnico:
             **Formato da Saída:**
             Retorne a sua análise como um objeto JSON ESTRICTAMENTE VÁLIDO.
             **NÃO INCLUA VÍRGULAS PENDENTES (TRAILING COMMAS) EM LISTAS OU OBJETOS JSON.**
-            **O JSON deve seguir exatamente este formato:**
+            **NÃO ENVOLVA A SAÍDA JSON EM BLOCOS DE CÓDIGO MARKDOWN (ou seja, não use ```json ou ```).**
+            **O JSON deve seguir exatamente este formato (apenas o JSON, sem outros caracteres antes ou depois):**
             ```json
             {{
                 "fundamentos_legais": [
                     {{"lei": "Nome da Lei/Código", "artigos": "Artigos relevantes", "descricao": "Breve descrição"}}
-                    // Adicione mais objetos de lei/artigo conforme necessário, SEM vírgula no último item
                 ],
                 "principios_juridicos": ["Princípio 1", "Princípio 2"],
                 "jurisprudencia_relevante": "Exemplo de jurisprudência ou súmula relevante",
