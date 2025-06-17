@@ -205,7 +205,7 @@ if __name__ == '__main__':
         "historico_peticao": "Maria Joaquina foi aprovada em concurso público para delegada.",
         "fatos_peticao": "João Liborio proferiu insultos públicos, chamando-a de 'charlatã', 'ladrona', 'discarada' e acusando-a de fraude em concurso.",
         "pedido_peticao": "Indenização por danos morais no valor de R$ 16.000,00.",
-        "valor_causa_peticao": "R$ 16.000,00",
+        "valor_causa_peticao": "R$ 16.00,00",
         "base_legal_peticao": "Constituição Federal, Art. 5º, V e X; Código Civil, Art. 186, 927; Código Penal, Art. 138, 139, 140; Lei 12.550/2011.",
         "nome_contrario_peticao": "João Liborio",
         # ... outros campos de petição conforme o AgenteColetorDados retorna
@@ -216,7 +216,7 @@ if __name__ == '__main__':
         "tipo_contrato": "Prestação de Serviços de Desenvolvimento de Software",
         "contratante_nome": "Empresa X Ltda.",
         "cnpjContratante": "12.345.678/0001-99",
-        "contratado_nome": "João Desenvolvedor",
+        "contratado_nome": "João Desenvolvedo",
         "cpfContratado": "111.222.333-44",
         "objeto_contrato": "Desenvolvimento de um aplicativo mobile para gerenciamento de tarefas.",
         "valor_contrato": "R$ 25.000,00",

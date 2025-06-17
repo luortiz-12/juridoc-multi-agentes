@@ -158,7 +158,7 @@ if __name__ == '__main__':
         "contratante_endereco": "Rua Exemplo, 123, Cidade, Estado",
         "contratado_nome": "João Liborio",
         "contratado_cpf": "000.987.654-32",
-        "contratado_endereco": "Av. Teste, 456, Cidade, Estado",
+        "contratado_endereco": "Av. Teste, 4536, Cidade, Estado",
         "objeto_contrato": "Reparação de danos morais",
         "historico_peticao": "Maria Joaquina foi aprovada em concurso público para delegada.",
         "fatos_peticao": "João Liborio proferiu insultos públicos, chamando-a de 'charlatã', 'ladrona', 'discarada' e acusando-a de fraude em concurso.",

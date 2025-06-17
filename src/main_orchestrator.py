@@ -128,7 +128,7 @@ if __name__ == '__main__':
         "contratado": "João Liborio",
         "cpfContratado": "000.987.654-32",
         "cnpjContratado": None,
-        "enderecoContratado": "Av. Teste, 456, Cidade, Estado",
+        "enderecoContratado": "Av. Teste, 4056, Cidade, Estado",
         "objeto": "Reparação de danos morais",
         "valor": "R$ 16.000,00",
         "pagamento": None,
