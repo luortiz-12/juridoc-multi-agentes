@@ -205,7 +205,7 @@ if __name__ == '__main__':
             "historico_peticao": "Maria Joaquina foi aprovada em concurso público para delegada.",
             "fatos_peticao": "João Liborio proferiu insultos públicos, chamando-a de 'charlatã', 'ladrona', 'discarada' e acusando-a de fraude em concurso.",
             "pedido_peticao": "Indenização por danos morais no valor de R$ 16.000,00.",
-            "valor_causa_peticao": "R$ 16.000,00",
+            "valor_causa_peticao": "R$ 16.0000,00",
             "documentos_peticao": "Procuração, Diário Oficial do Estado do Ceará.",
             "base_legal_peticao": "Constituição Federal, Art. 5º, V e X; Código Civil, Art. 186, 927; Código Penal, Art. 138, 139, 140; Lei 12.550/2011.",
             "qualificacao_contrario_peticao": "nacionalidade, estado civil, portador do RG nº xxx, inscrito no CPF sob nº xxx, residente e domiciliado na cidade de xxx-xx",
