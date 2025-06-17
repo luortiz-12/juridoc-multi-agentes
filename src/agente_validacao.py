@@ -75,7 +75,7 @@ class AgenteValidacao:
 
 # Exemplo de uso (requer uma chave de API da OpenAI configurada como variável de ambiente OPENAI_API_KEY)
 if __name__ == '__main__':
-    api_key = "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" # Substitua ou use variável de ambiente
+    api_key = "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" # Substitua ou use variável de ambiente
 
     if not api_key or api_key == "sk-placeholder-key":
         print("Chave da API OpenAI não configurada. Defina a variável de ambiente OPENAI_API_KEY ou substitua no código.")
