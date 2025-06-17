@@ -5,10 +5,13 @@ import sys
 # Mensagem de debug para verificar se o script está sendo executado
 print("DEBUG: Script start.py iniciado.")
 
+# Obtém a porta da variável de ambiente 'PORT' fornecida pelo Render.
+# Usa 5000 como fallback para desenvolvimento local, se 'PORT' não estiver definida.
+port = os.environ.get("PORT", "5000")
+
 # Comando Gunicorn para iniciar a aplicação Flask
-# Certifique-se de que src.main:app está correto
-# e que a porta 5000 é a porta alvo configurada no EasyPanel
-command = ["gunicorn", "--bind", "0.0.0.0:5000", "src.main:app"]
+# Certifique-se de que src.main:app está correto e que a porta é dinâmica
+command = ["gunicorn", "--bind", f"0.0.0.0:{port}", "src.main:app"]
 
 try:
     # Executa o comando Gunicorn
@@ -22,4 +25,3 @@ except subprocess.CalledProcessError as e:
 except Exception as e:
     print(f"ERRO INESPERADO: {e}")
     sys.exit(1)
-
