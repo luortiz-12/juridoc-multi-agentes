@@ -5,9 +5,9 @@ Este script implementa o Agente de Validação, responsável por verificar a coe
 estrutura e formato do documento jurídico gerado, além de identificar erros.
 """
 
-import os # Importar os para acessar variáveis de ambiente
+import os
 import json
-import sys # Importar sys para sys.exit()
+import sys
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
@@ -17,7 +17,6 @@ class AgenteValidacao:
         # Mudei para gpt-4o-mini para melhor precisão na validação e aderência ao formato JSON
         self.llm = ChatOpenAI(model="gpt-4o-mini", openai_api_key=llm_api_key, temperature=0)
 
-        # Inicio do PromptTemplate (a parte que você forneceu)
         self.prompt_template = PromptTemplate(
             input_variables=["documento_gerado", "dados_processados", "analise_juridica"],
             template=
@@ -48,19 +47,22 @@ class AgenteValidacao:
             - **Se um problema for identificado, descreva-o e indique qual seção do documento (ou aspecto geral) precisa de melhoria.**
             - **Se o documento for reprovado por falta de jurisprudência ou fundamentação, seja explícito na sugestão.**
 
-            Retorne um JSON ESTRICTAMENTE VÁLIDO.
-            **NÃO INCLUA VÍRGULAS PENDENTES (TRAILING_COMMAS) EM LISTAS OU OBJETOS JSON.**
-            **O JSON deve seguir exatamente este formato:**
-            ```json
+            **REGRA DE OURO PARA A SAÍDA:**
+            Sua resposta DEVE ser um objeto JSON VÁLIDO e NADA MAIS.
+            NÃO escreva nenhum texto explicativo antes ou depois do JSON.
+            NÃO envolva o JSON em blocos de código Markdown como ```json.
+            Sua resposta deve começar DIRETAMENTE com o caractere `{` e terminar DIRETAMENTE com o caractere `}`.
+            
+            O JSON deve seguir estritamente este formato:
             {{
-                "status": "aprovado" ou "revisar", // "aprovado" se não houver problemas significativos; "revisar" caso contrário.
+                "status": "aprovado" ou "revisar",
                 "sugestoes_melhoria": [
-                    {{"secao": "Seção do documento (ex: 'Dos Fatos', 'Cláusula Terceira', 'Conclusão', 'Formatação HTML', 'Fundamentação Legal')", "descricao": "Descrição clara e concisa da sugestão de melhoria ou erro encontrado. Ex: 'Expandir o detalhamento dos fatos, incluindo mais contexto.', 'Adicionar jurisprudência do STJ sobre o tema X para a seção Do Direito.', 'Corrigir a tag </div> mal fechada na seção X'."}}
-                    // Adicione mais sugestões conforme necessário. Se aprovado, esta lista deve ser vazia.
+                    {{"secao": "Seção do documento", "descricao": "Descrição da sugestão de melhoria."}}
                 ]
             }}
-            ```
+            
             Se o status for "aprovado", a lista `sugestoes_melhoria` DEVE estar vazia.
+            NÃO inclua vírgulas pendentes (trailing commas).
             """
         ) # Fim do PromptTemplate
 
@@ -72,6 +74,7 @@ class AgenteValidacao:
         # Converter dicionários para strings JSON para o prompt
         dados_processados_str = json.dumps(dados_processados, indent=2, ensure_ascii=False)
         analise_juridica_str = json.dumps(analise_juridica, indent=2, ensure_ascii=False)
+        texto_gerado = "" # <-- ALTERAÇÃO: Inicializar a variável para o bloco except
 
         try:
             resultado_llm = self.chain.invoke({
@@ -82,7 +85,23 @@ class AgenteValidacao:
             
             texto_gerado = resultado_llm["text"]
 
-            validacao_resultado = json.loads(texto_gerado)
+            # --- ALTERAÇÃO: Pós-processamento defensivo para limpar a saída do LLM ---
+            # Remove espaços em branco no início/fim
+            texto_limpo = texto_gerado.strip()
+            
+            # Se encontrar o marcador de início de markdown, remove ele e o que vem antes
+            if '```json' in texto_limpo:
+                texto_limpo = texto_limpo.split('```json', 1)[-1]
+            
+            # Se encontrar o marcador de fim de markdown, remove ele e o que vem depois
+            if '```' in texto_limpo:
+                texto_limpo = texto_limpo.split('```', 1)[0]
+                
+            # Remove novamente espaços em branco que possam ter sobrado
+            texto_limpo = texto_limpo.strip()
+            # --- FIM DA ALTERAÇÃO ---
+
+            validacao_resultado = json.loads(texto_limpo) # <-- ALTERAÇÃO: Usa o texto limpo
             return validacao_resultado
         except json.JSONDecodeError as e:
             print(f"Erro ao decodificar JSON da saída do LLM no Agente de Validação: {e}")
@@ -91,7 +110,7 @@ class AgenteValidacao:
             return {"erro": "Falha na validação (JSON inválido)", "detalhes": str(e), "saida_llm": texto_gerado}
         except Exception as e:
             print(f"Erro inesperado no Agente de Validação: {e}")
-            return {"erro": "Falha inesperada na validação", "detalhes": str(e), "saida_llm": ""}
+            return {"erro": "Falha inesperada na validação", "detalhes": str(e), "saida_llm": texto_gerado}
 
 
 # Exemplo de uso (requer uma chave de API da OpenAI configurada como variável de ambiente OPENAI_API_KEY)
@@ -113,4 +132,6 @@ if __name__ == '__main__':
 
     EXCELENTÍSSIMO SENHOR JUIZ DE DIREITO DA XXX VARA CÍVEL DA COMARCA DE CIDADE– ESTADO
 
-    <p>Maria Joaquina, nacionalidade, estado civil, portador do RG nº xxxx, inscrito no CPF sob nº xxx, domiciliada na cidade de xxx, Estado de xxx, vem, respeitosamente, à presença de Vossa Excelência, por seu advogado que ao final subscreve – procuração anexa (DOC. 01) –, com fulcro na Constituição Federal, nos artigos"""
+    <p>Maria Joaquina, nacionalidade, estado civil, portador do RG nº xxxx, inscrito no CPF sob nº xxx, domiciliada na cidade de xxx, Estado de xxx, vem, respeitosamente, à presença de Vossa Excelência, por seu advogado que ao final subscreve – procuração anexa (DOC. 01) –, com fulcro na Constituição Federal, nos artigos</p>""" # <-- ALTERAÇÃO: Fechei a string corretamente
+
+    # ... (O restante do seu bloco de teste, se houver, continuaria aqui)
