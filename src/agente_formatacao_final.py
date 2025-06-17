@@ -135,7 +135,7 @@ EXCELENTÍSSIMO SENHOR JUIZ DE DIREITO DA XXX VARA CÍVEL DA COMARCA DE CIDADE�
 
 <h2>DOS FATOS</h2>
 <p>Em 30 de abril de 2021 a requerente, em comemoração a aprovação no concurso público de delegada da policia civil do estado do Ceará, estava com amigos e familiares em um restaurante.</p>
-<p>Momentos depois, João Liborio, diante das pessoas presentes no local, sem motivo ou razão aparente, se aproximou de Maria Joaquina e proferiu insultos, alegando, que “ Maria Joaquina tinha passado em tal concurso pois fraudou a prova”.</p>
+<p>Momentos depois, João Liborino, diante das pessoas presentes no local, sem motivo ou razão aparente, se aproximou de Maria Joaquina e proferiu insultos, alegando, que “ Maria Joaquina tinha passado em tal concurso pois fraudou a prova”.</p>
 <p>Em alto tom de voz, João Liborio chamou a requerente de “exibida”, “charlatã”, “ladrona” e “discarada”.</p>
 <p>Ocorre que, Maria constrangida com os insultos proferidos na frente de toda a sua família e de todo o restaurante, a mesma pagou a conta e se retirou do estabelecimento de forma discreta junto de seus familiares.</p>
 

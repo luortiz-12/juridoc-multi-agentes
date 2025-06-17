@@ -23,7 +23,7 @@ raw_input_data = {
         "cnpjContratante": "12.345.678/0001-99",
         "enderecoContratante": "Rua das Palmeiras, 123, São Paulo, SP",
         "contratado": "João Desenvolvedor",
-        "cpfContratado": "111.222.323-44",
+        "cpfContratado": "111.222.333-44",
         "cnpjContratado": None,
         "enderecoContratado": "Av. Principal, 456, Rio de Janeiro, RJ",
         "objeto": "Desenvolvimento de um aplicativo mobile para gerenciamento de tarefas.",
