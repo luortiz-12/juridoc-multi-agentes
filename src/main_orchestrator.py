@@ -4,10 +4,9 @@ import os
 import json
 import sys
 
-# --- ALTERAÇÃO: Imports diretos e simples ---
-# Como o Gunicorn agora roda de dentro da pasta 'src', não precisamos de prefixos.
+# Importações diretas, agora com o nome do arquivo de validação CORRETO
 from agente_coletor_dados import AgenteColetorDados
-from agente_validador import AgenteValidador
+from agente_validacao import AgenteValidador # <-- CORREÇÃO DA DIGITAÇÃO: validacao com 'c'
 from agente_formatacao_final import AgenteFormatacaoFinal
 from agente_tecnico_contrato import AgenteTecnicoContrato
 from agente_redator_contrato import AgenteRedatorContrato
@@ -20,11 +19,15 @@ from agente_redator_estudo_caso import AgenteRedatorEstudoCaso
 
 
 class Orquestrador:
+    """
+    Orquestra o fluxo de trabalho completo, roteando tarefas para
+    agentes especialistas com base no tipo de documento.
+    """
     def __init__(self, openai_api_key):
-        # A instanciação dos agentes permanece a mesma
+        # Instanciação de todos os agentes
         self.coletor = AgenteColetorDados(llm_api_key=openai_api_key)
         self.validador = AgenteValidador(llm_api_key=openai_api_key)
-        # ... (resto do seu código __init__ permanece igual) ...
+        self.formatador = AgenteFormatacaoFinal()
         self.tecnico_contrato = AgenteTecnicoContrato(llm_api_key=openai_api_key)
         self.redator_contrato = AgenteRedatorContrato(llm_api_key=openai_api_key)
         self.tecnico_peticao = AgenteTecnicoPeticao(llm_api_key=openai_api_key)
@@ -33,13 +36,11 @@ class Orquestrador:
         self.redator_parecer = AgenteRedatorParecer(llm_api_key=openai_api_key)
         self.tecnico_estudo_caso = AgenteTecnicoEstudoCaso(llm_api_key=openai_api_key)
         self.redator_estudo_caso = AgenteRedatorEstudoCaso(llm_api_key=openai_api_key)
-        self.formatador = AgenteFormatacaoFinal()
+
 
     def gerar_documento(self, raw_input_data: dict) -> dict:
-        # A lógica interna do gerar_documento permanece a mesma que já construímos.
-        # ... (código do método gerar_documento) ...
+        # A lógica interna do método gerar_documento permanece a mesma.
         print("\n--- Iniciando Geração de Documento com Arquitetura de Especialistas ---")
-        print("Executando Agente Coletor de Dados...")
         dados_processados = self.coletor.coletar_e_processar(raw_input_data)
         if dados_processados.get("erro"):
             return {"status": "erro", "mensagem": "Falha na coleta de dados", "detalhes": dados_processados}
@@ -62,7 +63,7 @@ class Orquestrador:
         else:
             return {"status": "erro", "mensagem": f"Tipo de documento '{tipo_documento}' não suportado pela arquitetura de especialistas."}
         print(f"Roteado para especialistas de '{tipo_documento}'.")
-        print(f"Executando Agente Técnico Especialista...")
+        print("Executando Agente Técnico Especialista...")
         analise_juridica = agente_tecnico_usado.analisar_dados(dados_processados)
         if analise_juridica.get("erro"):
             return {"status": "erro", "mensagem": "Falha na análise jurídica especialista", "detalhes": analise_juridica}
