@@ -14,16 +14,15 @@ from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.tools import tool
 
-# (As ferramentas e a base de dados jurídica permanecem as mesmas, omitidas aqui para brevidade)
-# ... (base_dados_juridica, @tool functions) ...
+# (As ferramentas e a base de dados jurídica permanecem as mesmas)
+# ...
 
 class AgenteJuridicoTecnico:
     def __init__(self, llm_api_key):
         self.llm = ChatOpenAI(model="gpt-4o-mini", openai_api_key=llm_api_key, temperature=0)
         
-        # (A lista de ferramentas permanece a mesma)
         self.tools = [
-            # buscar_legislacao_lexml, ...
+            # ... (lista de ferramentas) ...
         ]
 
         self.prompt_template = PromptTemplate(
@@ -48,7 +47,7 @@ class AgenteJuridicoTecnico:
             Sua resposta DEVE ser um objeto JSON VÁLIDO e NADA MAIS.
             NÃO escreva nenhum texto explicativo antes ou depois do JSON.
             NÃO envolva o JSON em blocos de código Markdown como ```json.
-            Sua resposta deve começar DIRETAMENTE com o caractere `{` e terminar DIRETAMENTE com o caractere `}`.
+            Sua resposta deve começar DIRETAMENTE com o caractere `{{` e terminar DIRETAMENTE com o caractere `}}`.
             
             O JSON deve seguir estritamente este formato:
             {{
@@ -63,22 +62,17 @@ class AgenteJuridicoTecnico:
             NÃO inclua vírgulas pendentes (trailing commas).
             ---
             """
-        ) # <-- ALTERAÇÃO 1: Prompt corrigido e reforçado.
+        )
 
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
 
     def analisar_dados(self, tipo_documento: str, dados_processados: dict) -> dict:
-        """Analisa os dados processados e identifica os fundamentos jurídicos."""
-        
         dados_processados_str = json.dumps(dados_processados, ensure_ascii=False)
-
-        # (A lógica de simulação das ferramentas permanece a mesma)
         informacoes_ferramentas = ""
-        # ... (if "código civil" in ..., if "danos morais" in ...) ...
-        
+        # ... (lógica de simulação de ferramentas) ...
         dados_para_prompt = f"{dados_processados_str}{informacoes_ferramentas}"
         
-        texto_gerado = "" # <-- ALTERAÇÃO 2: Inicializa a variável.
+        texto_gerado = ""
 
         try:
             resultado_llm = self.chain.invoke({
@@ -88,16 +82,14 @@ class AgenteJuridicoTecnico:
             
             texto_gerado = resultado_llm["text"]
 
-            # --- ALTERAÇÃO 3: Adicionado o pós-processamento defensivo ---
             texto_limpo = texto_gerado.strip()
             if '```json' in texto_limpo:
                 texto_limpo = texto_limpo.split('```json', 1)[-1]
             if '```' in texto_limpo:
                 texto_limpo = texto_limpo.split('```', 1)[0]
             texto_limpo = texto_limpo.strip()
-            # --- FIM DA LIMPEZA ---
             
-            analise_juridica = json.loads(texto_limpo) # Usa o texto limpo
+            analise_juridica = json.loads(texto_limpo)
             return analise_juridica
             
         except json.JSONDecodeError as e:
@@ -105,9 +97,8 @@ class AgenteJuridicoTecnico:
             print(f"Saída do LLM que causou o erro: {texto_gerado}")
             return {"erro": "Falha na análise jurídica", "detalhes": str(e), "saida_llm": texto_gerado}
         
-        except Exception as e: # Captura outras exceções inesperadas
+        except Exception as e:
             print(f"Erro inesperado no Agente Jurídico Técnico: {e}")
             return {"erro": "Falha inesperada na análise jurídica", "detalhes": str(e), "saida_llm": texto_gerado}
 
-# (O bloco 'if __name__ == "__main__":' permanece o mesmo, omitido para brevidade)
-# ... (código de teste) ...
+# (O bloco 'if __name__ == "__main__":' permanece o mesmo)

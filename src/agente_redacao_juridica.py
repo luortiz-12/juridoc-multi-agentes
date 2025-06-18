@@ -16,7 +16,6 @@ class AgenteRedacaoJuridica:
     def __init__(self, llm_api_key):
         self.llm = ChatOpenAI(model="gpt-4o-mini", openai_api_key=llm_api_key, temperature=0.2)
 
-        # <-- ALTERAÇÃO 1: Otimização e Refatoração ---
         # O prompt e o chain são criados UMA VEZ no construtor para máxima eficiência.
         prompt_template_base = """
             Você é um redator jurídico altamente qualificado, com vasta experiência na elaboração de documentos jurídicos no Brasil.
@@ -47,27 +46,54 @@ class AgenteRedacaoJuridica:
         )
 
         self.chain = LLMChain(llm=self.llm, prompt=prompt)
-        # --- FIM DA ALTERAÇÃO 1 ---
 
         # As instruções específicas agora são apenas atributos de string da classe
         self.instrucoes_peticao = """
             **Instruções Específicas para a Petição Inicial:**
-            1.  **Cabeçalho:** Inicie com "EXCELENTÍSSIMO SENHOR JUIZ DE DIREITO DA ... VARA ... DA COMARCA DE ...".
+            1.  **Cabeçalho:** Inicie com "EXCELENTÍSSIMO SENHOR JUIZ DE DIREITO DA [NÚMERO] VARA [TIPO DE VARA, ex: CÍVEL] DA COMARCA DE [CIDADE]– [ESTADO]".
             2.  **Qualificação das Partes:** Qualifique completamente o Requerente e o Requerido.
-            ... (restante das instruções) ...
+            3.  **Fundamentação Legal (com fulcro):** Cite artigos e leis relevantes usando "com fulcro na..." conforme a análise jurídica.
+            4.  **Título da Ação:** Defina o título da ação (ex: AÇÃO DE REPARAÇÃO DE DANOS MORAIS).
+            5.  **Dos Fatos:** Descreva os fatos de forma clara, concisa e cronológica.
+            6.  **Do Direito:** Desenvolva a argumentação jurídica, aplicando os fundamentos legais aos fatos.
+            7.  **Dos Danos (se aplicável):** Detalhe os danos sofridos (morais, materiais).
+            8.  **Da Quantia Devida (se aplicável):** Justifique o valor da indenização.
+            9.  **Dos Pedidos:** Liste os pedidos de forma clara e numerada (1., 2., etc.). Inclua citação, condenação (se for o caso), custas e honorários.
+            10. **Das Provas:** Cláusula padrão de protesto por todos os meios de prova.
+            11. **Do Valor da Causa:** Indique o valor da causa.
+            12. **Fechamento:** "Termos em que Pede Deferimento. [Local, data, ano]. Advogado OAB".
         """
         self.instrucoes_contrato = """
             **Instruções Específicas para o Contrato:**
-            1.  **Título:** O título do contrato deve ser o 'tipo_contrato', em maiúsculas.
+            1.  **Título:** O título do contrato deve ser o 'tipo_contrato' dos dados processados, em maiúsculas (ex: CONTRATO DE PRESTAÇÃO DE SERVIÇOS).
             2.  **Qualificação das Partes:** Qualifique completamente o CONTRATANTE e o CONTRATADO.
-            ... (restante das instruções) ...
+            3.  **Cláusulas:** Use "CLÁUSULA" para seções principais (CLÁUSULA PRIMEIRA), e numeração hierárquica para subcláusulas (1.1, 1.2).
+            4.  **Objeto do Contrato:** Descreva detalhadamente.
+            5.  **Valor e Forma de Pagamento:** Detalhe o valor e as condições.
+            6.  **Prazos de Vigência:** Especifique prazos.
+            7.  **Responsabilidades das Partes:** Descreva as responsabilidades.
+            8.  **Penalidades por Descumprimento:** Inclua penalidades.
+            9.  **Foro de Eleição:** Adicione cláusula final para o foro.
+            10. **Referências Legais:** Inclua referências legais específicas (ex.: artigos do Código Civil) sempre que aplicável, conforme a análise jurídica.
         """
-        self.instrucoes_parecer = "..." # Mantenha as instruções aqui
-        self.instrucoes_estudo = "..." # Mantenha as instruções aqui
+        self.instrucoes_parecer = """
+            **Instruções Específicas para o Parecer Jurídico:**
+            - **Título:** PARECER JURÍDICO.
+            - **Estrutura:** Identificação do Documento (SOLICITANTE, ASSUNTO), Consulta, Legislação Aplicável, Análise Jurídica, Conclusão.
+            - **Linguagem:** Formal e técnica.
+            - Inclua fundamentação jurídica (lei, doutrina, jurisprudência) de forma coesa.
+            - Não inclua "Observação" no final.
+        """
+        self.instrucoes_estudo = """
+            **Instruções Específicas para o Estudo de Caso Jurídico:**
+            - **Título:** ESTUDO DE CASO JURÍDICO.
+            - **Estrutura:** Título do Caso, Descrição do Caso, Contexto Jurídico, Pontos Relevantes, Análise do Caso, Conclusão (mínimo 3 parágrafos, com jurisprudência).
+            - **Linguagem:** Formal, objetiva, com destaque para termos jurídicos em MAIÚSCULAS e Negrito (se o LLM suportar).
+            - Inclua citações de leis, artigos, princípios, jurisprudência e doutrina.
+        """
 
     def _format_data_for_prompt(self, data: dict) -> str:
         """Formata um dicionário para uma string legível pelo LLM, ignorando valores None/vazios."""
-        # Este método auxiliar já estava bom e foi mantido.
         formatted_parts = []
         for key, value in data.items():
             if value is None or (isinstance(value, str) and not value.strip()):
@@ -80,9 +106,6 @@ class AgenteRedacaoJuridica:
 
     def redigir_documento(self, tipo_documento: str, dados_processados: dict, analise_juridica: dict) -> dict:
         """Redige o documento jurídico. Retorna um dicionário com 'documento' ou 'erro'."""
-        
-        # <-- ALTERAÇÃO 2: Lógica simplificada ---
-        # Apenas seleciona as instruções corretas. Não recria o chain.
         instrucoes_map = {
             "peticao": self.instrucoes_peticao,
             "contrato": self.instrucoes_contrato,
@@ -93,7 +116,6 @@ class AgenteRedacaoJuridica:
 
         if not instrucoes_especificas:
             return {"documento": None, "erro": f"Tipo de documento '{tipo_documento}' não suportado para redação."}
-        # --- FIM DA ALTERAÇÃO 2 ---
 
         dados_processados_formatados = self._format_data_for_prompt(dados_processados)
         analise_juridica_formatada = self._format_data_for_prompt(analise_juridica)
@@ -107,14 +129,12 @@ class AgenteRedacaoJuridica:
             
             texto_gerado = resultado_llm["text"]
 
-            # --- ALTERAÇÃO 3: Pós-processamento defensivo para HTML ---
             texto_limpo = texto_gerado.strip()
             if texto_limpo.startswith("```html"):
                 texto_limpo = texto_limpo[7:]
             if texto_limpo.endswith("```"):
                 texto_limpo = texto_limpo[:-3]
             texto_limpo = texto_limpo.strip()
-            # --- FIM DA ALTERAÇÃO 3 ---
             
             return {"documento": texto_limpo, "erro": None}
 
@@ -122,21 +142,5 @@ class AgenteRedacaoJuridica:
             print(f"Erro ao invocar LLM na Redação Jurídica: {e}")
             return {"documento": None, "erro": f"Falha na invocação do LLM para redação: {e}"}
 
-# (O bloco 'if __name__ == "__main__":' precisará de um pequeno ajuste para lidar com o novo formato de retorno)
-if __name__ == '__main__':
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        print("Erro: Chave da API OpenAI (OPENAI_API_KEY) não configurada.")
-        sys.exit(1)
-
-    redator = AgenteRedacaoJuridica(llm_api_key=api_key)
-    # ... (dados de exemplo permanecem os mesmos) ...
-
-    print("\n--- Redação da Petição ---")
-    resultado_peticao = redator.redigir_documento(
-        # ... (argumentos) ...
-    )
-    if resultado_peticao["erro"]:
-        print(f"Erro ao gerar petição: {resultado_peticao['erro']}")
-    else:
-        print(resultado_peticao["documento"])
+# (O bloco 'if __name__ == "__main__":' permanece o mesmo, mas lembre-se que ele precisa
+# ser ajustado para lidar com o dicionário retornado, como fizemos no script de teste completo)
