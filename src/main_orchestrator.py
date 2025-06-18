@@ -4,19 +4,24 @@ import os
 import json
 import sys
 
-# --- IMPORTAÇÕES DA NOVA ARQUITETURA ---
-# Importamos os agentes de suporte genéricos
+# Importações relativas para a nova arquitetura
 from .agente_coletor_dados import AgenteColetorDados
 from .agente_validador import AgenteValidador
 from .agente_formatacao_final import AgenteFormatacaoFinal
 
-# Importamos todos os 8 novos agentes especialistas
+# Especialistas de Contrato
 from .agente_tecnico_contrato import AgenteTecnicoContrato
 from .agente_redator_contrato import AgenteRedatorContrato
+
+# Especialistas de Petição
 from .agente_tecnico_peticao import AgenteTecnicoPeticao
 from .agente_redator_peticao import AgenteRedatorPeticao
+
+# Especialistas de Parecer
 from .agente_tecnico_parecer import AgenteTecnicoParecer
 from .agente_redator_parecer import AgenteRedatorParecer
+
+# Especialistas de Estudo de Caso
 from .agente_tecnico_estudo_caso import AgenteTecnicoEstudoCaso
 from .agente_redator_estudo_caso import AgenteRedatorEstudoCaso
 
@@ -27,26 +32,23 @@ class Orquestrador:
     agentes especialistas com base no tipo de documento.
     """
     def __init__(self, openai_api_key):
-        # --- INSTANCIAÇÃO DE TODOS OS AGENTES ---
+        # Instanciação de todos os agentes
         
         # Agentes de Suporte (Genéricos)
         self.coletor = AgenteColetorDados(llm_api_key=openai_api_key)
         self.validador = AgenteValidador(llm_api_key=openai_api_key)
         self.formatador = AgenteFormatacaoFinal()
 
-        # Agentes Especialistas de Contrato
+        # Agentes Especialistas
         self.tecnico_contrato = AgenteTecnicoContrato(llm_api_key=openai_api_key)
         self.redator_contrato = AgenteRedatorContrato(llm_api_key=openai_api_key)
         
-        # Agentes Especialistas de Petição
         self.tecnico_peticao = AgenteTecnicoPeticao(llm_api_key=openai_api_key)
         self.redator_peticao = AgenteRedatorPeticao(llm_api_key=openai_api_key)
 
-        # Agentes Especialistas de Parecer
         self.tecnico_parecer = AgenteTecnicoParecer(llm_api_key=openai_api_key)
         self.redator_parecer = AgenteRedatorParecer(llm_api_key=openai_api_key)
 
-        # Agentes Especialistas de Estudo de Caso
         self.tecnico_estudo_caso = AgenteTecnicoEstudoCaso(llm_api_key=openai_api_key)
         self.redator_estudo_caso = AgenteRedatorEstudoCaso(llm_api_key=openai_api_key)
 
@@ -111,4 +113,23 @@ class Orquestrador:
             if resultado_validacao.get("erro"):
                 return {"status": "erro", "mensagem": "Falha na validação do documento", "detalhes": resultado_validacao}
             
-            if
+            if resultado_validacao.get("status") == "aprovado":
+                print("Documento APROVADO pelo Agente de Validação.")
+                break
+            else:
+                sugestoes = resultado_validacao.get("sugestoes_melhoria", [])
+                print(f"Documento requer revisão. Sugestões: {sugestoes}")
+                analise_juridica["sugestoes_revisao"] = sugestoes
+                if tentativa == max_tentativas - 1:
+                    print("Documento não aprovado após múltiplas tentativas.")
+
+        if resultado_validacao.get("status") != "aprovado":
+            return {"status": "erro", "mensagem": "Documento não aprovado após múltiplas tentativas de revisão.", "detalhes": resultado_validacao}
+
+        # 5. Formatação Final (Genérico)
+        print("Executando Agente de Formatação Final...")
+        documento_final_html = self.formatador.formatar_documento(documento_gerado, dados_processados)
+        print("Documento final formatado com sucesso.")
+
+        print("--- Geração de Documento Concluída ---")
+        return {"status": "sucesso", "documento_html": documento_final_html}
