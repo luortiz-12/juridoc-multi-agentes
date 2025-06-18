@@ -1,4 +1,4 @@
-# agente_validacao.py
+# agente_validador.py
 
 import os
 import json
@@ -7,7 +7,11 @@ from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
 
-class AgenteValidacao:
+class AgenteValidador:
+    """
+    Agente de validação aprimorado que usa critérios específicos
+    com base no tipo de documento para garantir a qualidade.
+    """
     def __init__(self, llm_api_key):
         self.llm = ChatOpenAI(model="gpt-4o-mini", openai_api_key=llm_api_key, temperature=0)
 
@@ -26,7 +30,7 @@ class AgenteValidacao:
             **INSTRUÇÕES DE VALIDAÇÃO GERAL (Aplicar a todos):**
             1.  **Coerência:** Os fatos, fundamentos e pedidos/cláusulas estão alinhados?
             2.  **Completude:** Todas as informações essenciais dos dados originais foram incluídas no documento?
-            3.  **Placeholders:** O documento contém placeholders como '[data]', '[nome]' ou seções vazias que deveriam ter sido preenchidas? (Isto é um erro grave).
+            3.  **Placeholders:** O documento contém placeholders como '[data]', '[local]', '[nome do advogado]' ou seções vazias que deveriam ter sido preenchidas? (Isto é um erro grave).
             4.  **Formato HTML:** O HTML parece ser válido? (Não precisa ser uma análise profunda).
 
             **INSTRUÇÕES DE VALIDAÇÃO ESPECÍFICA (Aplicar conforme o tipo):**
@@ -44,7 +48,7 @@ class AgenteValidacao:
                     {{"secao": "Seção ou Aspecto a Melhorar", "descricao": "Descrição clara e acionável da sugestão ou erro encontrado."}}
                 ]
             }}
-            Se o status for "aprovado", a lista `sugestoes_melhoria` DEVE ser vazia.
+            Se o status for "aprovado", a lista `sugestoes_melhoria` DEVE estar vazia.
             """
         )
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
