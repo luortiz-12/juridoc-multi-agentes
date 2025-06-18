@@ -1,22 +1,43 @@
-import os
+# src/main.py
+
 from flask import Flask
-from src.routes.juridoc import juridoc_bp # Importa o Blueprint do seu arquivo juridoc.py
+from flask_cors import CORS
+import os # Adicionado o import de os para o bloco de teste local
 
-print("DEBUG: Iniciando a aplicação Flask...")
+# --- Usando Import Relativo ---
+# O '.' indica para importar de uma subpasta do pacote atual 'src'.
+from .routes.juridoc import juridoc_bp
 
-app = Flask(__name__)
+def create_app():
+    """
+    Cria e configura uma instância da aplicação Flask.
+    Este é o padrão 'Application Factory', uma boa prática em Flask.
+    """
+    print("DEBUG: Criando a instância da aplicação Flask...")
+    
+    app = Flask(__name__)
+    
+    # Habilita o CORS para todas as rotas da aplicação de forma global.
+    CORS(app)
 
-# Registra o Blueprint 'juridoc_bp' na aplicação Flask
-# Todas as rotas definidas em juridoc_bp (como /gerar-documento e /status)
-# serão acessíveis sob o prefixo /api/juridoc.
-app.register_blueprint(juridoc_bp, url_prefix='/api/juridoc')
+    # --- Registro Simplificado do Blueprint ---
+    # O url_prefix já está definido no próprio blueprint.
+    app.register_blueprint(juridoc_bp)
 
-# A rota /api/juridoc/status que existia diretamente aqui foi removida
-# para evitar duplicação, já que ela agora é fornecida pelo Blueprint.
+    @app.route("/")
+    def index():
+        # Rota raiz apenas para confirmar que o serviço está no ar
+        return "Serviço JuriDoc no ar. Acesse os endpoints em /api/juridoc"
 
-# Exemplo de como rodar a aplicação localmente (opcional, para testes de desenvolvimento)
+    return app
+
+# A variável 'app' é o que o Gunicorn procura para iniciar.
+app = create_app()
+
+
+# --- ESTE BLOCO FOI MANTIDO ---
+# A lógica abaixo é para testes locais e não é usada pelo Render, mas é importante mantê-la.
 if __name__ == '__main__':
-    # No ambiente de produção (Render), o Gunicorn é quem iniciará a aplicação.
-    # Esta parte é mais para testar localmente.
+    # Define a porta para o servidor de desenvolvimento local
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
