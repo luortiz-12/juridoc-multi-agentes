@@ -18,23 +18,26 @@ class AgenteRedacaoJuridica:
 
         # O prompt e o chain são criados UMA VEZ no construtor para máxima eficiência.
         prompt_template_base = """
-            Você é um redator jurídico altamente qualificado, com vasta experiência na elaboração de documentos jurídicos no Brasil.
-            Sua tarefa é redigir um documento jurídico completo e formal, utilizando os dados fornecidos e os fundamentos jurídicos identificados.
+    Você é um redator jurídico altamente qualificado, com vasta experiência na elaboração de documentos jurídicos no Brasil.
 
-            **Dados Processados (do Agente Coletor):**
-            {dados_processados_formatados}
+    **INSTRUÇÃO MAIS IMPORTANTE:** Se o campo 'Sugestoes Revisao' dentro da 'Análise Jurídica' for fornecido, sua tarefa principal é REVISAR o documento anterior aplicando OBRIGATORIAMENTE todas as sugestões listadas. A revisão tem prioridade máxima sobre a redação inicial. Se não houver sugestões, sua tarefa é redigir um novo documento.
 
-            **Análise Jurídica (do Agente Jurídico Técnico):**
-            {analise_juridica_formatada}
+    Sua tarefa é redigir um documento jurídico completo e formal, utilizando os dados fornecidos e os fundamentos jurídicos identificados.
 
-            **Instruções Gerais para Redação:**
-            - Mantenha a linguagem formal, técnica e jurídica.
-            - Evite repetições e seja conciso.
-            - **IMPORTANTE:** Ao referenciar dados, inclua APENAS os campos que têm valor. Se um dado não estiver disponível, omita-o.
-            - **Formato de Saída:** O documento deve ser retornado como HTML puro, sem tags `<html>`, `<body>`, ou blocos de código markdown (e.g., ```html`). O conteúdo deve começar diretamente pelo título `<h1>`.
+    **Dados Processados (do Agente Coletor):**
+    {dados_processados_formatados}
 
-            {instrucoes_especificas_tipo}
-        """
+    **Análise Jurídica (do Agente Jurídico Técnico, pode conter sugestões de revisão):**
+    {analise_juridica_formatada}
+
+    **Instruções Gerais para Redação:**
+    - Mantenha a linguagem formal, técnica e jurídica.
+    - Evite repetições e seja conciso.
+    - **IMPORTANTE:** Ao referenciar dados, inclua APENAS os campos que têm valor. Se um dado não estiver disponível, omita-o.
+    - **Formato de Saída:** O documento deve ser retornado como HTML puro, sem tags `<html>`, `<body>`, ou blocos de código markdown (e.g., ```html`). O conteúdo deve começar diretamente pelo título `<h1>`.
+
+    {instrucoes_especificas_tipo}
+"""
 
         prompt = PromptTemplate(
             input_variables=[
