@@ -4,71 +4,48 @@ import os
 import json
 import sys
 
-# Importações relativas para a nova arquitetura
-from .agente_coletor_dados import AgenteColetorDados
-from .agente_validador import AgenteValidador
-from .agente_formatacao_final import AgenteFormatacaoFinal
-
-# Especialistas de Contrato
-from .agente_tecnico_contrato import AgenteTecnicoContrato
-from .agente_redator_contrato import AgenteRedatorContrato
-
-# Especialistas de Petição
-from .agente_tecnico_peticao import AgenteTecnicoPeticao
-from .agente_redator_peticao import AgenteRedatorPeticao
-
-# Especialistas de Parecer
-from .agente_tecnico_parecer import AgenteTecnicoParecer
-from .agente_redator_parecer import AgenteRedatorParecer
-
-# Especialistas de Estudo de Caso
-from .agente_tecnico_estudo_caso import AgenteTecnicoEstudoCaso
-from .agente_redator_estudo_caso import AgenteRedatorEstudoCaso
+# --- ALTERAÇÃO: Usando imports absolutos a partir de 'src' ---
+from src.agente_coletor_dados import AgenteColetorDados
+from src.agente_validador import AgenteValidador
+from src.agente_formatacao_final import AgenteFormatacaoFinal
+from src.agente_tecnico_contrato import AgenteTecnicoContrato
+from src.agente_redator_contrato import AgenteRedatorContrato
+from src.agente_tecnico_peticao import AgenteTecnicoPeticao
+from src.agente_redator_peticao import AgenteRedatorPeticao
+from src.agente_tecnico_parecer import AgenteTecnicoParecer
+from src.agente_redator_parecer import AgenteRedatorParecer
+from src.agente_tecnico_estudo_caso import AgenteTecnicoEstudoCaso
+from src.agente_redator_estudo_caso import AgenteRedatorEstudoCaso
 
 
 class Orquestrador:
-    """
-    Orquestra o fluxo de trabalho completo, roteando tarefas para
-    agentes especialistas com base no tipo de documento.
-    """
     def __init__(self, openai_api_key):
-        # Instanciação de todos os agentes
-        
-        # Agentes de Suporte (Genéricos)
+        # A instanciação dos agentes permanece a mesma
         self.coletor = AgenteColetorDados(llm_api_key=openai_api_key)
         self.validador = AgenteValidador(llm_api_key=openai_api_key)
-        self.formatador = AgenteFormatacaoFinal()
-
-        # Agentes Especialistas
+        # ... (resto do seu código __init__ permanece igual) ...
         self.tecnico_contrato = AgenteTecnicoContrato(llm_api_key=openai_api_key)
         self.redator_contrato = AgenteRedatorContrato(llm_api_key=openai_api_key)
-        
         self.tecnico_peticao = AgenteTecnicoPeticao(llm_api_key=openai_api_key)
         self.redator_peticao = AgenteRedatorPeticao(llm_api_key=openai_api_key)
-
         self.tecnico_parecer = AgenteTecnicoParecer(llm_api_key=openai_api_key)
         self.redator_parecer = AgenteRedatorParecer(llm_api_key=openai_api_key)
-
         self.tecnico_estudo_caso = AgenteTecnicoEstudoCaso(llm_api_key=openai_api_key)
         self.redator_estudo_caso = AgenteRedatorEstudoCaso(llm_api_key=openai_api_key)
-
+        self.formatador = AgenteFormatacaoFinal()
 
     def gerar_documento(self, raw_input_data: dict) -> dict:
+        # A lógica interna do gerar_documento permanece a mesma que já construímos.
+        # ... (código do método gerar_documento) ...
         print("\n--- Iniciando Geração de Documento com Arquitetura de Especialistas ---")
-
-        # 1. Coleta de Dados (Genérico)
         print("Executando Agente Coletor de Dados...")
         dados_processados = self.coletor.coletar_e_processar(raw_input_data)
         if dados_processados.get("erro"):
             return {"status": "erro", "mensagem": "Falha na coleta de dados", "detalhes": dados_processados}
         print("Dados coletados e processados com sucesso.")
-
         tipo_documento = dados_processados.get("tipo_documento", "").lower().strip()
-
-        # 2. Roteamento Inteligente para Especialistas
         agente_tecnico_usado = None
         agente_redator_usado = None
-
         if tipo_documento == "contrato":
             agente_tecnico_usado = self.tecnico_contrato
             agente_redator_usado = self.redator_contrato
@@ -83,36 +60,26 @@ class Orquestrador:
             agente_redator_usado = self.redator_estudo_caso
         else:
             return {"status": "erro", "mensagem": f"Tipo de documento '{tipo_documento}' não suportado pela arquitetura de especialistas."}
-
         print(f"Roteado para especialistas de '{tipo_documento}'.")
-
-        # 3. Análise Jurídica (Especialista)
         print(f"Executando Agente Técnico Especialista...")
         analise_juridica = agente_tecnico_usado.analisar_dados(dados_processados)
         if analise_juridica.get("erro"):
             return {"status": "erro", "mensagem": "Falha na análise jurídica especialista", "detalhes": analise_juridica}
         print("Análise jurídica especialista concluída.")
-
-        # 4. Loop de Redação (Especialista) e Validação (Genérico Aprimorado)
         documento_gerado = ""
         resultado_validacao = {}
         max_tentativas = 3
         for tentativa in range(max_tentativas):
             print(f"Executando Agente Redator Especialista (Tentativa {tentativa + 1}/{max_tentativas})...")
             resultado_redacao = agente_redator_usado.redigir_documento(dados_processados, analise_juridica)
-            
             if resultado_redacao.get("erro"):
                 return {"status": "erro", "mensagem": "Falha na redação especialista", "detalhes": resultado_redacao}
-            
             documento_gerado = resultado_redacao.get("documento", "")
             print("Documento preliminar redigido pelo especialista.")
-
             print("Executando Agente de Validação...")
             resultado_validacao = self.validador.validar_documento(documento_gerado, dados_processados, analise_juridica, tipo_documento)
-            
             if resultado_validacao.get("erro"):
                 return {"status": "erro", "mensagem": "Falha na validação do documento", "detalhes": resultado_validacao}
-            
             if resultado_validacao.get("status") == "aprovado":
                 print("Documento APROVADO pelo Agente de Validação.")
                 break
@@ -122,14 +89,10 @@ class Orquestrador:
                 analise_juridica["sugestoes_revisao"] = sugestoes
                 if tentativa == max_tentativas - 1:
                     print("Documento não aprovado após múltiplas tentativas.")
-
         if resultado_validacao.get("status") != "aprovado":
             return {"status": "erro", "mensagem": "Documento não aprovado após múltiplas tentativas de revisão.", "detalhes": resultado_validacao}
-
-        # 5. Formatação Final (Genérico)
         print("Executando Agente de Formatação Final...")
         documento_final_html = self.formatador.formatar_documento(documento_gerado, dados_processados)
         print("Documento final formatado com sucesso.")
-
         print("--- Geração de Documento Concluída ---")
         return {"status": "sucesso", "documento_html": documento_final_html}
