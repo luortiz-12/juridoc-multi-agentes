@@ -4,18 +4,19 @@ import os
 import json
 import sys
 
-# --- ALTERAÇÃO: Usando imports absolutos a partir de 'src' ---
-from src.agente_coletor_dados import AgenteColetorDados
-from src.agente_validador import AgenteValidador
-from src.agente_formatacao_final import AgenteFormatacaoFinal
-from src.agente_tecnico_contrato import AgenteTecnicoContrato
-from src.agente_redator_contrato import AgenteRedatorContrato
-from src.agente_tecnico_peticao import AgenteTecnicoPeticao
-from src.agente_redator_peticao import AgenteRedatorPeticao
-from src.agente_tecnico_parecer import AgenteTecnicoParecer
-from src.agente_redator_parecer import AgenteRedatorParecer
-from src.agente_tecnico_estudo_caso import AgenteTecnicoEstudoCaso
-from src.agente_redator_estudo_caso import AgenteRedatorEstudoCaso
+# --- ALTERAÇÃO: Imports diretos e simples ---
+# Como o Gunicorn agora roda de dentro da pasta 'src', não precisamos de prefixos.
+from agente_coletor_dados import AgenteColetorDados
+from agente_validador import AgenteValidador
+from agente_formatacao_final import AgenteFormatacaoFinal
+from agente_tecnico_contrato import AgenteTecnicoContrato
+from agente_redator_contrato import AgenteRedatorContrato
+from agente_tecnico_peticao import AgenteTecnicoPeticao
+from agente_redator_peticao import AgenteRedatorPeticao
+from agente_tecnico_parecer import AgenteTecnicoParecer
+from agente_redator_parecer import AgenteRedatorParecer
+from agente_tecnico_estudo_caso import AgenteTecnicoEstudoCaso
+from agente_redator_estudo_caso import AgenteRedatorEstudoCaso
 
 
 class Orquestrador:

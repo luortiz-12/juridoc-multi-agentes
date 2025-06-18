@@ -1,11 +1,10 @@
 # src/routes/juridoc.py
 
 import os
-import sys
 from flask import Blueprint, request, jsonify
 
-# --- ALTERAÇÃO: Usando import absoluto a partir de 'src' ---
-from src.main_orchestrator import Orquestrador
+# --- ALTERAÇÃO: Import direto, sem 'src.' ou '..' ---
+from main_orchestrator import Orquestrador
 
 juridoc_bp = Blueprint('juridoc_bp', __name__, url_prefix='/api/juridoc')
 
@@ -20,11 +19,9 @@ orquestrador = Orquestrador(openai_api_key=OPENAI_API_KEY)
 def gerar_documento():
     if not request.is_json:
         return jsonify({"status": "erro", "mensagem": "A requisição deve conter um corpo JSON."}), 400
-
     dados_entrada = request.get_json()
     if not dados_entrada:
         return jsonify({"status": "erro", "mensagem": "Nenhum dado foi fornecido no corpo da requisição."}), 400
-
     try:
         resultado = orquestrador.gerar_documento(dados_entrada)
         if resultado.get("status") == "sucesso":
@@ -35,7 +32,6 @@ def gerar_documento():
         print(f"ERRO CRÍTICO NO ENDPOINT /gerar-documento: {e}")
         return jsonify({"status": "erro", "mensagem": "Ocorreu um erro interno inesperado no servidor."}), 500
 
-# (O resto das suas rotas /status e /tipos-documento permanecem iguais)
 @juridoc_bp.route('/status', methods=['GET'])
 def status():
     return jsonify({"status": "ativo", "mensagem": "Serviço JuriDoc funcionando."}), 200
