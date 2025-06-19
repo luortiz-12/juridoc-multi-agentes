@@ -1,55 +1,54 @@
-# agente_redator_peticao.py
-import os, json, sys
+# agente_tecnico_peticao.py
+import os, json
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
 
-class AgenteRedatorPeticao:
+class AgenteTecnicoPeticao:
+    """
+    Agente especialista que usa seu conhecimento interno para construir
+    a tese jurídica para uma petição.
+    """
     def __init__(self, llm_api_key):
         self.llm = ChatOpenAI(model="gpt-4o", openai_api_key=llm_api_key, temperature=0.1)
-        prompt_template_base = """
-            Você é um advogado processualista sênior, especialista na redação de petições iniciais.
-            {instrucoes_de_revisao}
-            **Dados do Caso:**
-            {dados_processados_formatados}
-            **Análise Jurídica e Tese:**
-            {analise_juridica_formatada}
-            **SUA TAREFA:** Redija o texto completo de uma Petição Inicial em HTML, seguindo as regras abaixo.
-            **REGRAS DE QUALIDADE OBRIGATÓRIAS:**
-            1.  **USO INTELIGENTE DE PLACEHOLDERS:** Se uma informação essencial NÃO FOR FORNECIDA (ex: nº da vara, OAB), NÃO omita a seção. Gere o texto e insira um placeholder claro. Exemplos: `[NOME DO ADVOGADO]`, `[NÚMERO DA OAB/UF]`, `[Nº DA VARA]`, `____/____/______`.
-            2.  **ESTRUTURA FORMAL:** Siga a estrutura: Endereçamento, Qualificação das Partes, Título da Ação, e as seções <h2>DOS FATOS</h2>, <h2>DO DIREITO</h2>, <h2>DOS PEDIDOS</h2>, etc. Adapte os termos (Autor/Réu, Reclamante/Reclamada) ao contexto.
-            3.  **SEM PLACEHOLDERS GENÉRICOS:** NUNCA use placeholders vagos como '[data]' ou '[preencher]'.
-            4.  **FORMATO DE SAÍDA:** HTML puro, começando com `<h1>`.
-        """
-        self.prompt = PromptTemplate(input_variables=["instrucoes_de_revisao", "dados_processados_formatados", "analise_juridica_formatada"], template=prompt_template_base)
-        self.chain = LLMChain(llm=self.llm, prompt=self.prompt)
+        self.prompt_template = PromptTemplate(
+            input_variables=["dados_processados"],
+            template="""
+            Você é um advogado pesquisador sênior com vasto conhecimento do direito brasileiro. Sua missão é analisar os fatos de um caso e, usando seu conhecimento interno, construir a melhor tese jurídica para uma petição. Você não tem acesso à internet.
 
-    def _format_data_for_prompt(self, data: dict) -> str:
-        formatted_parts = []
-        for key, value in data.items():
-            if value is None or (isinstance(value, str) and not value.strip()): continue
-            if isinstance(value, (dict, list)): formatted_parts.append(f"{key.replace('_', ' ').title()}: {json.dumps(value, ensure_ascii=False, indent=2)}")
-            else: formatted_parts.append(f"{key.replace('_', ' ').title()}: {value}")
-        return "\n".join(formatted_parts)
+            DADOS DO CASO:
+            {dados_processados}
 
-    def redigir_documento(self, dados_processados: dict, analise_juridica: dict, documento_anterior: str = None) -> dict:
-        instrucoes_de_revisao_str = ""
-        sugestoes_revisao = analise_juridica.get("sugestoes_revisao")
-        if documento_anterior and sugestoes_revisao:
-            sugestoes_formatadas = "\n".join([f"- Na seção '{s.get('secao', 'Geral')}': {s.get('descricao')}" for s in sugestoes_revisao])
-            instrucoes_de_revisao_str = f"""**MODO DE REVISÃO ATIVADO. SUA PRIORIDADE MÁXIMA É CORRIGIR O DOCUMENTO ABAIXO.**\nA sua versão anterior falhou na validação. Pense passo a passo e aplique TODAS as seguintes correções obrigatórias:\n{sugestoes_formatadas}\n\n**DOCUMENTO ANTERIOR PARA CORRIGIR:**\n```html\n{documento_anterior}\n```\n**REDIJA A VERSÃO FINAL E CORRIGIDA, SEM OS MESMOS ERROS.**\n---"""
-        
-        analise_juridica_sem_sugestoes = analise_juridica.copy()
-        analise_juridica_sem_sugestoes.pop("sugestoes_revisao", None)
-        dados_processados_formatados = self._format_data_for_prompt(dados_processados)
-        analise_juridica_formatada = self._format_data_for_prompt(analise_juridica_sem_sugestoes)
+            SUA TAREFA:
+            1.  Analise os fatos e o pedido do cliente.
+            2.  Identifique o ramo do direito (Cível, Consumidor, Trabalhista, etc.).
+            3.  Com base no seu conhecimento, formule a fundamentação jurídica, citando as leis, artigos e jurisprudência consolidada (Súmulas) mais relevantes.
+            4.  Retorne sua análise completa no formato JSON abaixo.
+
+            Formato Final da Resposta (DEVE ser um JSON válido):
+            ```json
+            {{
+                "fundamentos_legais": [{{"lei": "Nome da Lei/Código", "artigos": "Artigos aplicáveis", "descricao": "Explicação da relevância do artigo para o caso."}}],
+                "principios_juridicos": ["Princípios jurídicos que se aplicam."],
+                "jurisprudencia_relevante": "Cite uma Súmula do STJ/STF/TST ou um entendimento pacificado relevante.",
+                "analise_juridica_detalhada": "Um parágrafo explicando como os fatos se conectam com a lei e a jurisprudência para formar a tese da petição."
+            }}
+            ```
+            """
+        )
+        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
+
+    def analisar_dados(self, dados_processados: dict) -> dict:
+        dados_processados_str = json.dumps(dados_processados, ensure_ascii=False, indent=2)
+        texto_gerado = ""
         try:
-            resultado_llm = self.chain.invoke({"instrucoes_de_revisao": instrucoes_de_revisao_str, "dados_processados_formatados": dados_processados_formatados, "analise_juridica_formatada": analise_juridica_formatada})
-            texto_gerado = resultado_llm["text"]
+            resultado_llm = self.chain.invoke({"dados_processados": dados_processados_str})
+            texto_gerado = resultado_llm['text']
             texto_limpo = texto_gerado.strip()
-            if texto_limpo.startswith("```html"): texto_limpo = texto_limpo[7:]
-            if texto_limpo.endswith("```"): texto_limpo = texto_limpo[:-3]
-            return {"documento": texto_limpo.strip(), "erro": None}
+            if '```json' in texto_limpo: texto_limpo = texto_limpo.split('```json', 1)[-1]
+            if '```' in texto_limpo: texto_limpo = texto_limpo.split('```', 1)[0]
+            analise_juridica = json.loads(texto_limpo.strip())
+            return analise_juridica
         except Exception as e:
-            print(f"Erro no Agente Redator de Petição: {e}")
-            return {"documento": None, "erro": f"Falha na redação da petição: {e}"}
+            print(f"Erro no Agente Técnico de Petição: {e}")
+            return {"erro": "Falha na análise jurídica da petição", "detalhes": str(e), "saida_llm": texto_gerado}
