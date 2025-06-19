@@ -8,6 +8,7 @@ from langchain_core.tools import Tool
 def buscar_google_jurisprudencia(query: str) -> str:
     print(f"--- Usando Ferramenta: buscando no Google por '{query}' ---")
     try:
+        # --- CORREÇÃO AQUI ---
         search_results = Google Search(queries=[query])
         return json.dumps(search_results)
     except Exception as e:
@@ -17,30 +18,7 @@ class AgenteTecnicoParecer:
     def __init__(self, llm_api_key):
         self.llm = ChatOpenAI(model="gpt-4o", openai_api_key=llm_api_key, temperature=0.0)
         self.tools = [Tool(name="BuscaGoogleJurisprudencia", func=buscar_google_jurisprudencia, description="Busca doutrina, artigos acadêmicos e jurisprudência sobre um tema jurídico específico para fundamentar uma consulta.")]
-        react_prompt_template = """
-            Você é um jurista e parecerista renomado. Sua missão é analisar a consulta jurídica apresentada e, usando as ferramentas disponíveis, conduzir uma pesquisa aprofundada para encontrar a legislação, doutrina e jurisprudência que respondam objetivamente à questão.
-            Você tem acesso às seguintes ferramentas: {tools}
-            Para usar uma ferramenta, use o formato:
-            Thought: Preciso pesquisar sobre [tema da consulta].
-            Action: [nome da ferramenta]
-            Action Input: [termo de busca]
-            Observation: [resultado da ferramenta]
-            Quando tiver a resposta final, responda APENAS com o objeto JSON.
-
-            DADOS DA CONSULTA: {input}
-
-            Formato Final da Resposta (DEVE ser um JSON válido):
-            ```json
-            {{
-                "fundamentos_legais": [{{"lei": "Nome da Lei/Código", "artigos": "Artigos relevantes", "descricao": "Descrição da relevância dos artigos para a consulta."}}],
-                "principios_juridicos": ["Princípios que norteiam a discussão."],
-                "jurisprudencia_relevante": "Cite uma decisão ou entendimento encontrado com as ferramentas que seja crucial para responder à consulta.",
-                "analise_juridica_detalhada": "Análise técnica que conecta os fundamentos para formar o raciocínio central do parecer."
-            }}
-            ```
-            Comece!
-            Thought: {agent_scratchpad}
-        """
+        react_prompt_template = """Você é um jurista e parecerista renomado. Sua missão é analisar a consulta jurídica e, usando as ferramentas, conduzir uma pesquisa para encontrar a legislação, doutrina e jurisprudência que respondam à questão. Você tem acesso às seguintes ferramentas: {tools}. Use o ciclo Thought/Action/Action Input/Observation. Quando tiver a resposta final, responda APENAS com o objeto JSON. DADOS DA CONSULTA: {input}. Formato Final da Resposta (DEVE ser um JSON válido): ```json{{"fundamentos_legais": [{{"lei": "Nome da Lei/Código", "artigos": "Artigos relevantes", "descricao": "Descrição da relevância dos artigos para a consulta."}}], "principios_juridicos": ["Princípios que norteiam a discussão."], "jurisprudencia_relevante": "Cite uma decisão ou entendimento encontrado com as ferramentas que seja crucial para responder à consulta.", "analise_juridica_detalhada": "Análise técnica que conecta os fundamentos para formar o raciocínio central do parecer."}}``` Comece! Thought: {agent_scratchpad}"""
         prompt = ChatPromptTemplate.from_template(react_prompt_template)
         agent = create_react_agent(self.llm, self.tools, prompt)
         self.agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True, handle_parsing_errors=True)

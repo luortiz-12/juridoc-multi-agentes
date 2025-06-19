@@ -8,6 +8,7 @@ from langchain_core.tools import Tool
 def buscar_google_jurisprudencia(query: str) -> str:
     print(f"--- Usando Ferramenta: buscando no Google por '{query}' ---")
     try:
+        # --- CORREÇÃO AQUI ---
         search_results = Google Search(queries=[query])
         return json.dumps(search_results)
     except Exception as e:
@@ -17,26 +18,7 @@ class AgenteTecnicoEstudoCaso:
     def __init__(self, llm_api_key):
         self.llm = ChatOpenAI(model="gpt-4o", openai_api_key=llm_api_key, temperature=0.0)
         self.tools = [Tool(name="BuscaGoogleJurisprudencia", func=buscar_google_jurisprudencia, description="Busca doutrina e jurisprudência sobre um tema jurídico para analisar um caso de estudo.")]
-        react_prompt_template = """
-            Você é um professor de Direito e pesquisador. Sua missão é decompor um estudo de caso, identificar a questão jurídica central e realizar uma pesquisa aprofundada para encontrar os fundamentos que iluminam o problema de múltiplos ângulos.
-            Você tem acesso às seguintes ferramentas: {tools}
-            Use o ciclo Thought/Action/Action Input/Observation para pesquisar.
-            Quando tiver a resposta final, responda APENAS com o objeto JSON.
-
-            DADOS DO ESTUDO DE CASO: {input}
-
-            Formato Final da Resposta (DEVE ser um JSON válido):
-            ```json
-            {{
-                "fundamentos_legais": [{{"lei": "Nome da Lei/Código", "artigos": "Artigos relevantes", "descricao": "Descrição de como estes artigos se aplicam aos fatos do caso."}}],
-                "principios_juridicos": ["Princípios relevantes que norteiam a discussão do caso."],
-                "jurisprudencia_relevante": "Cite uma ou mais decisões de tribunais que sejam análogas ou que definam o entendimento sobre a questão central do caso.",
-                "analise_juridica_detalhada": "Resumo da tensão jurídica do caso, conectando os fatos aos fundamentos. Se houver teses conflitantes, mencione-as."
-            }}
-            ```
-            Comece!
-            Thought: {agent_scratchpad}
-        """
+        react_prompt_template = """Você é um professor de Direito e pesquisador. Sua missão é decompor um estudo de caso, identificar a questão jurídica central e realizar uma pesquisa para encontrar os fundamentos que iluminam o problema de múltiplos ângulos. Você tem acesso às seguintes ferramentas: {tools}. Use o ciclo Thought/Action/Action Input/Observation. Quando tiver a resposta final, responda APENAS com o objeto JSON. DADOS DO ESTUDO DE CASO: {input}. Formato Final da Resposta (DEVE ser um JSON válido): ```json{{"fundamentos_legais": [{{"lei": "...", "artigos": "...", "descricao": "..."}}], "principios_juridicos": ["..."], "jurisprudencia_relevante": "Cite uma ou mais decisões análogas ou que definam o entendimento sobre a questão central do caso.", "analise_juridica_detalhada": "Resumo da tensão jurídica do caso, conectando os fatos aos fundamentos."}}``` Comece! Thought: {agent_scratchpad}"""
         prompt = ChatPromptTemplate.from_template(react_prompt_template)
         agent = create_react_agent(self.llm, self.tools, prompt)
         self.agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True, handle_parsing_errors=True)

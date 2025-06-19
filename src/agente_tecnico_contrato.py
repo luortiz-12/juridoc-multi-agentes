@@ -8,44 +8,24 @@ from langchain_core.tools import Tool
 def buscar_google_jurisprudencia(query: str) -> str:
     print(f"--- Usando Ferramenta: buscando no Google por '{query}' ---")
     try:
+        # --- CORREÇÃO AQUI ---
         search_results = Google Search(queries=[query])
         return json.dumps(search_results)
     except Exception as e:
         return f"Ocorreu um erro ao buscar no Google: {e}"
 
+def buscar_no_lexml(termo_da_lei: str) -> str:
+    print(f"--- Usando Ferramenta Manual: buscando no LexML por '{termo_da_lei}' ---")
+    return "Resultado simulado da LexML. (Implementação real necessária)."
+
 class AgenteTecnicoContrato:
     def __init__(self, llm_api_key):
         self.llm = ChatOpenAI(model="gpt-4o", openai_api_key=llm_api_key, temperature=0.0)
-        self.tools = [Tool(name="BuscaGoogleJurisprudencia", func=buscar_google_jurisprudencia, description="Busca jurisprudência sobre temas contratuais específicos (ex: rescisão, multa, boa-fé) na internet.")]
-        react_prompt_template = """
-            Você é um advogado sênior, especialista em Direito Contratual e Empresarial. Sua missão é analisar os dados de um futuro contrato e, usando as ferramentas disponíveis, definir a fundamentação jurídica e os princípios que regerão este acordo.
-            Você tem acesso às seguintes ferramentas: {tools}
-            Para usar uma ferramenta, use o formato:
-            Thought: Preciso pesquisar jurisprudência sobre [tema].
-            Action: [nome da ferramenta]
-            Action Input: [termo de busca]
-            Observation: [resultado da ferramenta]
-            ... (repita o ciclo Thought/Action/Action Input/Observation)
-            Quando tiver a resposta final, responda APENAS com o objeto JSON.
-
-            DADOS DO FUTURO CONTRATO: {input}
-
-            Formato Final da Resposta (DEVE ser um JSON válido):
-            ```json
-            {{
-                "fundamentos_legais": [{{"lei": "Código Civil", "artigos": "Art. 421 e 422", "descricao": "Princípios da função social do contrato e da boa-fé objetiva."}}],
-                "principios_juridicos": ["Pacta Sunt Servanda", "Boa-Fé Objetiva", "Autonomia da Vontade"],
-                "jurisprudencia_relevante": "Cite uma súmula ou o resumo de uma decisão encontrada com a ferramenta que se aplique ao tipo de contrato.",
-                "analise_juridica_detalhada": "Análise concisa explicando que o contrato será regido pelos princípios e leis encontrados, garantindo segurança jurídica."
-            }}
-            ```
-            Comece!
-            Thought: {agent_scratchpad}
-        """
+        self.tools = [Tool(name="BuscaGoogleJurisprudencia", func=buscar_google_jurisprudencia, description="Busca jurisprudência sobre temas contratuais específicos (ex: rescisão, multa, boa-fé) na internet."), Tool(name="BuscaTextoDeLeiNoLexML", func=buscar_no_lexml, description="Busca o texto oficial de um artigo de lei específico. Use quando souber o número do artigo e a lei.")]
+        react_prompt_template = """Você é um advogado sênior, especialista em Direito Contratual. Sua missão é analisar os dados de um contrato e, usando as ferramentas, definir a fundamentação jurídica. Você tem acesso às seguintes ferramentas: {tools}. Use o ciclo Thought/Action/Action Input/Observation. Quando tiver a resposta final, responda APENAS com o objeto JSON. DADOS DO FUTURO CONTRATO: {input}. Formato Final da Resposta (DEVE ser um JSON válido): ```json{{"fundamentos_legais": [{{"lei": "Código Civil", "artigos": "Art. 421 e 422", "descricao": "Princípios da função social do contrato e da boa-fé objetiva."}}], "principios_juridicos": ["Pacta Sunt Servanda", "Boa-Fé Objetiva", "Autonomia da Vontade"], "jurisprudencia_relevante": "Cite uma súmula ou o resumo de uma decisão encontrada com a ferramenta que se aplique ao tipo de contrato.", "analise_juridica_detalhada": "Análise concisa explicando como o contrato será regido pelos princípios e leis encontrados."}}``` Comece! Thought: {agent_scratchpad}"""
         prompt = ChatPromptTemplate.from_template(react_prompt_template)
         agent = create_react_agent(self.llm, self.tools, prompt)
         self.agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True, handle_parsing_errors=True)
-
     def analisar_dados(self, dados_processados: dict) -> dict:
         dados_processados_str = json.dumps(dados_processados, ensure_ascii=False, indent=2)
         try:
