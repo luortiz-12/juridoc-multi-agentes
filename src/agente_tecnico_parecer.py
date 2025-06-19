@@ -22,7 +22,6 @@ class AgenteTecnicoParecer:
         prompt = ChatPromptTemplate.from_template(react_prompt_template)
         agent = create_react_agent(self.llm, self.tools, prompt)
         self.agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True, handle_parsing_errors=True)
-
     def analisar_dados(self, dados_processados: dict) -> dict:
         dados_processados_str = json.dumps(dados_processados, ensure_ascii=False, indent=2)
         try:

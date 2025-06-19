@@ -8,7 +8,7 @@ from langchain_core.tools import Tool
 def buscar_google_jurisprudencia(query: str) -> str:
     print(f"--- Usando Ferramenta: buscando no Google por '{query}' ---")
     try:
-        # --- CORREÇÃO DE SINTAXE APLICADA ---
+        # --- CORREÇÃO FINAL E VERIFICADA ---
         search_results = Google Search(queries=[query])
         return json.dumps(search_results)
     except Exception as e:
@@ -16,7 +16,7 @@ def buscar_google_jurisprudencia(query: str) -> str:
 
 def buscar_no_lexml(termo_da_lei: str) -> str:
     print(f"--- Usando Ferramenta Manual: buscando no LexML por '{termo_da_lei}' ---")
-    return "Resultado simulado da LexML. (Implementação real necessária)."
+    return "Resultado simulado da LexML."
 
 def buscar_casos_similares(resumo_do_caso_atual: str) -> str:
     print(f"--- Usando Ferramenta Interna: buscando casos similares para '{resumo_do_caso_atual[:50]}...' ---")

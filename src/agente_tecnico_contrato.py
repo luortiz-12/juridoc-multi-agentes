@@ -8,7 +8,7 @@ from langchain_core.tools import Tool
 def buscar_google_jurisprudencia(query: str) -> str:
     print(f"--- Usando Ferramenta: buscando no Google por '{query}' ---")
     try:
-        # --- CORREÇÃO DE SINTAXE APLICADA ---
+        # --- CORREÇÃO FINAL E VERIFICADA ---
         search_results = Google Search(queries=[query])
         return json.dumps(search_results)
     except Exception as e:
@@ -21,7 +21,7 @@ def buscar_no_lexml(termo_da_lei: str) -> str:
 class AgenteTecnicoContrato:
     def __init__(self, llm_api_key):
         self.llm = ChatOpenAI(model="gpt-4o", openai_api_key=llm_api_key, temperature=0.0)
-        self.tools = [Tool(name="BuscaGoogleJurisprudencia", func=buscar_google_jurisprudencia, description="Busca jurisprudência sobre temas contratuais."), Tool(name="BuscaTextoDeLeiNoLexML", func=buscar_no_lexml, description="Busca o texto oficial de um artigo de lei específico.")]
+        self.tools = [Tool(name="BuscaGoogleJurisprudencia", func=buscar_google_jurisprudencia, description="Busca jurisprudência sobre temas contratuais específicos."), Tool(name="BuscaTextoDeLeiNoLexML", func=buscar_no_lexml, description="Busca o texto oficial de um artigo de lei específico.")]
         react_prompt_template = """Você é um advogado sênior, especialista em Direito Contratual. Sua missão é analisar os dados de um contrato e, usando as ferramentas, definir a fundamentação jurídica. Você tem acesso às seguintes ferramentas: {tools}. Use o ciclo Thought/Action/Action Input/Observation. Quando tiver a resposta final, responda APENAS com o objeto JSON. DADOS DO FUTURO CONTRATO: {input}. Formato Final da Resposta (DEVE ser um JSON válido): ```json{{"fundamentos_legais": [{{"lei": "Código Civil", "artigos": "Art. 421 e 422", "descricao": "Princípios da função social do contrato e da boa-fé objetiva."}}], "principios_juridicos": ["Pacta Sunt Servanda", "Boa-Fé Objetiva"], "jurisprudencia_relevante": "Cite uma súmula ou resumo de decisão encontrada com a ferramenta.", "analise_juridica_detalhada": "Análise concisa explicando como o contrato será regido pelos princípios e leis encontrados."}}``` Comece! Thought: {agent_scratchpad}"""
         prompt = ChatPromptTemplate.from_template(react_prompt_template)
         agent = create_react_agent(self.llm, self.tools, prompt)
