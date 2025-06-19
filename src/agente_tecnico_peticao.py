@@ -2,79 +2,128 @@
 
 import os
 import json
-import sys
-from langchain_core.prompts import PromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
-from langchain.chains import LLMChain
+from langchain.agents import AgentExecutor, create_react_agent
+from langchain_core.tools import Tool
+
+# --- FERRAMENTAS DO AGENTE ---
+
+# Ferramenta 1: Busca no Google (Já existente)
+def buscar_google_jurisprudencia(query: str) -> str:
+    """Use para buscar jurisprudência, súmulas e notícias jurídicas recentes na internet."""
+    print(f"--- Usando Ferramenta Externa: buscando no Google por '{query}' ---")
+    try:
+        search_results = Google Search(queries=[query])
+        return json.dumps(search_results)
+    except Exception as e:
+        return f"Ocorreu um erro ao buscar no Google: {e}"
+
+# Ferramenta 2: Busca em portal de legislação (Placeholder)
+def buscar_no_lexml(termo_da_lei: str) -> str:
+    """Use para buscar o texto oficial de leis e artigos específicos."""
+    print(f"--- Usando Ferramenta Externa: buscando no LexML por '{termo_da_lei}' ---")
+    return "Resultado simulado da LexML. (Implementação real necessária)."
+
+
+# --- NOVA FERRAMENTA ESSENCIAL: BUSCA EM CASOS ANTERIORES (RAG) ---
+
+# 1. Simulação da sua base de conhecimento interna
+BASE_DE_CASOS_INTERNA = [
+    {
+        "id": "caso_001",
+        "resumo_dos_fatos": "cliente comprou produto online, veio com defeito, loja se recusou a trocar alegando prazo expirado",
+        "palavras_chave": ["consumidor", "vício do produto", "defeito", "troca negada"],
+        "tese_aplicada": "Aplicou-se a teoria do vício oculto do Art. 18 do Código de Defesa do Consumidor (CDC), com pedido de inversão do ônus da prova (Art. 6º, VIII do CDC) e dano moral por desvio produtivo do consumidor."
+    },
+    {
+        "id": "caso_002",
+        "resumo_dos_fatos": "empresa prestou serviço de design, cliente aprovou a entrega mas não efetuou o pagamento da última parcela do contrato",
+        "palavras_chave": ["inadimplemento contratual", "prestação de serviços", "falta de pagamento", "cobrança"],
+        "tese_aplicada": "Ação de Cobrança baseada no inadimplemento de obrigação contratual (Art. 389 e 475 do Código Civil), combinada com enriquecimento sem causa (Art. 884 do CC). Pedido de pagamento do principal com juros e correção monetária."
+    }
+]
+
+# 2. A função que o agente irá chamar
+def buscar_casos_similares(resumo_do_caso_atual: str) -> str:
+    """
+    Use esta ferramenta PRIMEIRO para pesquisar em nosso banco de dados interno por casos anteriores
+    que são similares ao caso atual. Isso ajuda a encontrar teses jurídicas que já foram validadas e usadas com sucesso.
+    """
+    print(f"--- Usando Ferramenta Interna: buscando casos similares para '{resumo_do_caso_atual[:50]}...' ---")
+    resumo_do_caso_atual = resumo_do_caso_atual.lower()
+    palavras_encontradas = [caso for caso in BASE_DE_CASOS_INTERNA if any(palavra in resumo_do_caso_atual for palavra in caso["palavras_chave"])]
+    
+    if not palavras_encontradas:
+        return "Nenhum caso similar encontrado no banco de dados interno."
+    
+    # Em um sistema real, aqui entraria um cálculo de similaridade de vetores.
+    # Para nossa simulação, retornamos o primeiro que encontrar.
+    caso_encontrado = palavras_encontradas[0]
+    return f"Caso similar encontrado (ID: {caso_encontrado['id']}). A tese de sucesso aplicada foi: {caso_encontrado['tese_aplicada']}"
+
+# --- FIM DAS FERRAMENTAS ---
+
 
 class AgenteTecnicoPeticao:
-    """
-    Agente especialista em analisar os fatos de um caso, identificar a área do
-    direito aplicável (Cível, Trabalhista, Penal) e construir a tese jurídica.
-    """
     def __init__(self, llm_api_key):
         self.llm = ChatOpenAI(model="gpt-4o", openai_api_key=llm_api_key, temperature=0.1)
+        
+        # Adicionamos a nova ferramenta à "caixa de ferramentas" do agente
+        self.tools = [
+            Tool(
+                name="BuscaCasosSimilaresInternos",
+                func=buscar_casos_similares,
+                description="Pesquisa no banco de dados interno do escritório por casos passados com fatos similares. Use esta ferramenta ANTES de buscas externas."
+            ),
+            Tool(
+                name="BuscaGoogleJurisprudencia",
+                func=buscar_google_jurisprudencia,
+                description="Busca jurisprudência, súmulas e notícias na internet. Use para encontrar decisões recentes ou para complementar a tese encontrada nos casos internos."
+            ),
+            Tool(
+                name="BuscaTextoDeLeiNoLexML",
+                func=buscar_no_lexml,
+                description="Busca o texto oficial de um artigo de lei específico quando você já sabe qual é."
+            )
+        ]
 
-        # Prompt 100% focado em análise e pesquisa para litígios.
-        self.prompt_template = PromptTemplate(
-            input_variables=["dados_processados"],
-            template=
-            """
-            Você é um advogado pesquisador sênior, com vasta experiência em Direito Processual Cível, Trabalhista e Penal no Brasil.
-            Sua missão é analisar os fatos de um caso e, a partir deles, identificar o tipo de ação cabível e construir a tese jurídica mais forte e completa possível para uma petição inicial.
+        # O prompt é o mesmo, o agente aprenderá a usar a nova ferramenta pela sua descrição.
+        react_prompt_template = """
+            Você é um advogado pesquisador sênior. Sua missão é analisar os fatos de um caso e, usando as ferramentas disponíveis, construir a melhor tese jurídica.
+            Sempre comece usando a ferramenta `BuscaCasosSimilaresInternos` para verificar se já temos uma solução para um problema parecido.
+            Você tem acesso às seguintes ferramentas: {tools}
+            Use o ciclo Thought/Action/Action Input/Observation. Quando tiver a resposta final, responda APENAS com o objeto JSON.
 
-            **DADOS DO CASO:**
-            {dados_processados}
+            DADOS DO CASO: {input}
 
-            **SUA TAREFA - Pense passo a passo:**
-            1.  **Analise os Fatos:** Examine os campos 'fatos_peticao', 'pedido_peticao', e outros campos específicos como 'data_admissao_peticao' ou 'motivo_prisao_peticao' para entender a natureza do conflito.
-            2.  **Identifique o Ramo do Direito:**
-                - Se os dados contêm 'data_admissao', 'salario_peticao', 'verbas_pleiteadas_peticao', o caso é **Trabalhista**.
-                - Se os dados contêm 'data_fato_peticao', 'nome_vitima_peticao', 'desejo_representar_peticao', o caso é **Penal (Queixa-Crime)**.
-                - Se os dados contêm 'autoridade_coatora_peticao', 'motivo_prisao_peticao', é **Constitucional/Penal (Habeas Corpus)**.
-                - Caso contrário, é provavelmente **Cível** ou **Consumidor**.
-            3.  **Realize a Pesquisa Jurídica Específica:** Com base no ramo identificado, pesquise e defina os fundamentos legais mais pertinentes. Para casos trabalhistas, foque na CLT. Para casos penais, no Código Penal e de Processo Penal. Para cíveis, no Código Civil e CPC.
-            4.  **Estruture a Análise:** Retorne sua pesquisa em um formato JSON estrito, conforme o modelo abaixo.
-
-            **REGRA DE OURO PARA A SAÍDA:**
-            Sua resposta DEVE ser um objeto JSON VÁLIDO e NADA MAIS, começando com `{{` e terminando com `}}`. NÃO use blocos de Markdown.
-
-            **O JSON deve seguir estritamente este formato:**
+            Formato Final da Resposta (JSON válido):
+            ```json
             {{
-                "fundamentos_legais": [
-                    {{"lei": "Nome da Lei/Código", "artigos": "Artigos relevantes", "descricao": "Breve descrição da relevância desses artigos para o caso concreto."}}
-                ],
-                "principios_juridicos": ["Princípio Relevante 1", "Princípio Relevante 2"],
-                "jurisprudencia_relevante": "Cite uma Súmula do TST (se trabalhista) ou do STJ/STF (se cível/penal) ou um entendimento jurisprudencial consolidado que se aplique diretamente ao caso.",
-                "analise_juridica_detalhada": "Escreva um parágrafo conciso explicando como os fatos se conectam com os fundamentos legais e a jurisprudência, formando a tese central que será usada na petição."
+                "fundamentos_legais": [{{"lei": "...", "artigos": "...", "descricao": "..."}}],
+                "principios_juridicos": ["..."],
+                "jurisprudencia_relevante": "Cite uma Súmula ou decisão encontrada. Se encontrou um caso interno similar, mencione-o aqui.",
+                "analise_juridica_detalhada": "Parágrafo explicando como os fatos se conectam com a tese, idealmente partindo da tese encontrada no caso interno e complementada pela pesquisa externa."
             }}
-            """
-        )
-
-        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
+            ```
+            Comece!
+            Thought: {agent_scratchpad}
+        """
+        
+        prompt = ChatPromptTemplate.from_template(react_prompt_template)
+        agent = create_react_agent(self.llm, self.tools, prompt)
+        self.agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True, handle_parsing_errors=True)
 
     def analisar_dados(self, dados_processados: dict) -> dict:
-        """Analisa os dados de uma petição e retorna a base jurídica."""
         dados_processados_str = json.dumps(dados_processados, ensure_ascii=False, indent=2)
-        texto_gerado = ""
-
         try:
-            resultado_llm = self.chain.invoke({
-                "dados_processados": dados_processados_str
-            })
-            texto_gerado = resultado_llm["text"]
-
-            # Limpeza defensiva do JSON
+            resultado = self.agent_executor.invoke({"input": dados_processados_str})
+            texto_gerado = resultado['output']
             texto_limpo = texto_gerado.strip()
-            if '```json' in texto_limpo:
-                texto_limpo = texto_limpo.split('```json', 1)[-1]
-            if '```' in texto_limpo:
-                texto_limpo = texto_limpo.split('```', 1)[0]
-            texto_limpo = texto_limpo.strip()
-
-            analise_juridica = json.loads(texto_limpo)
+            if '```json' in texto_limpo: texto_limpo = texto_limpo.split('```json', 1)[-1]
+            if '```' in texto_limpo: texto_limpo = texto_limpo.split('```', 1)[0]
+            analise_juridica = json.loads(texto_limpo.strip())
             return analise_juridica
         except Exception as e:
             print(f"Erro no Agente Técnico de Petição: {e}")
-            print(f"Saída do LLM que causou o erro: {texto_gerado}")
-            return {"erro": "Falha na análise jurídica da petição", "detalhes": str(e), "saida_llm": texto_gerado}
+            return {"erro": "Falha na análise jurídica da petição", "detalhes": str(e)}

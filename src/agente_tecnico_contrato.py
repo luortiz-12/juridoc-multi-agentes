@@ -1,78 +1,61 @@
 # agente_tecnico_contrato.py
-
-import os
-import json
-import sys
-from langchain_core.prompts import PromptTemplate
+import os, json
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
-from langchain.chains import LLMChain
+from langchain.agents import AgentExecutor, create_react_agent
+from langchain_core.tools import Tool
+
+def buscar_google_jurisprudencia(query: str) -> str:
+    print(f"--- Usando Ferramenta: buscando no Google por '{query}' ---")
+    try:
+        search_results = Google Search(queries=[query])
+        return json.dumps(search_results)
+    except Exception as e:
+        return f"Ocorreu um erro ao buscar no Google: {e}"
 
 class AgenteTecnicoContrato:
-    """
-    Agente especialista em analisar dados de um futuro contrato e definir
-    a fundamentação jurídica e os princípios que regerão o acordo.
-    """
     def __init__(self, llm_api_key):
-        self.llm = ChatOpenAI(model="gpt-4o-mini", openai_api_key=llm_api_key, temperature=0.1)
+        self.llm = ChatOpenAI(model="gpt-4o", openai_api_key=llm_api_key, temperature=0.0)
+        self.tools = [Tool(name="BuscaGoogleJurisprudencia", func=buscar_google_jurisprudencia, description="Busca jurisprudência sobre temas contratuais específicos (ex: rescisão, multa, boa-fé) na internet.")]
+        react_prompt_template = """
+            Você é um advogado sênior, especialista em Direito Contratual e Empresarial. Sua missão é analisar os dados de um futuro contrato e, usando as ferramentas disponíveis, definir a fundamentação jurídica e os princípios que regerão este acordo.
+            Você tem acesso às seguintes ferramentas: {tools}
+            Para usar uma ferramenta, use o formato:
+            Thought: Preciso pesquisar jurisprudência sobre [tema].
+            Action: [nome da ferramenta]
+            Action Input: [termo de busca]
+            Observation: [resultado da ferramenta]
+            ... (repita o ciclo Thought/Action/Action Input/Observation)
+            Quando tiver a resposta final, responda APENAS com o objeto JSON.
 
-        # Prompt 100% focado em análise contratual
-        self.prompt_template = PromptTemplate(
-            input_variables=["dados_processados"],
-            template=
-            """
-            Você é um advogado sênior, especialista em Direito Contratual e Empresarial no Brasil.
-            Sua missão é analisar os dados de um futuro contrato e, a partir deles, definir a fundamentação jurídica e os princípios que regerão este acordo.
+            DADOS DO FUTURO CONTRATO: {input}
 
-            **DADOS DO FUTURO CONTRATO:**
-            {dados_processados}
-
-            **SUA TAREFA:**
-            1.  **Analise os Dados:** Entenda o objeto do contrato, as partes envolvidas, os valores, prazos e penalidades.
-            2.  **Pesquisa Jurídica:** Com base na sua análise, identifique os fundamentos legais mais fortes. Foque em artigos do Código Civil (Teoria Geral dos Contratos, Contratos em Espécie), e leis específicas se aplicável.
-            3.  **Identifique Princípios:** Determine os princípios contratuais essenciais para este acordo, como 'Pacta Sunt Servanda', 'Boa-Fé Objetiva', 'Função Social do Contrato'.
-            4.  **Estruture a Análise:** Retorne sua pesquisa em um formato JSON estrito.
-
-            **REGRA DE OURO PARA A SAÍDA:**
-            Sua resposta DEVE ser um objeto JSON VÁLIDO e NADA MAIS, começando com `{{` e terminando com `}}`.
-            NÃO use blocos de Markdown.
-
-            **O JSON deve seguir estritamente este formato:**
+            Formato Final da Resposta (DEVE ser um JSON válido):
+            ```json
             {{
-                "fundamentos_legais": [
-                    {{"lei": "Código Civil", "artigos": "Art. 421 e 422", "descricao": "Princípios da função social do contrato e da boa-fé objetiva."}},
-                    {{"lei": "Código Civil", "artigos": "Art. 593 a 609", "descricao": "Regras específicas sobre a prestação de serviços, se aplicável."}}
-                ],
+                "fundamentos_legais": [{{"lei": "Código Civil", "artigos": "Art. 421 e 422", "descricao": "Princípios da função social do contrato e da boa-fé objetiva."}}],
                 "principios_juridicos": ["Pacta Sunt Servanda", "Boa-Fé Objetiva", "Autonomia da Vontade"],
-                "jurisprudencia_relevante": "Citar uma súmula ou entendimento do STJ sobre o tipo de contrato em questão (ex: rescisão, multas, etc.).",
-                "analise_juridica_detalhada": "Escreva um parágrafo conciso explicando que o contrato será regido pelos princípios da autonomia da vontade e da boa-fé, e que as cláusulas estão em conformidade com o Código Civil, garantindo segurança jurídica para ambas as partes."
+                "jurisprudencia_relevante": "Cite uma súmula ou o resumo de uma decisão encontrada com a ferramenta que se aplique ao tipo de contrato.",
+                "analise_juridica_detalhada": "Análise concisa explicando que o contrato será regido pelos princípios e leis encontrados, garantindo segurança jurídica."
             }}
-            """
-        )
-
-        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
+            ```
+            Comece!
+            Thought: {agent_scratchpad}
+        """
+        prompt = ChatPromptTemplate.from_template(react_prompt_template)
+        agent = create_react_agent(self.llm, self.tools, prompt)
+        self.agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True, handle_parsing_errors=True)
 
     def analisar_dados(self, dados_processados: dict) -> dict:
-        """Analisa os dados de um contrato e retorna a base jurídica."""
         dados_processados_str = json.dumps(dados_processados, ensure_ascii=False, indent=2)
-        texto_gerado = ""
-
         try:
-            resultado_llm = self.chain.invoke({
-                "dados_processados": dados_processados_str
-            })
-            texto_gerado = resultado_llm["text"]
-
-            # Limpeza defensiva do JSON
+            resultado = self.agent_executor.invoke({"input": dados_processados_str})
+            texto_gerado = resultado['output']
             texto_limpo = texto_gerado.strip()
-            if '```json' in texto_limpo:
-                texto_limpo = texto_limpo.split('```json', 1)[-1]
-            if '```' in texto_limpo:
-                texto_limpo = texto_limpo.split('```', 1)[0]
-            texto_limpo = texto_limpo.strip()
-            
-            analise_juridica = json.loads(texto_limpo)
+            if '```json' in texto_limpo: texto_limpo = texto_limpo.split('```json', 1)[-1]
+            if '```' in texto_limpo: texto_limpo = texto_limpo.split('```', 1)[0]
+            analise_juridica = json.loads(texto_limpo.strip())
             return analise_juridica
         except Exception as e:
             print(f"Erro no Agente Técnico de Contrato: {e}")
-            print(f"Saída do LLM que causou o erro: {texto_gerado}")
-            return {"erro": "Falha na análise jurídica do contrato", "detalhes": str(e), "saida_llm": texto_gerado}
+            return {"erro": "Falha na análise jurídica do contrato", "detalhes": str(e)}
