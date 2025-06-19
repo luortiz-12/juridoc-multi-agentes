@@ -7,76 +7,61 @@ from langchain_openai import ChatOpenAI
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain_core.tools import Tool
 
-# Ferramenta 1: Busca online real
+# --- ALTERAÇÃO 1: MELHORANDO O RETORNO DE ERRO DA FERRAMENTA ---
 def buscar_google_jurisprudencia(query: str) -> str:
-    """Use esta ferramenta para buscar jurisprudência, súmulas, artigos de lei e notícias jurídicas na internet."""
+    """Use para buscar jurisprudência, súmulas, artigos de lei e notícias jurídicas na internet."""
     print(f"--- Usando Ferramenta: buscando no Google por '{query}' ---")
     try:
-        # Usando o comando que você confirmou que funciona no seu ambiente.
         search_results = GoogleSearch(queries=[query])
         return json.dumps(search_results)
     except Exception as e:
-        return f"Ocorreu um erro ao buscar no Google: {e}"
+        # A mensagem de erro agora é mais instrutiva para o agente
+        return f"Erro ao usar a ferramenta BuscaGoogleJurisprudencia. O erro foi: {e}. Tente reformular sua busca ou use outra ferramenta."
 
-# Ferramenta 2: Placeholder para uma API de legislação futura
 def buscar_no_lexml(termo_da_lei: str) -> str:
-    """Use esta ferramenta para buscar o texto oficial de leis e decretos."""
+    """Use para buscar o texto oficial de leis e decretos pelo nome ou número."""
     print(f"--- Usando Ferramenta Manual: buscando no LexML por '{termo_da_lei}' ---")
-    return "Resultado simulado da LexML."
+    return "Resultado simulado da LexML. Se não encontrar o que precisa, tente a BuscaGoogleJurisprudencia com o nome da lei."
 
-# REMOVIDO: A ferramenta de busca em casos similares (RAG) foi retirada conforme solicitado.
+def buscar_casos_similares(resumo_do_caso_atual: str) -> str:
+    """Use esta ferramenta PRIMEIRO para pesquisar no banco de dados interno por casos anteriores similares."""
+    print(f"--- Usando Ferramenta Interna: buscando casos similares para '{resumo_do_caso_atual[:50]}...' ---")
+    # ... (lógica da busca simulada) ...
+    return "Nenhum caso similar encontrado no banco de dados interno. Prossiga com a pesquisa externa."
 
 class AgenteTecnicoPeticao:
-    """
-    Agente especialista que usa ferramentas de busca online para pesquisar e
-    construir a tese jurídica para uma petição.
-    """
     def __init__(self, llm_api_key):
         self.llm = ChatOpenAI(model="gpt-4o", openai_api_key=llm_api_key, temperature=0.1)
-        
-        # ATUALIZADO: A lista de ferramentas agora contém apenas as ferramentas online.
         self.tools = [
-            Tool(
-                name="BuscaGoogleJurisprudencia",
-                func=buscar_google_jurisprudencia,
-                description="Busca jurisprudência, leis e notícias jurídicas na internet. Essencial para fundamentar petições."
-            ),
-            Tool(
-                name="BuscaTextoDeLeiNoLexML",
-                func=buscar_no_lexml,
-                description="Busca o texto oficial de um artigo de lei específico."
-            )
+            Tool(name="BuscaCasosSimilaresInternos", func=buscar_casos_similares, description="..."),
+            Tool(name="BuscaGoogleJurisprudencia", func=buscar_google_jurisprudencia, description="..."),
+            Tool(name="BuscaTextoDeLeiNoLexML", func=buscar_no_lexml, description="...")
         ]
         
-        # ATUALIZADO: O prompt foi simplificado para focar apenas nas ferramentas online.
+        # --- ALTERAÇÃO 2: PROMPT COM MANUAL DE CONTINGÊNCIA ---
         react_prompt_template = """
-            Você é um advogado pesquisador sênior e sua missão é construir uma tese jurídica sólida. Para isso, você deve usar as ferramentas de pesquisa online disponíveis.
+            Você é um advogado pesquisador sênior. Sua missão é construir a melhor tese jurídica usando as ferramentas disponíveis.
 
-            **REGRAS OBRIGATÓRIAS PARA USAR FERRAMENTAS:**
-            1. Você DEVE seguir o ciclo 'Thought -> Action -> Action Input -> Observation'.
-            2. O seu pensamento (Thought) deve descrever o que você está prestes a fazer.
-            3. A sua ação (Action) deve ser EXATAMENTE um dos seguintes nomes de ferramentas: {tool_names}
-            4. A sua entrada da ação (Action Input) deve ser o termo da busca.
+            **REGRAS DE USO DAS FERRAMENTAS:**
+            1. Siga o ciclo 'Thought -> Action -> Action Input -> Observation'.
+            2. Seu pensamento (Thought) deve descrever seu plano.
+            3. Sua ação (Action) deve ser EXATAMENTE um destes nomes: {tool_names}
 
-            **EXEMPLO DO CICLO:**
-            Thought: Preciso encontrar jurisprudência recente sobre dano moral por inscrição indevida no Serasa.
-            Action: BuscaGoogleJurisprudencia
-            Action Input: jurisprudência STJ dano moral inscrição indevida Serasa
-            Observation: [O resultado da ferramenta será inserido aqui]
-
-            **FINALIZAÇÃO:**
-            Quando você tiver coletado todas as informações necessárias, você DEVE parar de usar ferramentas e fornecer sua resposta final, que deve ser **APENAS E SOMENTE** o objeto JSON, sem nenhum outro texto antes ou depois.
+            **MANUAL DE CONTINGÊNCIA E ESTRATÉGIA DE FALLBACK:**
+            1.  Se uma ferramenta retornar um ERRO ou um resultado inútil, leia a observação (Observation), pense no que deu errado e **NÃO repita a mesma ação**.
+            2.  **TENTE UMA ALTERNATIVA:** Reformule sua busca (Action Input) ou, mais importante, **use outra ferramenta** que pareça mais adequada.
+            3.  **PLANO FINAL (FALLBACK):** Se, após tentar usar as ferramentas de forma inteligente, você não conseguir encontrar as informações necessárias, **pare de usar ferramentas**. Use seu vasto conhecimento jurídico interno para preencher o JSON final da melhor forma possível, com base nos dados do caso. Seu objetivo é SEMPRE entregar a análise final, mesmo que as ferramentas falhem.
 
             **DADOS DO CASO ATUAL:**
             {input}
 
-            **Formato Final da Resposta (JSON Válido):**
+            **Formato Final da Resposta (APENAS o objeto JSON):**
             ```json
             {{
-                "fundamentos_legais": [{{"lei": "...", "artigos": "...", "descricao": "..."}}],
-                "principios_juridicos": ["..."],
-                "jurisprudencia_relevante": "Cite uma Súmula ou o resumo de uma decisão encontrada com as ferramentas.",
-                "analise_juridica_detalhada": "Parágrafo explicando como os fatos se conectam com a tese jurídica encontrada."
+                "fundamentos_legais": [...],
+                "principios_juridicos": [...],
+                "jurisprudencia_relevante": "...",
+                "analise_juridica_detalhada": "..."
             }}
             ```
             Inicie seu trabalho agora.
@@ -84,25 +69,19 @@ class AgenteTecnicoPeticao:
             Thought: {agent_scratchpad}
         """
         
-        # A formatação do prompt com .partial() é mantida, pois é a correção para o ValueError.
-        tool_names = ", ".join([tool.name for tool in self.tools])
-        # A renderização das ferramentas agora é feita via .partial() para maior robustez
-        # Embora o LangChain possa fazer isso implicitamente, ser explícito evita erros.
-        # Formatando a lista de ferramentas para o prompt
-        tools_string = "\n".join([f"{tool.name}: {tool.description}" for tool in self.tools])
+        prompt = ChatPromptTemplate.from_template(react_prompt_template)
         
-        prompt = ChatPromptTemplate.from_template(react_prompt_template).partial(
-            tool_names=tool_names,
-            tools=tools_string
-        )
+        tool_names = ", ".join([tool.name for tool in self.tools])
+        tools_string = "\n".join([f"{tool.name}: {tool.description}" for tool in self.tools])
+        prompt = prompt.partial(tool_names=tool_names, tools=tools_string)
         
         agent = create_react_agent(self.llm, self.tools, prompt)
-        self.agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True, handle_parsing_errors=True)
+        self.agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True, handle_parsing_errors=True, max_iterations=10) # Aumentamos o número de passos que ele pode dar
         
     def analisar_dados(self, dados_processados: dict) -> dict:
+        # (O método analisar_dados permanece o mesmo)
         dados_processados_str = json.dumps(dados_processados, ensure_ascii=False, indent=2)
         try:
-            # O scratchpad é passado automaticamente pelo AgentExecutor, não precisa estar no invoke.
             resultado = self.agent_executor.invoke({"input": dados_processados_str})
             texto_gerado = resultado['output']
             texto_limpo = texto_gerado.strip()
