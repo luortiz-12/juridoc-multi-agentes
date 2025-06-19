@@ -1,5 +1,5 @@
 # agente_redator_estudo_caso.py
-import os, json
+import os, json, sys
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
@@ -16,7 +16,7 @@ class AgenteRedatorEstudoCaso:
             {analise_juridica_formatada}
             **SUA TAREFA:** Redija um Estudo de Caso Jurídico em HTML.
             **REGRAS DE QUALIDADE OBRIGATÓRIAS:**
-            1.  **USO INTELIGENTE DE PLACEHOLDERS:** Se informações estiverem faltando, utilize placeholders claros como `[INFORMAÇÃO PENDENTE]`.
+            1.  **USO INTELIGENTE DE PLACEHOLDERS:** Se informações estiverem faltando nos dados, utilize placeholders claros como `[INFORMAÇÃO PENDENTE]` ou `[DETALHE NÃO FORNECIDO]`.
             2.  **ESTRUTURA ACADÊMICA:** Siga a estrutura: `<h1>ESTUDO DE CASO: [TÍTULO]</h1>`, `<h2>I - APRESENTAÇÃO DO CASO</h2>`, `<h2>II - ANÁLISE JURÍDICA</h2>`, `<h2>III - CONCLUSÃO</h2>`.
             3.  **FORMATO DE SAÍDA:** HTML puro, começando com `<h1>`.
         """

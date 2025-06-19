@@ -1,10 +1,11 @@
 # agente_redator_contrato.py
-import os, json
+import os, json, sys
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
 
 class AgenteRedatorContrato:
+    """Agente especialista em redigir contratos, com lógica de placeholders e revisão."""
     def __init__(self, llm_api_key):
         self.llm = ChatOpenAI(model="gpt-4o", openai_api_key=llm_api_key, temperature=0.1)
         prompt_template_base = """

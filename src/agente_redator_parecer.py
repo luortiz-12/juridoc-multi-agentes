@@ -1,5 +1,5 @@
 # agente_redator_parecer.py
-import os, json
+import os, json, sys
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
