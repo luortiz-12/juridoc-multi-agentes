@@ -11,7 +11,6 @@ def buscar_google_jurisprudencia(query: str) -> str:
     """Use esta ferramenta para buscar jurisprudência, súmulas, artigos de lei e notícias jurídicas na internet."""
     print(f"--- Usando Ferramenta: buscando no Google por '{query}' ---")
     try:
-        # Comando corrigido para a busca
         search_results = GoogleSearch(queries=[query])
         return json.dumps(search_results)
     except Exception as e:
@@ -39,22 +38,29 @@ class AgenteTecnicoPeticao:
             Tool(name="BuscaTextoDeLeiNoLexML", func=buscar_no_lexml, description="Busca o texto oficial de um artigo de lei.")
         ]
         
-        # --- AQUI ESTÁ A CORREÇÃO ---
-        # Adicionamos a variável {tool_names} que o LangChain precisa.
+        # --- CORREÇÃO 2/2: PROMPT ReAct MAIS ROBUSTO E EXPLÍCITO ---
         react_prompt_template = """
-            Você é um advogado pesquisador sênior. Sua missão é analisar os fatos de um caso e, usando as ferramentas disponíveis, construir a melhor tese jurídica.
-            Sempre comece usando a ferramenta `BuscaCasosSimilaresInternos` para verificar se já temos uma solução para um problema parecido.
-            
-            Você tem acesso às seguintes ferramentas:
-            {tools}
+            Você é um advogado pesquisador sênior e sua missão é construir uma tese jurídica sólida. Para isso, você deve usar as ferramentas disponíveis.
 
-            Para usar uma ferramenta, você deve usar o formato de Ação. Os nomes exatos das ferramentas que você pode usar são: {tool_names}
+            **REGRAS OBRIGATÓRIAS PARA USAR FERRAMENTAS:**
+            1. Você DEVE seguir o ciclo 'Thought -> Action -> Action Input -> Observation'.
+            2. O seu pensamento (Thought) deve descrever o que você está prestes a fazer.
+            3. A sua ação (Action) deve ser EXATAMENTE um dos seguintes nomes de ferramentas: {tool_names}
+            4. A sua entrada da ação (Action Input) deve ser o termo da busca.
 
-            Quando você tiver informações suficientes, você DEVE responder com a resposta final no formato JSON solicitado, e NADA MAIS.
+            **EXEMPLO DO CICLO:**
+            Thought: Preciso encontrar casos internos sobre inadimplemento para ter uma base.
+            Action: BuscaCasosSimilaresInternos
+            Action Input: inadimplemento de contrato de serviço por falta de pagamento
+            Observation: [O resultado da ferramenta será inserido aqui]
 
-            DADOS DO CASO: {input}
+            **FINALIZAÇÃO:**
+            Quando você tiver coletado todas as informações necessárias, você DEVE parar de usar ferramentas e fornecer sua resposta final, que deve ser **APENAS E SOMENTE** o objeto JSON, sem nenhum outro texto antes ou depois.
 
-            Formato Final da Resposta (JSON válido):
+            **DADOS DO CASO ATUAL:**
+            {input}
+
+            **Formato Final da Resposta (JSON Válido):**
             ```json
             {{
                 "fundamentos_legais": [{{"lei": "...", "artigos": "...", "descricao": "..."}}],
@@ -63,7 +69,8 @@ class AgenteTecnicoPeticao:
                 "analise_juridica_detalhada": "Parágrafo explicando como os fatos se conectam com a tese."
             }}
             ```
-            Comece!
+            Inicie seu trabalho agora.
+
             Thought: {agent_scratchpad}
         """
         
