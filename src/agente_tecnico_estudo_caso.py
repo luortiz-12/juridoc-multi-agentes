@@ -10,7 +10,7 @@ def buscar_google_jurisprudencia(query: str) -> str:
     print(f"--- Usando Ferramenta: buscando no Google por '{query}' ---")
     try:
         # --- CORREÇÃO 1/2: SINTAXE DA BUSCA ---
-        search_results = Google Search(queries=[query])
+        search_results = GoogleSearch(queries=[query])
         return json.dumps(search_results)
     except Exception as e:
         return f"Ocorreu um erro ao buscar no Google: {e}"
