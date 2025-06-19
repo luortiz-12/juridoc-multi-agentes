@@ -1,53 +1,44 @@
 # agente_tecnico_estudo_caso.py
 import os, json
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
-from langchain.agents import AgentExecutor, create_react_agent
-from langchain_core.tools import Tool
-
-def buscar_google_jurisprudencia(query: str) -> str:
-    """Busca doutrina e jurisprudência sobre um tema jurídico para analisar um caso de estudo."""
-    print(f"--- Usando Ferramenta: buscando no Google por '{query}' ---")
-    try:
-        # --- CORREÇÃO 1/2: SINTAXE DA BUSCA ---
-        search_results = GoogleSearch(queries=[query])
-        return json.dumps(search_results)
-    except Exception as e:
-        return f"Ocorreu um erro ao buscar no Google: {e}"
+from langchain.chains import LLMChain
 
 class AgenteTecnicoEstudoCaso:
     def __init__(self, llm_api_key):
         self.llm = ChatOpenAI(model="gpt-4o", openai_api_key=llm_api_key, temperature=0.0)
-        self.tools = [Tool(name="BuscaGoogleJurisprudencia", func=buscar_google_jurisprudencia, description="Busca doutrina e jurisprudência sobre um tema jurídico para analisar um caso de estudo.")]
-        
-        # --- CORREÇÃO 2/2: ADIÇÃO DA VARIÁVEL {tool_names} ---
-        react_prompt_template = """Você é um professor de Direito e pesquisador. Sua missão é decompor um estudo de caso, identificar a questão jurídica central e realizar uma pesquisa para encontrar os fundamentos que iluminam o problema de múltiplos ângulos.
-        
-        Você tem acesso às seguintes ferramentas:
-        {tools}
+        self.prompt_template = PromptTemplate(
+            input_variables=["dados_processados"],
+            template="""
+            Você é um professor de Direito e pesquisador. Sua missão é analisar um estudo de caso e, usando seu conhecimento, identificar e discorrer sobre os pontos jurídicos relevantes. Você não tem acesso a ferramentas de busca.
 
-        Para usar uma ferramenta, você deve usar o formato de Ação. Os nomes exatos das ferramentas que você pode usar são: {tool_names}
+            DADOS DO ESTUDO DE CASO:
+            {dados_processados}
 
-        Quando tiver a resposta final, responda APENAS com o objeto JSON.
-        
-        DADOS DO ESTUDO DE CASO: {input}
-        
-        Formato Final da Resposta (DEVE ser um JSON válido):
-        ```json
-        {{"fundamentos_legais": [{{"lei": "...", "artigos": "...", "descricao": "..."}}], "principios_juridicos": ["..."], "jurisprudencia_relevante": "Cite uma ou mais decisões análogas ou que definam o entendimento sobre a questão central do caso.", "analise_juridica_detalhada": "Resumo da tensão jurídica do caso, conectando os fatos aos fundamentos."}}
-        ```
-        Comece!
-        Thought: {agent_scratchpad}"""
-        
-        prompt = ChatPromptTemplate.from_template(react_prompt_template)
-        agent = create_react_agent(self.llm, self.tools, prompt)
-        self.agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True, handle_parsing_errors=True)
-        
+            SUA TAREFA:
+            1.  Decomponha o cenário apresentado.
+            2.  Identifique a questão jurídica central.
+            3.  Discorra sobre a legislação, princípios e jurisprudência aplicáveis, explorando os ângulos do problema.
+            4.  Retorne sua análise completa no formato JSON abaixo.
+
+            Formato Final da Resposta (DEVE ser um JSON válido):
+            ```json
+            {{
+                "fundamentos_legais": [{{"lei": "...", "artigos": "...", "descricao": "..."}}],
+                "principios_juridicos": ["..."],
+                "jurisprudencia_relevante": "...",
+                "analise_juridica_detalhada": "..."
+            }}
+            ```
+            """
+        )
+        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
     def analisar_dados(self, dados_processados: dict) -> dict:
         dados_processados_str = json.dumps(dados_processados, ensure_ascii=False, indent=2)
+        texto_gerado = ""
         try:
-            resultado = self.agent_executor.invoke({"input": dados_processados_str})
-            texto_gerado = resultado['output']
+            resultado_llm = self.chain.invoke({"dados_processados": dados_processados_str})
+            texto_gerado = resultado_llm['text']
             texto_limpo = texto_gerado.strip()
             if '```json' in texto_limpo: texto_limpo = texto_limpo.split('```json', 1)[-1]
             if '```' in texto_limpo: texto_limpo = texto_limpo.split('```', 1)[0]
@@ -55,4 +46,4 @@ class AgenteTecnicoEstudoCaso:
             return analise_juridica
         except Exception as e:
             print(f"Erro no Agente Técnico de Estudo de Caso: {e}")
-            return {"erro": "Falha na análise jurídica do estudo de caso", "detalhes": str(e)}
+            return {"erro": "Falha na análise jurídica do estudo de caso", "detalhes": str(e), "saida_llm": texto_gerado}
