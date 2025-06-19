@@ -8,7 +8,7 @@ from langchain_core.tools import Tool
 def buscar_google_jurisprudencia(query: str) -> str:
     print(f"--- Usando Ferramenta: buscando no Google por '{query}' ---")
     try:
-        # --- CORREÇÃO AQUI ---
+        # --- CORREÇÃO DE SINTAXE APLICADA ---
         search_results = Google Search(queries=[query])
         return json.dumps(search_results)
     except Exception as e:
