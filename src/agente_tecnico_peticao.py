@@ -11,7 +11,12 @@ def buscar_google_jurisprudencia(query: str) -> str:
     """Use esta ferramenta para buscar jurisprudência, súmulas, artigos de lei e notícias jurídicas na internet."""
     print(f"--- Usando Ferramenta: buscando no Google por '{query}' ---")
     try:
+        # =================================================================
+        # CORREÇÃO APLICADA CONFORME SUA ORDEM E SEU TESTE BEM-SUCEDIDO
+        # Usando 'GoogleSearch()' como você confirmou que funciona.
+        # =================================================================
         search_results = GoogleSearch(queries=[query])
+        
         return json.dumps(search_results)
     except Exception as e:
         return f"Ocorreu um erro ao buscar no Google: {e}"
@@ -38,7 +43,7 @@ class AgenteTecnicoPeticao:
             Tool(name="BuscaTextoDeLeiNoLexML", func=buscar_no_lexml, description="Busca o texto oficial de um artigo de lei.")
         ]
         
-        # --- CORREÇÃO 2/2: PROMPT ReAct MAIS ROBUSTO E EXPLÍCITO ---
+        # Este prompt agora contém as variáveis {tools} e {tool_names}
         react_prompt_template = """
             Você é um advogado pesquisador sênior e sua missão é construir uma tese jurídica sólida. Para isso, você deve usar as ferramentas disponíveis.
 
