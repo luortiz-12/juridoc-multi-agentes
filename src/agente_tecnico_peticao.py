@@ -5,31 +5,32 @@ from langchain_openai import ChatOpenAI
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain_core.tools import Tool
 
-# 🔧 Certifique-se de importar ou implementar GoogleSearch aqui.
-# from sua_biblioteca_de_busca import GoogleSearch
-
+# Simulação de busca — substitua por GoogleSearch real, se necessário
 def buscar_google_jurisprudencia(query: str) -> str:
-    """Use esta ferramenta para buscar jurisprudência, súmulas, artigos de lei e notícias jurídicas na internet."""
     print(f"--- Usando Ferramenta: buscando no Google por '{query}' ---")
     try:
-        # Simulação temporária (substitua com GoogleSearch real se necessário)
         return json.dumps({"resultado": f"Simulado: jurisprudência para '{query}'"})
     except Exception as e:
         return f"Ocorreu um erro ao buscar no Google: {e}"
 
 def buscar_no_lexml(termo_da_lei: str) -> str:
-    """Use esta ferramenta para buscar o texto oficial de leis e decretos."""
     print(f"--- Usando Ferramenta Manual: buscando no LexML por '{termo_da_lei}' ---")
     return "Resultado simulado da LexML."
 
 def buscar_casos_similares(resumo_do_caso_atual: str) -> str:
-    """Use esta ferramenta PRIMEIRO para pesquisar em nosso banco de dados interno por casos anteriores similares."""
     print(f"--- Usando Ferramenta Interna: buscando casos similares para '{resumo_do_caso_atual[:50]}...' ---")
     BASE_DE_CASOS_INTERNA = [
-        {"id": "caso_002", "resumo_dos_fatos": "inadimplemento contratual", "palavras_chave": ["inadimplemento", "cobrança"],
-         "tese_aplicada": "Ação de Cobrança baseada no inadimplemento de obrigação contratual (Art. 389 e 475 do Código Civil)."}
+        {
+            "id": "caso_002",
+            "resumo_dos_fatos": "inadimplemento contratual",
+            "palavras_chave": ["inadimplemento", "cobrança"],
+            "tese_aplicada": "Ação de Cobrança baseada no inadimplemento de obrigação contratual (Art. 389 e 475 do Código Civil)."
+        }
     ]
-    palavras_encontradas = [caso for caso in BASE_DE_CASOS_INTERNA if any(palavra in resumo_do_caso_atual.lower() for palavra in caso["palavras_chave"])]
+    palavras_encontradas = [
+        caso for caso in BASE_DE_CASOS_INTERNA
+        if any(palavra in resumo_do_caso_atual.lower() for palavra in caso["palavras_chave"])
+    ]
     if not palavras_encontradas:
         return "Nenhum caso similar encontrado."
     return f"Caso similar encontrado (ID: {palavras_encontradas[0]['id']}). A tese de sucesso foi: {palavras_encontradas[0]['tese_aplicada']}"
@@ -37,10 +38,23 @@ def buscar_casos_similares(resumo_do_caso_atual: str) -> str:
 class AgenteTecnicoPeticao:
     def __init__(self, llm_api_key):
         self.llm = ChatOpenAI(model="gpt-4o", openai_api_key=llm_api_key, temperature=0.1)
+        
         self.tools = [
-            Tool(name="BuscaCasosSimilaresInternos", func=buscar_casos_similares, description="Pesquisa no banco de dados interno por casos passados. Use ANTES de buscas externas."),
-            Tool(name="BuscaGoogleJurisprudencia", func=buscar_google_jurisprudencia, description="Busca jurisprudência e leis na internet."),
-            Tool(name="BuscaTextoDeLeiNoLexML", func=buscar_no_lexml, description="Busca o texto oficial de um artigo de lei.")
+            Tool(
+                name="BuscaCasosSimilaresInternos",
+                func=buscar_casos_similares,
+                description="Pesquisa no banco de dados interno por casos passados. Use ANTES de buscas externas."
+            ),
+            Tool(
+                name="BuscaGoogleJurisprudencia",
+                func=buscar_google_jurisprudencia,
+                description="Busca jurisprudência e leis na internet."
+            ),
+            Tool(
+                name="BuscaTextoDeLeiNoLexML",
+                func=buscar_no_lexml,
+                description="Busca o texto oficial de um artigo de lei."
+            )
         ]
 
         react_prompt_template = """
@@ -79,7 +93,11 @@ class AgenteTecnicoPeticao:
         """
 
         tool_names = [tool.name for tool in self.tools]
-        prompt = ChatPromptTemplate.from_template(react_prompt_template).partial(tool_names=", ".join(tool_names))
+        prompt = ChatPromptTemplate.from_template(react_prompt_template).partial(
+            tool_names=", ".join(tool_names),
+            tools=self.tools  # correção que soluciona o erro!
+        )
+
         agent = create_react_agent(self.llm, self.tools, prompt)
         self.agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True, handle_parsing_errors=True)
 
