@@ -1,13 +1,27 @@
-# JURIDOC MULTI-AGENTES COM RAG - VERSÃO COMPLETA
+# JURIDOC MULTI-AGENTES COM RAG - VERSÃO CORRIGIDA
 
-## 🚀 SISTEMA PRONTO PARA DEPLOY
+## 🚀 SISTEMA PRONTO PARA DEPLOY (VERSÃO CORRIGIDA)
 
 Este pacote contém o sistema JuriDoc completo com:
 - ✅ Todos os agentes originais mantidos
 - ✅ Sistema RAG integrado
 - ✅ Base de conhecimento com 195+ documentos
 - ✅ Busca online em fontes jurídicas
-- ✅ Compatível com deploy no Render
+- ✅ **DEPENDÊNCIAS CORRIGIDAS** para deploy no Render
+
+## 🔧 CORREÇÕES APLICADAS
+
+### ❌ PROBLEMA ANTERIOR:
+```
+ERROR: Cannot install langchain-core==0.3.15
+Conflito entre langchain-openai 0.2.8 e langchain-core 0.3.15
+```
+
+### ✅ SOLUÇÃO APLICADA:
+```
+langchain-core>=0.3.17  (versão flexível compatível)
+langchain-text-splitters>=0.3.0  (dependência adicionada)
+```
 
 ## 📁 ESTRUTURA DO PROJETO
 
@@ -15,7 +29,7 @@ Este pacote contém o sistema JuriDoc completo com:
 juridoc-multi-agentes/
 ├── start.py                           ← Corrigido para Render
 ├── Procfile                          ← Deploy config
-├── requirements.txt                  ← Dependencies atualizadas
+├── requirements.txt                  ← ✅ CORRIGIDO
 ├── rag_config.json                   ← Configurações RAG
 ├── README.md                         ← Este arquivo
 ├── DEPLOY_INSTRUCTIONS.md            ← Instruções detalhadas
@@ -43,12 +57,13 @@ juridoc-multi-agentes/
 # Substitua o conteúdo do seu repositório
 # Commit e push:
 git add .
-git commit -m "Sistema RAG completo integrado - v2.0"
+git commit -m "Sistema RAG completo - dependências corrigidas"
 git push origin main
 ```
 
 ### 2. Deploy no Render
 - O deploy será automático após o push
+- ✅ **Agora sem conflitos de dependências**
 - Aguarde 5-10 minutos para build completo
 - Verifique logs para confirmação do RAG
 
@@ -78,7 +93,7 @@ git push origin main
 - ✅ Taxa de sucesso: 100%
 - ✅ Qualidade média: 95.9%
 - ✅ Compatibilidade Render: 100%
-- ✅ Fallback robusto
+- ✅ **Dependências: CORRIGIDAS**
 
 ## 🆘 SUPORTE
 
@@ -87,7 +102,7 @@ Se houver problemas:
 2. Confirme que todas as variáveis de ambiente estão configuradas
 3. Teste endpoints de status primeiro
 
-**Versão:** 2.0 com RAG  
+**Versão:** 2.1 com RAG (Dependências Corrigidas)  
 **Data:** 23/06/2025  
 **Status:** ✅ Pronto para produção
 
