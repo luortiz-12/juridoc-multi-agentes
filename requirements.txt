@@ -1,25 +1,28 @@
-# requirements.txt - Versões Estáveis e Compatíveis
-
-# Framework Web
+# Framework Web e Servidor
 Flask==3.0.3
 Flask-Cors==4.0.1
 gunicorn==22.0.0
 
-# Core da OpenAI e LangChain
-openai==1.35.7
+# Core LangChain e OpenAI (versões compatíveis)
+openai==1.25.2
 langchain==0.2.1
-langchain-openai==0.1.7
 langchain-core==0.2.5
-
-# Componentes adicionais do LangChain e RAG
+langchain-openai==0.1.7
 langchain-community==0.2.1
-langchain-text-splitters==0.2.0
-langsmith==0.1.81
+langsmith==0.1.75
 
-# Dependências para busca e processamento de dados RAG
+# Dependências para RAG e processamento
+langchain-text-splitters==0.2.0
+sentence-transformers==2.7.0
+torch==2.3.1
+torchvision==0.18.1
+torchaudio==2.3.1
+transformers==4.41.2
+pypdf==4.2.0
+chromadb==0.5.0
 beautifulsoup4==4.12.3
+
+# Outras dependências necessárias
 requests==2.32.3
 aiohttp==3.9.5
-sentence-transformers==3.0.1
-chromadb==0.5.3 # Biblioteca para banco de dados vetorial
-pypdf==4.2.0    # Para ler PDFs, muito útil para a base de conhecimento
+pydantic==2.7.4
