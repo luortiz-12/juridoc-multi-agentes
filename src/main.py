@@ -1,5 +1,15 @@
 # src/main.py
 
+
+# Imports RAG
+try:
+    from rag_agent_integration import RAGEnhancedTechnicalAgent, RAGEnhancedWriterAgent
+    RAG_AVAILABLE = True
+    print("✅ Sistema RAG carregado com sucesso")
+except ImportError as e:
+    print(f"⚠️ Sistema RAG não disponível: {e}")
+    RAG_AVAILABLE = False
+
 from flask import Flask
 from flask_cors import CORS
 import os

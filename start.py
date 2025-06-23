@@ -1,5 +1,4 @@
 # start.py
-
 import os
 import subprocess
 import sys
@@ -25,3 +24,4 @@ try:
 except Exception as e:
     print(f"ERRO AO INICIAR GUNICORN: {e}")
     sys.exit(1)
+
