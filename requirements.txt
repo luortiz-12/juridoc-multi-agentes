@@ -1,28 +1,57 @@
-# Framework Web e Servidor
-Flask==3.0.3
-Flask-Cors==4.0.1
-gunicorn==22.0.0
+# Base estável do deploy anterior
+annotated-types==0.7.0
+anyio==4.9.0
+blinker==1.9.0
+certifi==2025.6.15
+charset-normalizer==3.4.2
+click==8.2.1
+distro==1.9.0
+Flask==3.1.1
+Flask-Cors==6.0.0
+Flask-SQLAlchemy==3.1.1
+greenlet==3.2.3
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.10
+itsdangerous==2.2.0
+Jinja2==3.1.6
+jiter==0.10.0
+jsonpatch==1.33
+jsonpointer==3.0.0
+langchain==0.3.25
+langchain-core==0.3.65
+langchain-openai==0.3.23
+langchain-text-splitters==0.3.8
+langsmith==0.3.45
+MarkupSafe==3.0.2
+openai==1.86.0
+orjson==3.10.18
+packaging==24.2
+pydantic==2.11.7
+pydantic_core==2.33.2
+PyYAML==6.0.2
+regex==2024.11.6
+requests==2.32.4
+requests-toolbelt==1.0.0
+sniffio==1.3.1
+SQLAlchemy==2.0.41
+tenacity==9.1.2
+tiktoken==0.9.0
+tqdm==4.67.1
+typing-inspection==0.4.1
+typing_extensions==4.14.0
+urllib3==2.4.0
+Werkzeug==3.1.3
+zstandard==0.23.0
+gunicorn
 
-# Core LangChain e OpenAI (versões compatíveis)
-openai==1.25.2
-langchain==0.2.1
-langchain-core==0.2.5
-langchain-openai==0.1.7
-langchain-community==0.2.1
-langsmith==0.1.75
-
-# Dependências para RAG e processamento
-langchain-text-splitters==0.2.0
-sentence-transformers==2.7.0
-torch==2.3.1
-torchvision==0.18.1
-torchaudio==2.3.1
-transformers==4.41.2
-pypdf==4.2.0
-chromadb==0.5.0
-beautifulsoup4==4.12.3
-
-# Outras dependências necessárias
-requests==2.32.3
-aiohttp==3.9.5
-pydantic==2.7.4
+# --- NOVAS DEPENDÊNCIAS PARA O SISTEMA RAG ---
+# Adicionadas para suportar a busca, embeddings e leitura de documentos
+sentence-transformers
+torch
+torchvision
+torchaudio
+beautifulsoup4
+pypdf
+chromadb
