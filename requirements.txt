@@ -55,3 +55,4 @@ torchaudio
 beautifulsoup4
 pypdf
 chromadb
+aiohttp==3.9.5 # <--- ADICIONADO: Dependência que estava faltando
