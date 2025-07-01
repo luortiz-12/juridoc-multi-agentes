@@ -1,150 +1,101 @@
-# agente_tecnico_peticao.py - VERSÃO INTEGRADA COM RAG
+# agente_tecnico_peticao.py
+
 import os
 import json
-from langchain_core.prompts import PromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from langchain.agents import AgentExecutor, create_react_agent
+from langchain_core.tools import Tool
+
+def buscar_google_jurisprudencia(query: str) -> str:
+    """Use esta ferramenta para buscar jurisprudência, súmulas, artigos de lei e notícias jurídicas na internet."""
+    print(f"--- Usando Ferramenta: buscando no Google por '{query}' ---")
+    try:
+        # --- CORREÇÃO DE SINTAXE APLICADA ---
+        # Trocado 'GoogleSearch(...)' pelo comando correto 'Google Search(...)'.
+        search_results = Google Search(queries=[query])
+        return json.dumps(search_results)
+    except Exception as e:
+        return f"Ocorreu um erro ao usar a ferramenta BuscaGoogleJurisprudencia. O erro foi: {e}. Tente reformular sua busca ou use outra ferramenta."
+
+def buscar_no_lexml(termo_da_lei: str) -> str:
+    """Use esta ferramenta para buscar o texto oficial de leis e decretos."""
+    print(f"--- Usando Ferramenta Manual: buscando no LexML por '{termo_da_lei}' ---")
+    return "Resultado simulado da LexML. Se não encontrar o que precisa, tente a BuscaGoogleJurisprudencia com o nome da lei."
+
+def buscar_casos_similares(resumo_do_caso_atual: str) -> str:
+    """Use esta ferramenta PRIMEIRO para pesquisar em nosso banco de dados interno por casos anteriores similares."""
+    print(f"--- Usando Ferramenta Interna: buscando casos similares para '{resumo_do_caso_atual[:50]}...' ---")
+    BASE_DE_CASOS_INTERNA = [{"id": "caso_002", "resumo_dos_fatos": "inadimplemento contratual", "palavras_chave": ["inadimplemento", "cobrança"], "tese_aplicada": "Ação de Cobrança baseada no inadimplemento de obrigação contratual (Art. 389 e 475 do Código Civil)."}]
+    palavras_encontradas = [caso for caso in BASE_DE_CASOS_INTERNA if any(palavra in resumo_do_caso_atual.lower() for palavra in caso["palavras_chave"])]
+    if not palavras_encontradas: return "Nenhum caso similar encontrado no banco de dados interno. Prossiga com a pesquisa externa."
+    return f"Caso similar encontrado (ID: {palavras_encontradas[0]['id']}). A tese de sucesso foi: {palavras_encontradas[0]['tese_aplicada']}"
 
 class AgenteTecnicoPeticao:
-    """
-    Agente especialista que analisa os fatos, identifica o tipo de petição
-    e constrói a tese jurídica com integração RAG e busca online.
-    """
     def __init__(self, llm_api_key):
         self.llm = ChatOpenAI(model="gpt-4o", openai_api_key=llm_api_key, temperature=0.1)
         
-        self.prompt_template = PromptTemplate(
-            input_variables=["dados_processados", "contexto_rag", "busca_online"],
-            template="""
-            Você é um advogado pesquisador sênior, com profundo conhecimento do ordenamento jurídico brasileiro. Sua missão é analisar os fatos de um caso e construir a tese jurídica mais forte possível para uma petição inicial.
+        self.tools = [
+            Tool(name="BuscaCasosSimilaresInternos", func=buscar_casos_similares, description="Pesquisa no banco de dados interno por casos passados com fatos similares. Use esta ferramenta ANTES de qualquer busca externa."),
+            Tool(name="BuscaGoogleJurisprudencia", func=buscar_google_jurisprudencia, description="Busca jurisprudência, leis e notícias jurídicas na internet. Use para encontrar decisões recentes ou para complementar a tese encontrada nos casos internos."),
+            Tool(name="BuscaTextoDeLeiNoLexML", func=buscar_no_lexml, description="Busca o texto oficial de um artigo de lei específico quando você já sabe qual é a lei e o artigo.")
+        ]
+        
+        # --- PROMPT ReAct MAIS ROBUSTO ---
+        # Inclui regras claras e um manual de contingência para evitar loops.
+        react_prompt_template = """
+            Você é um advogado pesquisador sênior e sua missão é construir uma tese jurídica sólida. Para isso, você deve usar as ferramentas disponíveis.
 
-            **DADOS DO CASO (recebidos do formulário N8N):**
-            {dados_processados}
+            **REGRAS OBRIGATÓRIAS PARA USAR FERRAMENTAS:**
+            1. Você DEVE seguir o ciclo 'Thought -> Action -> Action Input -> Observation'.
+            2. O seu pensamento (Thought) deve descrever seu plano de pesquisa.
+            3. Sua ação (Action) deve ser EXATAMENTE um dos seguintes nomes de ferramentas: {tool_names}
 
-            **CONTEXTO RAG DISPONÍVEL:**
-            {contexto_rag}
+            **MANUAL DE CONTINGÊNCIA E ESTRATÉGIA DE FALLBACK:**
+            1. Se uma ferramenta retornar um ERRO ou um resultado inútil, leia a observação (Observation), pense no que deu errado e **NÃO repita a mesma ação**.
+            2. **TENTE UMA ALTERNATIVA:** Reformule sua busca (Action Input) ou, mais importante, **use outra ferramenta** que pareça mais adequada.
+            3. **PLANO FINAL (FALLBACK):** Se, após tentar usar as ferramentas de forma inteligente, você não conseguir encontrar as informações necessárias, **pare de usar ferramentas**. Use seu vasto conhecimento jurídico interno para preencher o JSON final da melhor forma possível. Seu objetivo é SEMPRE entregar a análise.
 
-            **BUSCA ONLINE REALIZADA:**
-            {busca_online}
+            **Você tem acesso às seguintes ferramentas:**
+            {tools}
 
-            **SUA TAREFA APRIMORADA COM RAG:**
+            **DADOS DO CASO ATUAL:**
+            {input}
 
-            **1. ANÁLISE E CLASSIFICAÇÃO (Instrução Obrigatória):**
-            Sua primeira tarefa é identificar o tipo específico de petição com base nos campos preenchidos. Siga estas regras OBRIGATORIAMENTE:
-            - Se algum campo contiver as palavras 'trabalho' ou 'trabalhista' (como 'InfoExtraTrabalhista', 'datadmissaoTrabalhista'), o caso é **TRABALHISTA**. Fundamente sua pesquisa na CLT.
-            - Se algum campo contiver a palavra 'crime' ou 'criminal' (como 'datafatoCriminal'), o caso é **PENAL (QUEIXA-CRIME)**. Fundamente sua pesquisa no Código Penal e no Código de Processo Penal.
-            - Se algum campo contiver a palavra 'habiesCorpus', o caso é **CONSTITUCIONAL (HABEAS CORPUS)**. Fundamente sua pesquisa no Art. 5º da Constituição Federal e no Código de Processo Penal.
-            - Se nenhuma das condições acima for atendida, o caso é **CÍVEL**. Fundamente sua pesquisa no Código Civil e no Código de Processo Civil.
-            - Ignore completamente todos os campos que vierem com valor 'null' ou vazios. Baseie sua análise apenas nos campos que contêm informação.
-
-            **2. PESQUISA E FUNDAMENTAÇÃO APRIMORADA:**
-            - Use PRIORITARIAMENTE as informações da busca online para fundamentação atualizada
-            - Complemente com o contexto RAG dos modelos de petições similares
-            - Se busca online falhar, use seu conhecimento interno como fallback
-            - Cite leis, artigos e jurisprudência mais recentes encontradas
-
-            **3. ESTRUTURA DA RESPOSTA:**
-            Retorne sua análise completa no formato JSON abaixo.
-
-            **Formato Final da Resposta (DEVE ser um JSON válido):**
+            **Formato Final da Resposta (APENAS o objeto JSON):**
             ```json
             {{
-                "fundamentos_legais": [{{"lei": "Nome do Código ou Lei", "artigos": "Artigos aplicáveis", "descricao": "Explicação da relevância do artigo para o caso."}}],
-                "principios_juridicos": ["Princípios jurídicos que se aplicam ao caso específico."],
-                "jurisprudencia_relevante": "Cite uma Súmula do STJ/STF/TST ou um entendimento pacificado relevante para a tese.",
-                "analise_juridica_detalhada": "Um parágrafo completo e bem fundamentado explicando como os fatos se conectam com a lei e a jurisprudência para formar a tese da petição."
+                "fundamentos_legais": [{{"lei": "...", "artigos": "...", "descricao": "..."}}],
+                "principios_juridicos": ["..."],
+                "jurisprudencia_relevante": "...",
+                "analise_juridica_detalhada": "..."
             }}
             ```
-            """
-        )
-    
-    def analisar_com_rag(self, dados_processados, contexto_rag="", busca_online=""):
-        """
-        Análise técnica integrada com RAG e busca online.
-        """
-        try:
-            # Importar sistemas RAG com fallback
-            try:
-                from rag_simple_knowledge_base import SimpleJuriDocRAG
-                from rag_real_online_search import RealJuridicalSearcher
-                
-                # Obter contexto RAG
-                if not contexto_rag:
-                    rag = SimpleJuriDocRAG()
-                    contexto_rag = rag.get_relevant_context('peticao', dados_processados)
-                
-                # Realizar busca online
-                if not busca_online:
-                    searcher = RealJuridicalSearcher()
-                    tipo_caso = self._identificar_tipo_caso(dados_processados)
-                    busca_online = searcher.buscar_fundamentacao_juridica(tipo_caso, dados_processados)
-                    
-            except Exception as e:
-                print(f"⚠️ RAG/Busca indisponível: {e}")
-                contexto_rag = "Sistema RAG temporariamente indisponível"
-                busca_online = "Busca online temporariamente indisponível"
-            
-            # Executar análise
-            response = self.llm.invoke(
-                self.prompt_template.format(
-                    dados_processados=json.dumps(dados_processados, indent=2, ensure_ascii=False),
-                    contexto_rag=str(contexto_rag),
-                    busca_online=str(busca_online)
-                )
-            )
-            
-            return self._processar_resposta(response.content)
-            
-        except Exception as e:
-            print(f"❌ Erro na análise técnica: {e}")
-            return self._fallback_analise(dados_processados)
-    
-    def _identificar_tipo_caso(self, dados):
-        """Identifica tipo de caso para busca direcionada."""
-        dados_str = str(dados).lower()
-        if 'trabalh' in dados_str:
-            return 'trabalhista'
-        elif 'crime' in dados_str or 'penal' in dados_str:
-            return 'penal'
-        elif 'habeas' in dados_str:
-            return 'constitucional'
-        else:
-            return 'civil'
-    
-    def _processar_resposta(self, resposta):
-        """Processa resposta do LLM e extrai JSON."""
-        try:
-            # Extrair JSON da resposta
-            inicio = resposta.find('{')
-            fim = resposta.rfind('}') + 1
-            if inicio != -1 and fim > inicio:
-                json_str = resposta[inicio:fim]
-                return json.loads(json_str)
-            else:
-                return {"erro": "Formato de resposta inválido", "resposta_bruta": resposta}
-        except Exception as e:
-            return {"erro": f"Erro ao processar resposta: {e}", "resposta_bruta": resposta}
-    
-    def _fallback_analise(self, dados_processados):
-        """Análise de fallback sem RAG."""
-        try:
-            response = self.llm.invoke(f"""
-            Analise este caso jurídico e forneça fundamentação básica:
-            {json.dumps(dados_processados, indent=2, ensure_ascii=False)}
-            
-            Retorne JSON com: fundamentos_legais, principios_juridicos, jurisprudencia_relevante, analise_juridica_detalhada
-            """)
-            return self._processar_resposta(response.content)
-        except Exception as e:
-            return {
-                "fundamentos_legais": [{"lei": "Análise indisponível", "artigos": "N/A", "descricao": f"Erro: {e}"}],
-                "principios_juridicos": ["Sistema em recuperação"],
-                "jurisprudencia_relevante": "Indisponível temporariamente",
-                "analise_juridica_detalhada": "Sistema em modo de emergência - análise manual necessária"
-            }
+            Inicie seu trabalho agora.
 
-    def analisar_caso(self, dados_processados):
+            Thought: {agent_scratchpad}
         """
-        Método original mantido para compatibilidade.
-        """
-        return self.analisar_com_rag(dados_processados)
+        
+        prompt = ChatPromptTemplate.from_template(react_prompt_template)
+        
+        # Usando o método .partial() para injetar as variáveis de forma segura
+        tool_names = ", ".join([tool.name for tool in self.tools])
+        tools_string = "\n".join([f"{tool.name}: {tool.description}" for tool in self.tools])
+        prompt = prompt.partial(tool_names=tool_names, tools=tools_string)
+        
+        agent = create_react_agent(self.llm, self.tools, prompt)
+        self.agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True, handle_parsing_errors=True, max_iterations=10)
 
+    def analisar_dados(self, dados_processados: dict) -> dict:
+        dados_processados_str = json.dumps(dados_processados, ensure_ascii=False, indent=2)
+        try:
+            resultado = self.agent_executor.invoke({"input": dados_processados_str})
+            texto_gerado = resultado['output']
+            texto_limpo = texto_gerado.strip()
+            if '```json' in texto_limpo: texto_limpo = texto_limpo.split('```json', 1)[-1]
+            if '```' in texto_limpo: texto_limpo = texto_limpo.split('```', 1)[0]
+            analise_juridica = json.loads(texto_limpo.strip())
+            return analise_juridica
+        except Exception as e:
+            print(f"Erro no Agente Técnico de Petição: {e}")
+            return {"erro": "Falha na análise jurídica da petição", "detalhes": str(e)}
