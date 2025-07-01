@@ -1,8 +1,4 @@
-# rag_agent_integration.py
-"""
-Integração do sistema RAG com os agentes especializados do JuriDoc.
-Combina conhecimento estrutural, busca online e templates para cada tipo de agente.
-"""
+# rag_agent_integration.py - VERSÃO CORRIGIDA
 
 import os
 import json
@@ -23,7 +19,6 @@ class RAGEnhancedAgent:
         self.doc_type = doc_type
         self.llm_api_key = llm_api_key
         
-        # Sua inicialização dos componentes RAG está perfeita.
         self.knowledge_base = SimpleJuriDocRAG()
         self.online_searcher = RealJuridicalSearcher()
         self.smart_searcher = SmartJuridicalSearcher(self.online_searcher)
@@ -32,20 +27,17 @@ class RAGEnhancedAgent:
         self.search_cache = {}
     
     def _load_knowledge_base(self):
-        """
-        Carrega a base de conhecimento RAG de forma relativa e com o método correto.
-        """
+        """ Carrega a base de conhecimento RAG de forma relativa. """
         try:
             # --- CORREÇÃO 1: Caminho do Arquivo ---
-            # Usa um caminho relativo para encontrar o arquivo no Render.
+            # Usa a biblioteca pathlib para encontrar o arquivo na pasta 'src'
             base_path = Path(__file__).parent
             kb_file_path = base_path / "juridoc_rag_knowledge_base.json"
             
             if kb_file_path.exists():
-                # --- CORREÇÃO 2: Nome do Método ---
-                # Chamando o método que realmente existe na sua classe SimpleJuriDocRAG.
+                # Chamando o método correto que existe na sua classe SimpleJuriDocRAG
                 if self.knowledge_base.load_structural_patterns(str(kb_file_path)):
-                    print(f"✅ Base de conhecimento RAG carregada e processada para {self.agent_type} {self.doc_type}")
+                    print(f"✅ Base de conhecimento RAG carregada para {self.agent_type}/{self.doc_type}")
                 else:
                     print(f"❌ Falha no processamento dos padrões pela classe SimpleJuriDocRAG.")
             else:
@@ -74,8 +66,8 @@ class RAGEnhancedAgent:
         except Exception as e:
             print(f"Erro na busca online: {e}")
             return self._get_fallback_content(query, context)
-
-    # Mantenha todos os seus outros métodos da classe RAGEnhancedAgent aqui
+    
+    # Mantenha todos os seus outros métodos originais da classe RAGEnhancedAgent aqui
     # _get_document_templates, _get_contextual_formulas, _process_search_results, etc.
 
 
@@ -84,7 +76,8 @@ class RAGEnhancedTechnicalAgent(RAGEnhancedAgent):
     Agente técnico aprimorado com RAG para análise jurídica especializada.
     """
     def __init__(self, doc_type: str, llm_api_key: str):
-        # A correção para passar 'agent_type' está mantida.
+        # --- CORREÇÃO 2: Passando o 'agent_type' que faltava ---
+        # Garantimos que a classe mãe receba todos os argumentos que ela espera.
         super().__init__('tecnico', doc_type, llm_api_key)
     
     def analyze_with_rag(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -97,7 +90,8 @@ class RAGEnhancedWriterAgent(RAGEnhancedAgent):
     Agente redator aprimorado com RAG para redação especializada.
     """
     def __init__(self, doc_type: str, llm_api_key: str):
-        # A correção para passar 'agent_type' está mantida.
+        # --- CORREÇÃO 2: Passando o 'agent_type' que faltava ---
+        # Garantimos que a classe mãe receba todos os argumentos que ela espera.
         super().__init__('redator', doc_type, llm_api_key)
 
     def write_with_rag(self, user_data: Dict[str, Any], technical_analysis: Dict[str, Any] = None) -> Dict[str, Any]:
