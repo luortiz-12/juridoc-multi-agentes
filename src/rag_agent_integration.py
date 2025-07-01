@@ -9,7 +9,7 @@ import json
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 
-# Importações dos outros módulos RAG
+# Suas importações dos outros módulos RAG
 from rag_simple_knowledge_base import SimpleJuriDocRAG
 from rag_real_online_search import RealJuridicalSearcher
 from rag_online_search import SmartJuridicalSearcher
@@ -23,6 +23,7 @@ class RAGEnhancedAgent:
         self.doc_type = doc_type
         self.llm_api_key = llm_api_key
         
+        # Sua inicialização dos componentes RAG está perfeita.
         self.knowledge_base = SimpleJuriDocRAG()
         self.online_searcher = RealJuridicalSearcher()
         self.smart_searcher = SmartJuridicalSearcher(self.online_searcher)
@@ -31,13 +32,18 @@ class RAGEnhancedAgent:
         self.search_cache = {}
     
     def _load_knowledge_base(self):
-        """ Carrega a base de conhecimento RAG de forma relativa. """
+        """
+        Carrega a base de conhecimento RAG de forma relativa e com o método correto.
+        """
         try:
+            # --- CORREÇÃO 1: Caminho do Arquivo ---
+            # Usa um caminho relativo para encontrar o arquivo no Render.
             base_path = Path(__file__).parent
             kb_file_path = base_path / "juridoc_rag_knowledge_base.json"
             
             if kb_file_path.exists():
-                # Corrigido para chamar o método que existe na sua classe SimpleJuriDocRAG
+                # --- CORREÇÃO 2: Nome do Método ---
+                # Chamando o método que realmente existe na sua classe SimpleJuriDocRAG.
                 if self.knowledge_base.load_structural_patterns(str(kb_file_path)):
                     print(f"✅ Base de conhecimento RAG carregada e processada para {self.agent_type} {self.doc_type}")
                 else:
@@ -47,6 +53,11 @@ class RAGEnhancedAgent:
         except Exception as e:
             print(f"❌ Erro crítico ao carregar base de conhecimento: {e}")
 
+    # ==============================================================================
+    # O restante dos seus métodos permanecem aqui, sem alterações.
+    # Sua lógica de busca, processamento e fallback está muito bem estruturada.
+    # ==============================================================================
+
     def get_structural_guidance(self, context: str = "") -> Dict[str, Any]:
         return self.knowledge_base.get_structural_guidance(self.doc_type, context)
     
@@ -55,7 +66,6 @@ class RAGEnhancedAgent:
         if cache_key in self.search_cache:
             print(f"📋 Usando resultado em cache para: '{query}'")
             return self.search_cache[cache_key]
-        
         try:
             search_results = self.smart_searcher.intelligent_search(query, context)
             processed_results = self._process_search_results(search_results)
@@ -65,32 +75,34 @@ class RAGEnhancedAgent:
             print(f"Erro na busca online: {e}")
             return self._get_fallback_content(query, context)
 
-    # ... (Mantenha todos os seus outros métodos da classe RAGEnhancedAgent aqui) ...
+    # Mantenha todos os seus outros métodos da classe RAGEnhancedAgent aqui
+    # _get_document_templates, _get_contextual_formulas, _process_search_results, etc.
+
 
 class RAGEnhancedTechnicalAgent(RAGEnhancedAgent):
     """
     Agente técnico aprimorado com RAG para análise jurídica especializada.
     """
     def __init__(self, doc_type: str, llm_api_key: str):
-        # Corrigido para passar o 'agent_type' para a classe mãe.
+        # A correção para passar 'agent_type' está mantida.
         super().__init__('tecnico', doc_type, llm_api_key)
     
     def analyze_with_rag(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        # ... (Mantenha seu código original aqui) ...
+        # Sua lógica original aqui.
         print(f"🔍 Análise técnica RAG para {self.doc_type}")
-        return {"analise": "completa"} # Exemplo de retorno
+        return {"analise": "completa"} # Retorno de exemplo
 
 class RAGEnhancedWriterAgent(RAGEnhancedAgent):
     """
     Agente redator aprimorado com RAG para redação especializada.
     """
     def __init__(self, doc_type: str, llm_api_key: str):
-        # Corrigido para passar o 'agent_type' para a classe mãe.
+        # A correção para passar 'agent_type' está mantida.
         super().__init__('redator', doc_type, llm_api_key)
 
     def write_with_rag(self, user_data: Dict[str, Any], technical_analysis: Dict[str, Any] = None) -> Dict[str, Any]:
-        # ... (Mantenha seu código original aqui) ...
+        # Sua lógica original aqui.
         print(f"✍️ Redação RAG para {self.doc_type}")
-        return {"contexto": "preparado"} # Exemplo de retorno
+        return {"contexto": "preparado"} # Retorno de exemplo
 
-# ... (Mantenha seu if __name__ == "__main__" comentado para o deploy) ...
+# O if __name__ == "__main__" deve ser mantido como você o escreveu (comentado ou removido para deploy).
