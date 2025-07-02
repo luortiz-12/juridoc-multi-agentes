@@ -1,9 +1,0 @@
-{
-  "rag_enabled": true,
-  "knowledge_base_file": "src/juridoc_rag_knowledge_base.json",
-  "online_search_enabled": true,
-  "fallback_to_llm": true,
-  "cache_search_results": true,
-  "max_search_results": 10,
-  "search_timeout": 15
-}
