@@ -6,6 +6,9 @@ from langchain_core.prompts import PromptTemplate
 from langchain.chains import LLMChain
 # Importa a classe de pesquisa do seu outro arquivo
 from pesquisa_juridica import PesquisaJuridica
+# --- CORREÇÃO AQUI ---
+# Importamos 'List' e 'Dict' para usar nas anotações de tipo das funções.
+from typing import List, Dict
 
 class AgenteTecnicoPeticao:
     """
