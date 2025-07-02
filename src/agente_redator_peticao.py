@@ -1,5 +1,4 @@
-# agente_redator_peticao.py - VERSÃO REFATORADA (O ESCRITOR)
-
+# agente_redator_peticao.py - VERSÃO FINAL (O ESCRITOR)
 import json
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
@@ -29,16 +28,15 @@ class AgenteRedatorPeticao:
             - Use a 'analise_juridica_detalhada' como o fio condutor da sua argumentação na seção DO DIREITO.
             - Incorpore os 'fundamentos_legais' e a 'jurisprudencia_relevante' de forma fluida no texto.
             - Siga a estrutura formal (Endereçamento, Qualificação, Fatos, Direito, Pedidos, Valor da Causa, etc.).
-            - Adapte os termos (Autor/Réu, Reclamante/Reclamada) com base na natureza da ação.
             - Se alguma informação essencial não foi fornecida nos dados (ex: nome do advogado, OAB), use placeholders claros: [NOME DO ADVOGADO], [OAB/UF].
             - O resultado deve ser apenas o HTML, começando com <h1>.
             """
         )
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
 
-    def redigir_documento(self, dados_processados: dict, analise_tecnica: dict, documento_anterior: str = None) -> dict:
+    def redigir_documento(self, dados_processados: dict, analise_tecnica: dict) -> dict:
         """
-        Executa o processo de redação. O loop de revisão foi simplificado por enquanto.
+        Executa o processo de redação.
         """
         try:
             print("✍️ Etapa de Redação: Escrevendo a petição...")

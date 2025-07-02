@@ -1,231 +1,88 @@
-# agente_peticao.py
-import os
+# agente_tecnico_peticao.py - VERSÃO FINAL (O ESTRATEGISTA)
+
 import json
-from typing import Dict, Any, List
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain.chains import LLMChain
+# Importa a classe de pesquisa do seu outro arquivo
 from pesquisa_juridica import PesquisaJuridica
 
-class AgentePeticao:
+class AgenteTecnicoPeticao:
     """
-    Agente simplificado especializado em gerar petições iniciais.
-    Integra pesquisa jurídica via DuckDuckGo para fundamentação legal.
+    Agente especialista que analisa fatos, realiza pesquisa jurídica online
+    e estrutura a tese e os fundamentos para uma petição.
     """
-    
-    def __init__(self, openai_api_key: str):
-        self.llm = ChatOpenAI(
-            model="gpt-4o", 
-            openai_api_key=openai_api_key, 
-            temperature=0.2
-        )
-        
-        # Inicializar módulo de pesquisa jurídica
+    def __init__(self, llm_api_key: str):
+        self.llm = ChatOpenAI(model="gpt-4o", openai_api_key=llm_api_key, temperature=0.1)
         self.pesquisa = PesquisaJuridica()
-        
-        # Template para análise e estruturação dos dados
-        self.prompt_analise = PromptTemplate(
-            input_variables=["dados_entrada"],
+        self.prompt_template = PromptTemplate(
+            input_variables=["dados_processados", "pesquisa_juridica"],
             template="""
-            Você é um advogado especialista em petições iniciais. Analise os dados fornecidos e extraia as informações essenciais para estruturar uma petição.
+            Você é um advogado pesquisador sênior. Sua missão é analisar os fatos de um caso, junto com os resultados de uma pesquisa jurídica online, e construir a tese jurídica mais forte para uma petição.
 
-            DADOS RECEBIDOS:
-            {dados_entrada}
+            DADOS DO CASO:
+            {dados_processados}
 
-            TAREFA: Extraia e organize as seguintes informações:
-            1. Tipo de ação/procedimento
-            2. Partes envolvidas (autor/requerente e réu/requerido)
-            3. Fatos principais do caso
-            4. Fundamentos jurídicos necessários
-            5. Pedidos específicos
-            6. Valor da causa (se aplicável)
-            7. Competência/foro
-
-            FORMATO DE RESPOSTA: JSON com as chaves:
-            - "tipo_acao": string
-            - "autor": dict com nome, cpf/cnpj, endereço, etc.
-            - "reu": dict com nome, cpf/cnpj, endereço, etc.
-            - "fatos": string descritiva
-            - "fundamentos_necessarios": lista de temas jurídicos para pesquisar
-            - "pedidos": lista de pedidos específicos
-            - "valor_causa": string
-            - "competencia": string
-            - "observacoes": string com informações adicionais
-            """
-        )
-        
-        # Template para redação da petição
-        self.prompt_peticao = PromptTemplate(
-            input_variables=["dados_estruturados", "pesquisa_juridica"],
-            template="""
-            Você é um advogado processualista sênior especializado em petições iniciais.
-
-            DADOS ESTRUTURADOS DO CASO:
-            {dados_estruturados}
-
-            FUNDAMENTAÇÃO JURÍDICA PESQUISADA:
+            PESQUISA ONLINE REALIZADA:
             {pesquisa_juridica}
 
-            TAREFA: Redija uma petição inicial completa em HTML, seguindo a estrutura formal brasileira.
+            SUA TAREFA:
+            Com base em TUDO, estruture uma análise jurídica detalhada em formato JSON. Seja preciso e técnico. Identifique o ramo do direito (Cível, Trabalhista, etc.), os artigos de lei e a jurisprudência mais relevante encontrada.
 
-            ESTRUTURA OBRIGATÓRIA:
-            1. Endereçamento ao juízo
-            2. Qualificação das partes
-            3. Título da ação
-            4. DOS FATOS
-            5. DO DIREITO (com fundamentação legal pesquisada)
-            6. DOS PEDIDOS
-            7. Valor da causa
-            8. Local, data e assinatura
-
-            REGRAS IMPORTANTES:
-            - Use HTML semântico com tags <h1>, <h2>, <p>, <strong>, etc.
-            - Para informações não fornecidas, use placeholders claros: [NOME DO ADVOGADO], [OAB/UF], [ENDEREÇO], etc.
-            - Cite as leis, jurisprudências e doutrinas encontradas na pesquisa
-            - Mantenha linguagem técnica e formal
-            - Inclua fundamentação sólida baseada na pesquisa realizada
-            - Estruture os pedidos de forma clara e objetiva
-
-            FORMATO: HTML puro, começando com <h1> e sem tags <html>, <head> ou <body>.
+            FORMATO DE RESPOSTA (JSON VÁLIDO):
+            {{
+                "tipo_acao": "Ex: Reclamação Trabalhista com Pedido de Indenização por Danos Morais",
+                "fundamentos_legais": [{{"lei": "CLT", "artigos": "Art. 483, 'd'", "descricao": "Rescisão indireta por descumprimento de obrigações contratuais."}}],
+                "principios_juridicos": ["Princípio da Proteção ao Trabalhador"],
+                "jurisprudencia_relevante": "Cite as decisões mais importantes encontradas na pesquisa sobre horas extras e assédio moral.",
+                "analise_juridica_detalhada": "Parágrafo explicando como os fatos (horas extras não pagas, assédio) se conectam com a CLT e a jurisprudência para justificar a rescisão indireta e o dano moral."
+            }}
             """
         )
-        
-        self.chain_analise = LLMChain(llm=self.llm, prompt=self.prompt_analise)
-        self.chain_peticao = LLMChain(llm=self.llm, prompt=self.prompt_peticao)
-    
-    def gerar_peticao(self, dados_entrada: Dict[str, Any]) -> Dict[str, Any]:
+        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
+
+    def analisar_dados(self, dados_processados: dict) -> dict:
         """
-        Método principal para gerar uma petição inicial.
-        
-        Args:
-            dados_entrada: Dados recebidos do n8n ou outro sistema
-            
-        Returns:
-            Dict com status e documento HTML gerado
+        Executa o processo completo de análise e pesquisa.
         """
         try:
-            print("🚀 Iniciando geração de petição...")
+            print("🧠 Etapa Técnica: Analisando e pesquisando...")
             
-            # Etapa 1: Analisar e estruturar dados
-            print("📊 Etapa 1: Analisando dados de entrada...")
-            dados_estruturados = self._analisar_dados(dados_entrada)
+            temas_para_pesquisa = self._extrair_temas(dados_processados)
             
-            # Etapa 2: Realizar pesquisa jurídica
-            print("🔍 Etapa 2: Realizando pesquisa jurídica...")
-            pesquisa_juridica = self._realizar_pesquisa_juridica(dados_estruturados)
-            
-            # Etapa 3: Redigir petição
-            print("✍️ Etapa 3: Redigindo petição...")
-            peticao_html = self._redigir_peticao(dados_estruturados, pesquisa_juridica)
-            
-            # Etapa 4: Validar e formatar resultado
-            print("✅ Etapa 4: Finalizando...")
-            resultado = {
-                "status": "sucesso",
-                "documento_html": peticao_html,
-                "dados_estruturados": dados_estruturados,
-                "pesquisa_realizada": pesquisa_juridica.get("resumo_pesquisa", ""),
-                "timestamp": self._get_timestamp()
-            }
-            
-            print("🎉 Petição gerada com sucesso!")
-            return resultado
-            
-        except Exception as e:
-            print(f"❌ Erro na geração da petição: {e}")
-            traceback.print_exc()
-            return {
-                "status": "erro",
-                "mensagem": f"Erro na geração da petição: {str(e)}",
-                "detalhes": traceback.format_exc()
-            }
-    
-    def _analisar_dados(self, dados_entrada: Dict[str, Any]) -> Dict[str, Any]:
-        """Analisa e estrutura os dados de entrada."""
-        try:
-            dados_formatados = json.dumps(dados_entrada, indent=2, ensure_ascii=False)
-            resposta = self.chain_analise.run(dados_entrada=dados_formatados)
-            
-            # Tentar parsear como JSON
-            try:
-                dados_estruturados = json.loads(resposta)
-            except json.JSONDecodeError:
-                # Se não conseguir parsear, criar estrutura básica
-                dados_estruturados = {
-                    "tipo_acao": dados_entrada.get("tipo_acao", "Ação não especificada"),
-                    "autor": dados_entrada.get("autor", {}),
-                    "reu": dados_entrada.get("reu", {}),
-                    "fatos": dados_entrada.get("fatos", "Fatos não especificados"),
-                    "fundamentos_necessarios": ["direito civil", "código de processo civil"],
-                    "pedidos": dados_entrada.get("pedidos", ["Pedido não especificado"]),
-                    "valor_causa": dados_entrada.get("valor_causa", "A ser arbitrado"),
-                    "competencia": dados_entrada.get("competencia", "Foro competente"),
-                    "observacoes": resposta
-                }
-            
-            return dados_estruturados
-            
-        except Exception as e:
-            print(f"⚠️ Erro na análise de dados: {e}")
-            # Retornar estrutura mínima em caso de erro
-            return {
-                "tipo_acao": dados_entrada.get("tipo_acao", "Ação não especificada"),
-                "autor": dados_entrada.get("autor", {}),
-                "reu": dados_entrada.get("reu", {}),
-                "fatos": dados_entrada.get("fatos", "Fatos não especificados"),
-                "fundamentos_necessarios": ["direito civil"],
-                "pedidos": dados_entrada.get("pedidos", ["Pedido não especificado"]),
-                "valor_causa": dados_entrada.get("valor_causa", "A ser arbitrado"),
-                "competencia": dados_entrada.get("competencia", "Foro competente"),
-                "observacoes": f"Erro na análise: {str(e)}"
-            }
-    
-    def _realizar_pesquisa_juridica(self, dados_estruturados: Dict[str, Any]) -> Dict[str, Any]:
-        """Realiza pesquisa jurídica baseada nos fundamentos necessários."""
-        try:
-            fundamentos = dados_estruturados.get("fundamentos_necessarios", [])
-            tipo_acao = dados_estruturados.get("tipo_acao", "")
-            
-            # Realizar pesquisas específicas
-            resultados_pesquisa = self.pesquisa.pesquisar_fundamentos_juridicos(
-                fundamentos=fundamentos,
-                tipo_acao=tipo_acao
+            pesquisa_juridica = self.pesquisa.pesquisar_fundamentos_juridicos(
+                fundamentos=temas_para_pesquisa,
+                tipo_acao=dados_processados.get("tipo_acao", "petição")
             )
             
-            return resultados_pesquisa
-            
-        except Exception as e:
-            print(f"⚠️ Erro na pesquisa jurídica: {e}")
-            return {
-                "leis": "Pesquisa jurídica não disponível devido a erro técnico.",
-                "jurisprudencia": "Consulte jurisprudência específica para o caso.",
-                "doutrina": "Consulte doutrina especializada.",
-                "resumo_pesquisa": f"Erro na pesquisa: {str(e)}"
-            }
-    
-    def _redigir_peticao(self, dados_estruturados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> str:
-        """Redige a petição inicial em HTML."""
-        try:
-            dados_formatados = json.dumps(dados_estruturados, indent=2, ensure_ascii=False)
+            dados_formatados = json.dumps(dados_processados, indent=2, ensure_ascii=False)
             pesquisa_formatada = json.dumps(pesquisa_juridica, indent=2, ensure_ascii=False)
             
-            peticao_html = self.chain_peticao.run(
-                dados_estruturados=dados_formatados,
-                pesquisa_juridica=pesquisa_formatada
-            )
+            resposta_llm = self.chain.invoke({
+                "dados_processados": dados_formatados,
+                "pesquisa_juridica": pesquisa_formatada
+            })
             
-            return peticao_html
+            texto_gerado = resposta_llm['text']
+            texto_limpo = texto_gerado.strip()
+            if '```json' in texto_limpo: texto_limpo = texto_limpo.split('```json', 1)[-1]
+            if '```' in texto_limpo: texto_limpo = texto_limpo.split('```', 1)[0]
             
-        except Exception as e:
-            print(f"⚠️ Erro na redação: {e}")
-            return f"""
-            <h1>PETIÇÃO INICIAL</h1>
-            <p><strong>ERRO NA GERAÇÃO:</strong> {str(e)}</p>
-            <p>Por favor, tente novamente ou entre em contato com o suporte técnico.</p>
-            """
-    
-    def _get_timestamp(self) -> str:
-        """Retorna timestamp atual."""
-        from datetime import datetime
-        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            analise_final = json.loads(texto_limpo.strip())
+            return analise_final
 
+        except Exception as e:
+            print(f"❌ Erro no Agente Técnico de Petição: {e}")
+            return {"erro": "Falha na análise técnica da petição", "detalhes": str(e)}
+
+    def _extrair_temas(self, dados_processados: dict) -> List[str]:
+        fatos = dados_processados.get("fatos_peticao", "")
+        pedido = dados_processados.get("pedido_peticao", "")
+        texto_completo = (fatos + " " + pedido).lower()
+        
+        temas = set()
+        if "hora extra" in texto_completo: temas.add("horas extras")
+        if "assédio moral" in texto_completo: temas.add("assédio moral no trabalho")
+        if "rescisão indireta" in texto_completo: temas.add("rescisão indireta do contrato de trabalho")
+        
+        return list(temas) if temas else ["direito geral"]

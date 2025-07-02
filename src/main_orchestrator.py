@@ -1,4 +1,4 @@
-# main_orchestrator.py - VERSÃO FINAL SIMPLIFICADA
+# main_orchestrator.py - VERSÃO FINAL FOCADA EM PETIÇÕES
 
 import os
 import json
@@ -22,28 +22,24 @@ class Orquestrador:
         print("\n🚀 Iniciando geração de petição...")
         
         # 1. Coletar Dados
-        print("ETAPA 1: Coleta de dados...")
         dados_processados = self.coletor.coletar_e_processar(raw_input_data)
         if dados_processados.get("erro"):
             return {"status": "erro", "mensagem": "Falha na coleta de dados", "detalhes": dados_processados}
         
         # 2. Análise Técnica (com pesquisa online)
-        print("ETAPA 2: Análise técnica e pesquisa...")
         analise_tecnica = self.tecnico.analisar_dados(dados_processados)
         if analise_tecnica.get("erro"):
             return {"status": "erro", "mensagem": "Falha na análise técnica", "detalhes": analise_tecnica}
         
         # 3. Redação do Documento
-        print("ETAPA 3: Redação do documento...")
         resultado_redacao = self.redator.redigir_documento(dados_processados, analise_tecnica)
         if resultado_redacao.get("erro"):
             return {"status": "erro", "mensagem": "Falha na redação", "detalhes": resultado_redacao}
         documento_html = resultado_redacao.get("documento")
         
-        # Opcional: A lógica de validação e loop de revisão pode ser adicionada aqui
+        # Aqui pode voltar o loop de validação se necessário no futuro
 
         # 4. Formatação Final
-        print("ETAPA 4: Formatação final...")
         documento_final = self.formatador.formatar_documento(documento_html, dados_processados)
         
         print("🎉 DOCUMENTO GERADO COM SUCESSO!")
