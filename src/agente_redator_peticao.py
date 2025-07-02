@@ -1,70 +1,58 @@
-# agente_redator_peticao.py
+# agente_redator_peticao.py - VERSÃO REFATORADA (O ESCRITOR)
 
-import os
 import json
-import sys
-from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
+from langchain_core.prompts import PromptTemplate
 from langchain.chains import LLMChain
 
 class AgenteRedatorPeticao:
     """
-    Agente especialista em redigir o texto completo de uma Petição Inicial,
-    com lógica de placeholders e capacidade de auto-revisão.
+    Agente especialista em redigir o texto de uma petição com base
+    nos dados do caso e na análise técnica recebida.
     """
-    def __init__(self, llm_api_key):
+    def __init__(self, llm_api_key: str):
         self.llm = ChatOpenAI(model="gpt-4o", openai_api_key=llm_api_key, temperature=0.2)
+        self.prompt_template = PromptTemplate(
+            input_variables=["dados_estruturados", "analise_tecnica"],
+            template="""
+            Você é um advogado processualista sênior, um mestre na arte de escrever petições iniciais persuasivas e tecnicamente perfeitas.
 
-        # Este é o prompt final e mais avançado para o redator de petições
-        prompt_template_base = """
-            Você é um advogado processualista sênior, especialista na redação de petições iniciais.
+            Sua tarefa é redigir o texto completo em HTML de uma petição com base no dossiê abaixo, que contém os dados do caso e a análise jurídica preparada pelo seu pesquisador.
 
-            {instrucoes_de_revisao}
+            **DADOS DO CASO (fornecidos pelo cliente):**
+            {dados_estruturados}
 
-            **Dados do Caso:**
-            {dados_processados_formatados}
+            **ANÁLISE JURÍDICA E FUNDAMENTAÇÃO (preparada pelo pesquisador):**
+            {analise_tecnica}
 
-            **Análise Jurídica e Tese (Fornecida pelo Agente Técnico):**
-            {analise_juridica_formatada}
+            **REGRAS DE REDAÇÃO:**
+            - Use a 'analise_juridica_detalhada' como o fio condutor da sua argumentação na seção DO DIREITO.
+            - Incorpore os 'fundamentos_legais' e a 'jurisprudencia_relevante' de forma fluida no texto.
+            - Siga a estrutura formal (Endereçamento, Qualificação, Fatos, Direito, Pedidos, Valor da Causa, etc.).
+            - Adapte os termos (Autor/Réu, Reclamante/Reclamada) com base na natureza da ação.
+            - Se alguma informação essencial não foi fornecida nos dados (ex: nome do advogado, OAB), use placeholders claros: [NOME DO ADVOGADO], [OAB/UF].
+            - O resultado deve ser apenas o HTML, começando com <h1>.
+            """
+        )
+        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
 
-            **SUA TAREFA:** Redija o texto completo de uma Petição Inicial em HTML, seguindo as regras abaixo.
-
-            **REGRAS DE QUALIDADE OBRIGATÓRIAS:**
-            1.  **USO INTELIGENTE DE PLACEHOLDERS:** Se uma informação essencial NÃO FOR FORNECIDA nos dados (ex: nº da vara, OAB), NÃO omita a seção. Gere o texto e insira um placeholder claro e padronizado. Exemplos: `[NOME DO ADVOGADO]`, `[NÚMERO DA OAB/UF]`, `[Nº DA VARA]`, `____/____/______`.
-            2.  **ESTRUTURA FORMAL:** Siga a estrutura: Endereçamento, Qualificação das Partes, Título da Ação, e as seções <h2>DOS FATOS</h2>, <h2>DO DIREITO</h2>, <h2>DOS PEDIDOS</h2>, etc. Adapte os termos (Autor/Réu, Reclamante/Reclamada) ao contexto.
-            3.  **SEM PLACEHOLDERS GENÉRICOS:** NUNCA use placeholders vagos como '[data]' ou '[preencher]'.
-            4.  **FORMATO DE SAÍDA:** HTML puro, começando com `<h1>`.
+    def redigir_documento(self, dados_processados: dict, analise_tecnica: dict, documento_anterior: str = None) -> dict:
         """
-        self.prompt = PromptTemplate(input_variables=["instrucoes_de_revisao", "dados_processados_formatados", "analise_juridica_formatada"], template=prompt_template_base)
-        self.chain = LLMChain(llm=self.llm, prompt=self.prompt)
-
-    def _format_data_for_prompt(self, data: dict) -> str:
-        formatted_parts = []
-        for key, value in data.items():
-            if value is None or (isinstance(value, str) and not value.strip()): continue
-            if isinstance(value, (dict, list)): formatted_parts.append(f"{key.replace('_', ' ').title()}: {json.dumps(value, ensure_ascii=False, indent=2)}")
-            else: formatted_parts.append(f"{key.replace('_', ' ').title()}: {value}")
-        return "\n".join(formatted_parts)
-
-    def redigir_documento(self, dados_processados: dict, analise_juridica: dict, documento_anterior: str = None) -> dict:
-        """Redige ou REVISA a petição com base no feedback."""
-        instrucoes_de_revisao_str = ""
-        sugestoes_revisao = analise_juridica.get("sugestoes_revisao")
-        if documento_anterior and sugestoes_revisao:
-            sugestoes_formatadas = "\n".join([f"- Na seção '{s.get('secao', 'Geral')}': {s.get('descricao')}" for s in sugestoes_revisao])
-            instrucoes_de_revisao_str = f"""**MODO DE REVISÃO ATIVADO. SUA PRIORIDADE MÁXIMA É CORRIGIR O DOCUMENTO ABAIXO.**\nA sua versão anterior falhou na validação. Pense passo a passo e aplique TODAS as seguintes correções obrigatórias:\n{sugestoes_formatadas}\n\n**DOCUMENTO ANTERIOR PARA CORRIGIR:**\n```html\n{documento_anterior}\n```\n**REDIJA A VERSÃO FINAL E CORRIGIDA, SEM OS MESMOS ERROS.**\n---"""
-        
-        analise_juridica_sem_sugestoes = analise_juridica.copy()
-        analise_juridica_sem_sugestoes.pop("sugestoes_revisao", None)
-        dados_processados_formatados = self._format_data_for_prompt(dados_processados)
-        analise_juridica_formatada = self._format_data_for_prompt(analise_juridica_sem_sugestoes)
+        Executa o processo de redação. O loop de revisão foi simplificado por enquanto.
+        """
         try:
-            resultado_llm = self.chain.invoke({"instrucoes_de_revisao": instrucoes_de_revisao_str, "dados_processados_formatados": dados_processados_formatados, "analise_juridica_formatada": analise_juridica_formatada})
-            texto_gerado = resultado_llm["text"]
-            texto_limpo = texto_gerado.strip()
-            if texto_limpo.startswith("```html"): texto_limpo = texto_limpo[7:]
-            if texto_limpo.endswith("```"): texto_limpo = texto_limpo[:-3]
-            return {"documento": texto_limpo.strip(), "erro": None}
+            print("✍️ Etapa de Redação: Escrevendo a petição...")
+            dados_formatados = json.dumps(dados_processados, indent=2, ensure_ascii=False)
+            analise_formatada = json.dumps(analise_tecnica, indent=2, ensure_ascii=False)
+            
+            resposta_llm = self.chain.invoke({
+                "dados_estruturados": dados_formatados,
+                "analise_tecnica": analise_formatada
+            })
+            
+            peticao_html = resposta_llm.get("text", "")
+            return {"documento": peticao_html, "erro": None}
+
         except Exception as e:
-            print(f"Erro no Agente Redator de Petição: {e}")
-            return {"documento": None, "erro": f"Falha na redação da petição: {e}"}
+            print(f"❌ Erro no Agente Redator de Petição: {e}")
+            return {"documento": None, "erro": f"Falha na redação da petição: {str(e)}"}
