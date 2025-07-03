@@ -58,3 +58,4 @@ pypdf
 chromadb
 aiohttp==3.9.5 # <--- ADICIONADO: Dependência que estava faltando
 duckduckgo-search
+beautifulsoup4
