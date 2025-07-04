@@ -1,334 +1,444 @@
-# agente_coletor_dados.py - Agente Coletor de Dados Simplificado
+# agente_coletor_dados.py - Agente Coletor que SEMPRE usa dados reais
 
+import os
 import json
 import re
 from typing import Dict, Any, List, Optional
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import PromptTemplate
-from langchain.chains import LLMChain
+from datetime import datetime
+
+# LangChain imports
+try:
+    from langchain.llms import OpenAI
+    from langchain.prompts import PromptTemplate
+    from langchain.chains import LLMChain
+    LANGCHAIN_AVAILABLE = True
+except ImportError:
+    LANGCHAIN_AVAILABLE = False
 
 class AgenteColetorDados:
     """
-    Agente responsável por coletar, validar e estruturar os dados de entrada
-    para geração de petições iniciais.
+    Agente Coletor de Dados CORRIGIDO que:
+    - SEMPRE usa dados reais do formulário
+    - NUNCA cria dados simulados ou falsos
+    - Mapeia corretamente os campos do n8n
+    - Fallback inteligente quando LLM falha
     """
     
-    def __init__(self, openai_api_key: str):
-        self.llm = ChatOpenAI(
-            model="gpt-4o", 
-            openai_api_key=openai_api_key, 
-            temperature=0.1
-        )
+    def __init__(self, openai_api_key: str = None):
+        print("📊 Inicializando Agente Coletor de Dados CORRIGIDO...")
         
-        # Template para análise e estruturação dos dados
-        self.prompt_estruturacao = PromptTemplate(
-            input_variables=["dados_brutos"],
-            template="""
-            Você é um assistente jurídico especializado em organizar dados para petições iniciais.
-            
-            DADOS RECEBIDOS:
-            {dados_brutos}
-            
-            TAREFA: Analise os dados e organize-os em uma estrutura padronizada para petição inicial.
-            
-            ESTRUTURA ESPERADA (retorne em JSON válido):
-            {{
-                "tipo_acao": "string - tipo da ação jurídica",
-                "competencia": "string - vara/foro competente",
-                "valor_causa": "string - valor da causa",
-                "autor": {{
-                    "nome": "string",
-                    "tipo_pessoa": "fisica|juridica",
-                    "cpf_cnpj": "string",
-                    "endereco": "string",
-                    "telefone": "string",
-                    "email": "string",
-                    "profissao": "string (se pessoa física)",
-                    "estado_civil": "string (se pessoa física)"
-                }},
-                "reu": {{
-                    "nome": "string",
-                    "tipo_pessoa": "fisica|juridica", 
-                    "cpf_cnpj": "string",
-                    "endereco": "string",
-                    "telefone": "string",
-                    "email": "string"
-                }},
-                "fatos": {{
-                    "resumo": "string - resumo dos fatos principais",
-                    "cronologia": ["lista de eventos em ordem cronológica"],
-                    "documentos": ["lista de documentos mencionados"],
-                    "valores": ["lista de valores envolvidos"]
-                }},
-                "fundamentos_juridicos": {{
-                    "areas_direito": ["lista de áreas do direito aplicáveis"],
-                    "leis_aplicaveis": ["lista de leis que podem ser aplicáveis"],
-                    "temas_pesquisa": ["lista de temas para pesquisa jurídica"]
-                }},
-                "pedidos": {{
-                    "principais": ["lista de pedidos principais"],
-                    "alternativos": ["lista de pedidos alternativos"],
-                    "cautelares": ["lista de pedidos cautelares se houver"]
-                }},
-                "urgencia": "boolean - se há urgência no caso",
-                "observacoes": "string - observações adicionais importantes"
-            }}
-            
-            REGRAS:
-            1. Se alguma informação não estiver disponível, use null ou string vazia
-            2. Seja preciso na classificação do tipo de ação
-            3. Identifique corretamente se as partes são pessoas físicas ou jurídicas
-            4. Extraia todos os fatos relevantes de forma organizada
-            5. Sugira áreas do direito e leis aplicáveis baseado nos fatos
-            6. Organize os pedidos por ordem de importância
-            
-            RESPOSTA: Apenas o JSON estruturado, sem texto adicional.
-            """
-        )
+        self.openai_api_key = openai_api_key or os.getenv('OPENAI_API_KEY')
         
-        self.chain_estruturacao = LLMChain(llm=self.llm, prompt=self.prompt_estruturacao)
+        # MAPEAMENTO DIRETO DOS CAMPOS DO FORMULÁRIO
+        self.mapeamento_campos = {
+            # Dados do autor/cliente
+            'clienteNome': 'autor.nome',
+            'Qualificação': 'autor.qualificacao',
+            
+            # Dados da parte contrária
+            'nome_contrario_peticao': 'reu.nome',
+            'qualificacao_contrario_peticao': 'reu.qualificacao',
+            
+            # Dados do caso
+            'tipoDocumento': 'tipo_acao',
+            'fatos_peticao': 'fatos',
+            'verbas_pleiteadas_peticao': 'pedidos',
+            'valor_causa_peticao': 'valor_causa',
+            
+            # Dados trabalhistas específicos
+            'data_admissao_peticao': 'data_admissao',
+            'data_demissao_peticao': 'data_demissao',
+            'salario_peticao': 'salario',
+            'jornada_peticao': 'jornada',
+            'motivo_saida_peticao': 'motivo_saida',
+            'documentos_peticao': 'documentos'
+        }
+        
+        # Inicializar LLM apenas se disponível
+        if LANGCHAIN_AVAILABLE and self.openai_api_key:
+            try:
+                self.llm = OpenAI(
+                    openai_api_key=self.openai_api_key,
+                    temperature=0.1,
+                    max_tokens=1000
+                )
+                self.llm_disponivel = True
+                print("✅ LLM inicializado para análise complementar")
+            except Exception as e:
+                print(f"⚠️ LLM não disponível: {e}")
+                self.llm_disponivel = False
+        else:
+            self.llm_disponivel = False
+            print("⚠️ LLM não disponível - usando apenas mapeamento direto")
+        
+        print("✅ Agente Coletor CORRIGIDO inicializado")
     
-    def coletar_e_processar(self, dados_brutos: Dict[str, Any]) -> Dict[str, Any]:
+    def coletar_e_processar(self, dados_entrada: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Método principal para coletar e processar dados de entrada.
-        
-        Args:
-            dados_brutos: Dados recebidos do n8n ou outro sistema
-            
-        Returns:
-            Dict com dados estruturados e validados
+        Coleta e processa dados SEMPRE usando informações reais do formulário.
+        NUNCA cria dados simulados ou falsos.
         """
         try:
-            print("📊 Iniciando coleta e processamento de dados...")
+            print("📊 Iniciando coleta e processamento de dados REAIS...")
+            print(f"📋 Campos recebidos: {list(dados_entrada.keys())}")
             
-            # Etapa 1: Validação básica
-            dados_validados = self._validar_dados_basicos(dados_brutos)
+            # ETAPA 1: MAPEAMENTO DIRETO (SEMPRE FUNCIONA)
+            dados_estruturados = self._mapear_dados_direto(dados_entrada)
             
-            # Etapa 2: Estruturação via LLM
-            dados_estruturados = self._estruturar_dados_llm(dados_validados)
+            # ETAPA 2: ANÁLISE COMPLEMENTAR (SE LLM DISPONÍVEL)
+            if self.llm_disponivel:
+                try:
+                    dados_complementares = self._analisar_com_llm(dados_entrada)
+                    dados_estruturados = self._mesclar_dados(dados_estruturados, dados_complementares)
+                except Exception as e:
+                    print(f"⚠️ Análise LLM falhou, usando apenas mapeamento direto: {e}")
             
-            # Etapa 3: Validação final e enriquecimento
-            dados_finais = self._validar_e_enriquecer(dados_estruturados)
+            # ETAPA 3: VALIDAÇÃO E LIMPEZA
+            dados_finais = self._validar_e_limpar(dados_estruturados)
             
             print("✅ Dados coletados e processados com sucesso")
+            print(f"📊 Autor: {dados_finais['autor']['nome']}")
+            print(f"📊 Réu: {dados_finais['reu']['nome']}")
+            print(f"📊 Tipo: {dados_finais['tipo_acao']}")
+            
             return {
                 "status": "sucesso",
                 "dados_estruturados": dados_finais,
-                "dados_originais": dados_brutos
+                "metadados": {
+                    "timestamp": datetime.now().isoformat(),
+                    "campos_processados": len(dados_entrada),
+                    "metodo_usado": "mapeamento_direto" + ("_com_llm" if self.llm_disponivel else ""),
+                    "dados_reais": True,
+                    "dados_simulados": False
+                }
             }
             
         except Exception as e:
             print(f"❌ Erro na coleta de dados: {e}")
             return {
                 "status": "erro",
-                "mensagem": f"Erro no processamento dos dados: {str(e)}",
-                "dados_originais": dados_brutos
+                "erro": str(e),
+                "dados_estruturados": self._gerar_estrutura_minima(dados_entrada),
+                "timestamp": datetime.now().isoformat()
             }
     
-    def _validar_dados_basicos(self, dados: Dict[str, Any]) -> Dict[str, Any]:
-        """Validação básica dos dados de entrada."""
-        dados_validados = dados.copy()
+    def _mapear_dados_direto(self, dados_entrada: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Mapeia dados diretamente do formulário para estrutura padronizada.
+        SEMPRE usa dados reais, nunca simula.
+        """
+        print("🔄 Mapeando dados diretamente do formulário...")
         
-        # Garantir campos mínimos
-        campos_obrigatorios = ['tipo_acao', 'autor', 'reu', 'fatos']
-        for campo in campos_obrigatorios:
-            if campo not in dados_validados or not dados_validados[campo]:
-                if campo == 'tipo_acao':
-                    dados_validados[campo] = "Ação não especificada"
-                elif campo in ['autor', 'reu']:
-                    dados_validados[campo] = {"nome": "Não informado"}
-                elif campo == 'fatos':
-                    dados_validados[campo] = "Fatos não especificados"
+        # Estrutura base
+        dados_estruturados = {
+            "tipo_acao": self._extrair_tipo_acao(dados_entrada),
+            "autor": self._extrair_dados_autor(dados_entrada),
+            "reu": self._extrair_dados_reu(dados_entrada),
+            "fatos": self._extrair_fatos(dados_entrada),
+            "pedidos": self._extrair_pedidos(dados_entrada),
+            "valor_causa": self._extrair_valor_causa(dados_entrada),
+            "competencia": self._extrair_competencia(dados_entrada),
+            "fundamentos_necessarios": self._extrair_fundamentos(dados_entrada),
+            "observacoes": self._extrair_observacoes(dados_entrada),
+            "urgencia": False
+        }
         
-        # Normalizar estruturas de autor e réu
-        for parte in ['autor', 'reu']:
-            if isinstance(dados_validados.get(parte), str):
-                dados_validados[parte] = {"nome": dados_validados[parte]}
-            elif not isinstance(dados_validados.get(parte), dict):
-                dados_validados[parte] = {"nome": "Não informado"}
-        
-        return dados_validados
+        return dados_estruturados
     
-    def _estruturar_dados_llm(self, dados: Dict[str, Any]) -> Dict[str, Any]:
-        """Estrutura os dados usando LLM."""
-        try:
-            dados_formatados = json.dumps(dados, indent=2, ensure_ascii=False)
-            resposta = self.chain_estruturacao.run(dados_brutos=dados_formatados)
-            
-            # Tentar parsear como JSON
+    def _extrair_tipo_acao(self, dados: Dict[str, Any]) -> str:
+        """Extrai tipo de ação dos dados reais."""
+        
+        # Verificar campo direto
+        tipo_documento = dados.get('tipoDocumento', '').strip()
+        if tipo_documento and tipo_documento != 'peticao':
+            return tipo_documento
+        
+        # Analisar contexto para identificar tipo
+        fatos = str(dados.get('fatos_peticao', '')).lower()
+        motivo_saida = str(dados.get('motivo_saida_peticao', '')).lower()
+        verbas = str(dados.get('verbas_pleiteadas_peticao', '')).lower()
+        
+        # Identificar por palavras-chave
+        if any(palavra in fatos + motivo_saida + verbas for palavra in 
+               ['rescisão indireta', 'horas extras', 'assédio moral', 'trabalhista', 'clt', 'demissão']):
+            return "Ação Trabalhista"
+        elif any(palavra in fatos + verbas for palavra in 
+                ['consumidor', 'defeito', 'vício', 'fornecedor']):
+            return "Ação de Consumidor"
+        elif any(palavra in fatos + verbas for palavra in 
+                ['danos morais', 'responsabilidade civil', 'indenização']):
+            return "Ação de Indenização"
+        
+        # Se não conseguir identificar, usar dados disponíveis
+        return "Ação Cível"
+    
+    def _extrair_dados_autor(self, dados: Dict[str, Any]) -> Dict[str, Any]:
+        """Extrai dados do autor usando apenas informações reais."""
+        
+        nome = dados.get('clienteNome', '').strip()
+        qualificacao = dados.get('Qualificação', '').strip()
+        
+        # Extrair CPF da qualificação se disponível
+        cpf = ""
+        if qualificacao:
+            cpf_match = re.search(r'CPF\s*n?º?\s*([\d\.\-]+)', qualificacao, re.IGNORECASE)
+            if cpf_match:
+                cpf = cpf_match.group(1)
+        
+        # Extrair CTPS se disponível
+        ctps = ""
+        if qualificacao:
+            ctps_match = re.search(r'CTPS\s*n?º?\s*([\d]+)', qualificacao, re.IGNORECASE)
+            if ctps_match:
+                ctps = ctps_match.group(1)
+        
+        return {
+            "nome": nome if nome else "[NOME DO AUTOR A SER PREENCHIDO]",
+            "qualificacao": qualificacao if qualificacao else "[QUALIFICAÇÃO A SER PREENCHIDA]",
+            "cpf_cnpj": cpf,
+            "ctps": ctps,
+            "tipo_pessoa": "fisica",  # Assumir pessoa física por padrão
+            "endereco": "[ENDEREÇO A SER PREENCHIDO]",
+            "telefone": "",
+            "email": ""
+        }
+    
+    def _extrair_dados_reu(self, dados: Dict[str, Any]) -> Dict[str, Any]:
+        """Extrai dados do réu usando apenas informações reais."""
+        
+        nome = dados.get('nome_contrario_peticao', '').strip()
+        qualificacao = dados.get('qualificacao_contrario_peticao', '').strip()
+        
+        # Extrair CNPJ da qualificação se disponível
+        cnpj = ""
+        if qualificacao:
+            cnpj_match = re.search(r'CNPJ\s*(?:sob\s*o\s*)?n?º?\s*([\d\.\-\/]+)', qualificacao, re.IGNORECASE)
+            if cnpj_match:
+                cnpj = cnpj_match.group(1)
+        
+        # Extrair endereço se disponível
+        endereco = ""
+        if qualificacao:
+            endereco_match = re.search(r'(?:sede|endereço|sito).*?([A-Z][^,]+(?:,\s*[^,]+)*)', qualificacao, re.IGNORECASE)
+            if endereco_match:
+                endereco = endereco_match.group(1).strip()
+        
+        # Determinar tipo de pessoa
+        tipo_pessoa = "juridica" if any(palavra in qualificacao.lower() for palavra in 
+                                      ['ltda', 'sa', 's.a.', 'eireli', 'mei', 'cnpj']) else "fisica"
+        
+        return {
+            "nome": nome if nome else "[NOME DO RÉU A SER PREENCHIDO]",
+            "qualificacao": qualificacao if qualificacao else "[QUALIFICAÇÃO A SER PREENCHIDA]",
+            "cpf_cnpj": cnpj,
+            "tipo_pessoa": tipo_pessoa,
+            "endereco": endereco if endereco else "[ENDEREÇO A SER PREENCHIDO]",
+            "telefone": "",
+            "email": ""
+        }
+    
+    def _extrair_fatos(self, dados: Dict[str, Any]) -> str:
+        """Extrai fatos usando apenas informações reais do formulário."""
+        
+        fatos_principais = dados.get('fatos_peticao', '').strip()
+        
+        # Adicionar informações complementares se disponíveis
+        fatos_completos = []
+        
+        if fatos_principais:
+            fatos_completos.append(fatos_principais)
+        
+        # Adicionar dados trabalhistas específicos se disponíveis
+        if dados.get('data_admissao_peticao'):
+            fatos_completos.append(f"Data de admissão: {dados['data_admissao_peticao']}")
+        
+        if dados.get('data_demissao_peticao'):
+            fatos_completos.append(f"Data de demissão: {dados['data_demissao_peticao']}")
+        
+        if dados.get('salario_peticao'):
+            fatos_completos.append(f"Salário: R$ {dados['salario_peticao']}")
+        
+        if dados.get('jornada_peticao'):
+            fatos_completos.append(f"Jornada de trabalho: {dados['jornada_peticao']}")
+        
+        if dados.get('motivo_saida_peticao'):
+            fatos_completos.append(f"Motivo da saída: {dados['motivo_saida_peticao']}")
+        
+        return " ".join(fatos_completos) if fatos_completos else "[FATOS A SEREM DETALHADOS]"
+    
+    def _extrair_pedidos(self, dados: Dict[str, Any]) -> str:
+        """Extrai pedidos usando apenas informações reais."""
+        
+        verbas = dados.get('verbas_pleiteadas_peticao', '').strip()
+        
+        if verbas:
+            return verbas
+        
+        # Se não há pedidos específicos, indicar que devem ser preenchidos
+        return "[PEDIDOS A SEREM ESPECIFICADOS]"
+    
+    def _extrair_valor_causa(self, dados: Dict[str, Any]) -> str:
+        """Extrai valor da causa usando apenas dados reais."""
+        
+        valor = dados.get('valor_causa_peticao', '').strip()
+        
+        if valor and valor != '0' and valor != '0.00':
+            # Formatar valor se necessário
             try:
-                dados_estruturados = json.loads(resposta)
-                return dados_estruturados
-            except json.JSONDecodeError:
-                print("⚠️ Resposta do LLM não é JSON válido, usando estrutura básica")
-                return self._criar_estrutura_basica(dados)
+                valor_num = float(valor.replace(',', '.'))
+                return f"R$ {valor_num:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+            except:
+                return f"R$ {valor}"
+        
+        return "[VALOR A SER ARBITRADO]"
+    
+    def _extrair_competencia(self, dados: Dict[str, Any]) -> str:
+        """Extrai competência baseada no tipo de ação e dados disponíveis."""
+        
+        # Analisar tipo de ação para determinar competência
+        fatos = str(dados.get('fatos_peticao', '')).lower()
+        motivo = str(dados.get('motivo_saida_peticao', '')).lower()
+        
+        if any(palavra in fatos + motivo for palavra in 
+               ['rescisão indireta', 'horas extras', 'trabalhista', 'clt', 'empregado', 'empregador']):
+            return "Justiça do Trabalho"
+        elif any(palavra in fatos for palavra in ['consumidor', 'fornecedor']):
+            return "Juizado Especial Cível"
+        
+        return "[COMPETÊNCIA A SER DEFINIDA]"
+    
+    def _extrair_fundamentos(self, dados: Dict[str, Any]) -> List[str]:
+        """Extrai fundamentos jurídicos baseados nos dados reais."""
+        
+        fundamentos = []
+        
+        fatos = str(dados.get('fatos_peticao', '')).lower()
+        motivo = str(dados.get('motivo_saida_peticao', '')).lower()
+        verbas = str(dados.get('verbas_pleiteadas_peticao', '')).lower()
+        
+        texto_completo = fatos + " " + motivo + " " + verbas
+        
+        # Identificar fundamentos baseados no conteúdo real
+        if 'rescisão indireta' in texto_completo:
+            fundamentos.extend(['rescisão indireta', 'CLT art. 483'])
+        
+        if 'horas extras' in texto_completo:
+            fundamentos.extend(['horas extras', 'CLT art. 59'])
+        
+        if 'assédio moral' in texto_completo:
+            fundamentos.extend(['assédio moral', 'danos morais'])
+        
+        if 'danos morais' in texto_completo:
+            fundamentos.append('danos morais')
+        
+        # Fundamentos por área
+        if any(palavra in texto_completo for palavra in ['trabalhista', 'empregado', 'clt']):
+            fundamentos.extend(['direito trabalhista', 'CLT'])
+        elif any(palavra in texto_completo for palavra in ['consumidor', 'fornecedor']):
+            fundamentos.extend(['direito do consumidor', 'CDC'])
+        else:
+            fundamentos.extend(['direito civil', 'código civil'])
+        
+        return list(set(fundamentos)) if fundamentos else ['direito civil']
+    
+    def _extrair_observacoes(self, dados: Dict[str, Any]) -> str:
+        """Extrai observações dos dados disponíveis."""
+        
+        observacoes = []
+        
+        if dados.get('documentos_peticao'):
+            observacoes.append(f"Documentos anexos: {dados['documentos_peticao']}")
+        
+        return ". ".join(observacoes) if observacoes else ""
+    
+    def _analisar_com_llm(self, dados_entrada: Dict[str, Any]) -> Dict[str, Any]:
+        """Análise complementar com LLM se disponível."""
+        
+        if not self.llm_disponivel:
+            return {}
+        
+        try:
+            prompt = f"""
+            Analise os seguintes dados de um caso jurídico e extraia informações estruturadas.
+            IMPORTANTE: Use APENAS as informações fornecidas, não invente dados.
+            
+            Dados do caso:
+            {json.dumps(dados_entrada, indent=2, ensure_ascii=False)}
+            
+            Retorne um JSON com análise complementar focando em:
+            - Identificação precisa do tipo de ação
+            - Fundamentos jurídicos aplicáveis
+            - Urgência do caso
+            
+            Responda apenas com JSON válido.
+            """
+            
+            resposta = self.llm(prompt)
+            
+            try:
+                return json.loads(resposta)
+            except:
+                print("⚠️ Resposta LLM não é JSON válido")
+                return {}
                 
         except Exception as e:
-            print(f"⚠️ Erro na estruturação via LLM: {e}")
-            return self._criar_estrutura_basica(dados)
+            print(f"⚠️ Erro na análise LLM: {e}")
+            return {}
     
-    def _criar_estrutura_basica(self, dados: Dict[str, Any]) -> Dict[str, Any]:
-        """Cria estrutura básica quando o LLM falha."""
-        return {
-            "tipo_acao": dados.get("tipo_acao", "Ação não especificada"),
-            "competencia": dados.get("competencia", "Foro competente"),
-            "valor_causa": dados.get("valor_causa", "A ser arbitrado"),
-            "autor": self._estruturar_parte(dados.get("autor", {})),
-            "reu": self._estruturar_parte(dados.get("reu", {})),
-            "fatos": {
-                "resumo": dados.get("fatos", "Fatos não especificados"),
-                "cronologia": dados.get("cronologia", []),
-                "documentos": dados.get("documentos", []),
-                "valores": dados.get("valores", [])
-            },
-            "fundamentos_juridicos": {
-                "areas_direito": self._extrair_areas_direito(dados),
-                "leis_aplicaveis": dados.get("leis_aplicaveis", []),
-                "temas_pesquisa": self._extrair_temas_pesquisa(dados)
-            },
-            "pedidos": {
-                "principais": dados.get("pedidos", ["Pedido não especificado"]) if isinstance(dados.get("pedidos"), list) else [dados.get("pedidos", "Pedido não especificado")],
-                "alternativos": dados.get("pedidos_alternativos", []),
-                "cautelares": dados.get("pedidos_cautelares", [])
-            },
-            "urgencia": dados.get("urgencia", False),
-            "observacoes": dados.get("observacoes", "")
-        }
+    def _mesclar_dados(self, dados_base: Dict[str, Any], dados_llm: Dict[str, Any]) -> Dict[str, Any]:
+        """Mescla dados base com análise LLM, priorizando dados reais."""
+        
+        # Sempre priorizar dados base (reais) sobre análise LLM
+        resultado = dados_base.copy()
+        
+        # Apenas complementar campos que não comprometam dados reais
+        if dados_llm.get('urgencia') and isinstance(dados_llm['urgencia'], bool):
+            resultado['urgencia'] = dados_llm['urgencia']
+        
+        return resultado
     
-    def _estruturar_parte(self, parte_dados: Dict[str, Any]) -> Dict[str, Any]:
-        """Estrutura dados de uma parte (autor ou réu)."""
-        if isinstance(parte_dados, str):
-            parte_dados = {"nome": parte_dados}
+    def _validar_e_limpar(self, dados: Dict[str, Any]) -> Dict[str, Any]:
+        """Valida e limpa dados estruturados."""
         
-        return {
-            "nome": parte_dados.get("nome", "Não informado"),
-            "tipo_pessoa": self._detectar_tipo_pessoa(parte_dados),
-            "cpf_cnpj": parte_dados.get("cpf", parte_dados.get("cnpj", parte_dados.get("cpf_cnpj", ""))),
-            "endereco": parte_dados.get("endereco", ""),
-            "telefone": parte_dados.get("telefone", ""),
-            "email": parte_dados.get("email", ""),
-            "profissao": parte_dados.get("profissao", "") if self._detectar_tipo_pessoa(parte_dados) == "fisica" else "",
-            "estado_civil": parte_dados.get("estado_civil", "") if self._detectar_tipo_pessoa(parte_dados) == "fisica" else ""
-        }
-    
-    def _detectar_tipo_pessoa(self, dados: Dict[str, Any]) -> str:
-        """Detecta se é pessoa física ou jurídica."""
-        # Verificar se tem CNPJ
-        cnpj = dados.get("cnpj", "")
-        if cnpj and (len(cnpj.replace(".", "").replace("/", "").replace("-", "")) == 14):
-            return "juridica"
-        
-        # Verificar se tem CPF
-        cpf = dados.get("cpf", "")
-        if cpf and (len(cpf.replace(".", "").replace("-", "")) == 11):
-            return "fisica"
-        
-        # Verificar campo tipo_pessoa explícito
-        tipo = dados.get("tipo_pessoa", "").lower()
-        if tipo in ["juridica", "pj", "empresa"]:
-            return "juridica"
-        elif tipo in ["fisica", "pf", "pessoa"]:
-            return "fisica"
-        
-        # Verificar por palavras-chave no nome
-        nome = dados.get("nome", "").lower()
-        palavras_pj = ["ltda", "s.a.", "s/a", "eireli", "mei", "empresa", "comercio", "industria"]
-        if any(palavra in nome for palavra in palavras_pj):
-            return "juridica"
-        
-        # Default para pessoa física
-        return "fisica"
-    
-    def _extrair_areas_direito(self, dados: Dict[str, Any]) -> List[str]:
-        """Extrai áreas do direito baseado no tipo de ação e fatos."""
-        areas = []
-        
-        tipo_acao = dados.get("tipo_acao", "").lower()
-        fatos = str(dados.get("fatos", "")).lower()
-        
-        # Mapeamento de palavras-chave para áreas do direito
-        mapeamento = {
-            "direito civil": ["civil", "contrato", "responsabilidade", "danos", "indenização"],
-            "direito do consumidor": ["consumidor", "produto", "serviço", "fornecedor", "cdc"],
-            "direito trabalhista": ["trabalho", "trabalhista", "emprego", "salário", "rescisão"],
-            "direito tributário": ["tributo", "imposto", "taxa", "contribuição", "fiscal"],
-            "direito administrativo": ["administrativo", "servidor", "público", "licitação"],
-            "direito penal": ["penal", "crime", "delito", "contravenção"],
-            "direito comercial": ["comercial", "empresarial", "sociedade", "falência"],
-            "direito de família": ["família", "divórcio", "alimentos", "guarda", "união"]
+        # Garantir que campos obrigatórios existam
+        campos_obrigatorios = {
+            'tipo_acao': 'Ação Cível',
+            'autor': {},
+            'reu': {},
+            'fatos': '[FATOS A SEREM DETALHADOS]',
+            'pedidos': '[PEDIDOS A SEREM ESPECIFICADOS]',
+            'valor_causa': '[VALOR A SER ARBITRADO]',
+            'competencia': '[COMPETÊNCIA A SER DEFINIDA]',
+            'fundamentos_necessarios': ['direito civil'],
+            'observacoes': '',
+            'urgencia': False
         }
         
-        texto_completo = f"{tipo_acao} {fatos}".lower()
-        
-        for area, palavras_chave in mapeamento.items():
-            if any(palavra in texto_completo for palavra in palavras_chave):
-                areas.append(area)
-        
-        # Se não encontrou nenhuma área, adicionar direito civil como padrão
-        if not areas:
-            areas.append("direito civil")
-        
-        return areas
-    
-    def _extrair_temas_pesquisa(self, dados: Dict[str, Any]) -> List[str]:
-        """Extrai temas específicos para pesquisa jurídica."""
-        temas = []
-        
-        tipo_acao = dados.get("tipo_acao", "")
-        areas = self._extrair_areas_direito(dados)
-        
-        # Adicionar tipo de ação como tema
-        if tipo_acao:
-            temas.append(tipo_acao.lower())
-        
-        # Adicionar áreas do direito
-        temas.extend(areas)
-        
-        # Adicionar temas específicos baseados no conteúdo
-        fatos = str(dados.get("fatos", "")).lower()
-        
-        temas_especificos = {
-            "danos morais": ["dano moral", "danos morais", "constrangimento", "humilhação"],
-            "juros e correção": ["juros", "correção monetária", "atualização"],
-            "tutela antecipada": ["urgência", "tutela", "liminar", "antecipação"],
-            "honorários advocatícios": ["honorários", "advocatícios", "sucumbência"],
-            "código de processo civil": ["processo", "procedimento", "cpc"],
-            "código civil": ["civil", "obrigação", "contrato"]
-        }
-        
-        for tema, palavras in temas_especificos.items():
-            if any(palavra in fatos for palavra in palavras):
-                temas.append(tema)
-        
-        return list(set(temas))  # Remover duplicatas
-    
-    def _validar_e_enriquecer(self, dados: Dict[str, Any]) -> Dict[str, Any]:
-        """Validação final e enriquecimento dos dados."""
-        # Validar CPF/CNPJ
-        for parte in ['autor', 'reu']:
-            if parte in dados:
-                cpf_cnpj = dados[parte].get('cpf_cnpj', '')
-                if cpf_cnpj:
-                    dados[parte]['cpf_cnpj'] = self._formatar_cpf_cnpj(cpf_cnpj)
-        
-        # Garantir que listas não estejam vazias
-        if not dados.get('fundamentos_juridicos', {}).get('temas_pesquisa'):
-            dados['fundamentos_juridicos']['temas_pesquisa'] = ['direito civil', 'código de processo civil']
-        
-        if not dados.get('pedidos', {}).get('principais'):
-            dados['pedidos']['principais'] = ['Pedido não especificado']
+        for campo, valor_padrao in campos_obrigatorios.items():
+            if campo not in dados or not dados[campo]:
+                dados[campo] = valor_padrao
         
         return dados
     
-    def _formatar_cpf_cnpj(self, documento: str) -> str:
-        """Formata CPF ou CNPJ."""
-        # Remove caracteres não numéricos
-        numeros = re.sub(r'\D', '', documento)
+    def _gerar_estrutura_minima(self, dados_entrada: Dict[str, Any]) -> Dict[str, Any]:
+        """Gera estrutura mínima quando tudo falha, usando apenas dados reais."""
         
-        if len(numeros) == 11:  # CPF
-            return f"{numeros[:3]}.{numeros[3:6]}.{numeros[6:9]}-{numeros[9:]}"
-        elif len(numeros) == 14:  # CNPJ
-            return f"{numeros[:2]}.{numeros[2:5]}.{numeros[5:8]}/{numeros[8:12]}-{numeros[12:]}"
-        else:
-            return documento  # Retorna original se não for CPF nem CNPJ válido
+        return {
+            "tipo_acao": "Ação Cível",
+            "autor": {
+                "nome": dados_entrada.get('clienteNome', '[NOME DO AUTOR A SER PREENCHIDO]'),
+                "qualificacao": dados_entrada.get('Qualificação', '[QUALIFICAÇÃO A SER PREENCHIDA]')
+            },
+            "reu": {
+                "nome": dados_entrada.get('nome_contrario_peticao', '[NOME DO RÉU A SER PREENCHIDO]'),
+                "qualificacao": dados_entrada.get('qualificacao_contrario_peticao', '[QUALIFICAÇÃO A SER PREENCHIDA]')
+            },
+            "fatos": dados_entrada.get('fatos_peticao', '[FATOS A SEREM DETALHADOS]'),
+            "pedidos": dados_entrada.get('verbas_pleiteadas_peticao', '[PEDIDOS A SEREM ESPECIFICADOS]'),
+            "valor_causa": dados_entrada.get('valor_causa_peticao', '[VALOR A SER ARBITRADO]'),
+            "competencia": "[COMPETÊNCIA A SER DEFINIDA]",
+            "fundamentos_necessarios": ["direito civil"],
+            "observacoes": "",
+            "urgencia": False
+        }
 
