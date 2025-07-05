@@ -1,4 +1,4 @@
-# agente_validador_corrigido.py - Agente Validador sem erros
+# agente_validador.py - Agente Validador sem erros
 
 import os
 import json
@@ -6,9 +6,9 @@ import re
 from typing import Dict, Any, List
 from datetime import datetime
 
-class AgenteValidadorCorrigido:
+class AgenteValidador:
     """
-    Agente Validador corrigido que:
+    Agente Validador que:
     - Valida documentos HTML extensos
     - Corrige problemas de formatação
     - Garante qualidade profissional
@@ -16,7 +16,7 @@ class AgenteValidadorCorrigido:
     """
     
     def __init__(self):
-        print("✅ Inicializando Agente Validador CORRIGIDO...")
+        print("✅ Inicializando Agente Validador...")
         self.criterios_validacao = {
             'tamanho_minimo': 30000,
             'secoes_obrigatorias': [
@@ -25,14 +25,14 @@ class AgenteValidadorCorrigido:
             'formatacao_html': True,
             'dados_reais': True
         }
-        print("✅ Agente Validador CORRIGIDO inicializado")
+        print("✅ Agente Validador inicializado")
     
     def validar_e_formatar(self, documento_html: str, dados_originais: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Valida e formata documento HTML garantindo qualidade profissional.
         """
         try:
-            print("🔍 Iniciando validação e formatação CORRIGIDA...")
+            print("🔍 Iniciando validação e formatação...")
             
             # Garantir que documento_html é string
             if not isinstance(documento_html, str):
@@ -50,7 +50,7 @@ class AgenteValidadorCorrigido:
             
             # ETAPA 2: IDENTIFICAR PROBLEMAS
             problemas = self._identificar_problemas(documento_html, analise_inicial)
-            print(f"🔧 Problemas identificados: {len(problemas)}")
+            print(f"🔧 Corrigindo petição ({len(problemas)} problemas)")
             
             # ETAPA 3: CORRIGIR PROBLEMAS
             documento_corrigido = self._corrigir_problemas(documento_html, problemas)
@@ -67,7 +67,8 @@ class AgenteValidadorCorrigido:
             score_qualidade = self._calcular_score_qualidade(documento_final)
             
             tamanho_final = len(documento_final)
-            print(f"✅ Validação concluída: {tamanho_final} caracteres, score {score_qualidade}%")
+            print(f"✅ Validação e formatação concluídas")
+            print(f"📊 Score de qualidade: {score_qualidade}%")
             
             return {
                 "status": "sucesso",
@@ -85,7 +86,7 @@ class AgenteValidadorCorrigido:
             }
             
         except Exception as e:
-            print(f"❌ Erro na validação corrigida: {e}")
+            print(f"❌ Erro na validação: {e}")
             return {
                 "status": "erro_corrigido",
                 "erro": str(e),
@@ -153,22 +154,6 @@ class AgenteValidadorCorrigido:
                 'severidade': 'media'
             })
         
-        # Problema 4: Poucas seções
-        if analise['secoes_encontradas'] < 5:
-            problemas.append({
-                'tipo': 'secoes_insuficientes',
-                'descricao': f"Apenas {analise['secoes_encontradas']} seções encontradas",
-                'severidade': 'media'
-            })
-        
-        # Problema 5: Muitos placeholders
-        if not analise['tem_dados_reais']:
-            problemas.append({
-                'tipo': 'dados_simulados',
-                'descricao': "Documento contém muitos placeholders",
-                'severidade': 'alta'
-            })
-        
         return problemas
     
     def _corrigir_problemas(self, documento: str, problemas: List[Dict[str, str]]) -> str:
@@ -184,12 +169,6 @@ class AgenteValidadorCorrigido:
             
             elif tipo == 'css_ausente':
                 documento_corrigido = self._adicionar_css_profissional(documento_corrigido)
-            
-            elif tipo == 'secoes_insuficientes':
-                documento_corrigido = self._adicionar_secoes_complementares(documento_corrigido)
-            
-            elif tipo == 'dados_simulados':
-                documento_corrigido = self._melhorar_placeholders(documento_corrigido)
         
         return documento_corrigido
     
@@ -255,13 +234,6 @@ class AgenteValidadorCorrigido:
             padding-bottom: 5px;
         }
         
-        h3 {
-            font-size: 14px;
-            font-weight: bold;
-            margin: 25px 0 15px 0;
-            text-transform: uppercase;
-        }
-        
         p {
             text-align: justify;
             margin-bottom: 15px;
@@ -297,9 +269,10 @@ class AgenteValidadorCorrigido:
         
         return documento
     
-    def _adicionar_secoes_complementares(self, documento: str) -> str:
-        """Adiciona seções complementares."""
+    def _expandir_documento(self, documento: str, dados_originais: Dict[str, Any]) -> str:
+        """Expande documento para atingir tamanho mínimo."""
         
+        # Adicionar seções de expansão
         secoes_extras = """
         <h2>DA FUNDAMENTAÇÃO COMPLEMENTAR</h2>
         
@@ -307,23 +280,11 @@ class AgenteValidadorCorrigido:
         
         <p>Os princípios da boa-fé objetiva, da função social dos contratos e da dignidade da pessoa humana constituem pilares fundamentais para a análise da questão apresentada.</p>
         
-        <p>A aplicação destes princípios ao caso concreto demonstra de forma inequívoca a procedência dos pedidos formulados, razão pela qual se requer o acolhimento integral da pretensão deduzida.</p>
-        
         <h2>DAS CONSIDERAÇÕES PROCESSUAIS</h2>
         
         <p>O presente feito encontra-se em perfeita ordem processual, observando-se todos os requisitos legais para o ajuizamento da ação.</p>
         
         <p>A competência jurisdicional está adequadamente fixada, não havendo qualquer óbice ao regular processamento da demanda.</p>
-        
-        <p>A representação processual encontra-se devidamente constituída, conforme procuração anexa, que confere poderes específicos para todos os atos processuais necessários.</p>
-        
-        <h2>DOS ASPECTOS PROBATÓRIOS COMPLEMENTARES</h2>
-        
-        <p>A prova dos fatos alegados será produzida através de todos os meios admitidos em direito, garantindo-se a demonstração cabal da veracidade das alegações apresentadas.</p>
-        
-        <p>A documentação anexa constitui prova robusta dos fatos narrados, sendo suficiente para embasar a procedência dos pedidos formulados.</p>
-        
-        <p>Caso necessário, outros elementos probatórios poderão ser produzidos no curso do processo, sempre observando-se os princípios do contraditório e da ampla defesa.</p>
         """
         
         # Inserir antes do fechamento
@@ -338,96 +299,11 @@ class AgenteValidadorCorrigido:
         
         return documento
     
-    def _melhorar_placeholders(self, documento: str) -> str:
-        """Melhora placeholders genéricos."""
-        
-        # Substituir placeholders genéricos por versões mais profissionais
-        substituicoes = {
-            '[NOME DO AUTOR]': '[NOME DO AUTOR A SER PREENCHIDO]',
-            '[NOME DO RÉU]': '[NOME DO RÉU A SER PREENCHIDO]',
-            '[VALOR]': '[VALOR A SER ARBITRADO CONFORME PROVA DOS AUTOS]',
-            '[DATA]': '[DATA A SER ESPECIFICADA]',
-            '[LOCAL]': '[COMARCA A SER INDICADA]',
-            '[FATOS]': '[FATOS ESPECÍFICOS A SEREM DETALHADOS CONFORME DOCUMENTAÇÃO]',
-            '[PEDIDOS]': '[PEDIDOS ESPECÍFICOS CONFORME PARTICULARIDADES DO CASO]'
-        }
-        
-        for antigo, novo in substituicoes.items():
-            documento = documento.replace(antigo, novo)
-        
-        return documento
-    
-    def _expandir_documento(self, documento: str, dados_originais: Dict[str, Any]) -> str:
-        """Expande documento para atingir tamanho mínimo."""
-        
-        # Adicionar seções de expansão
-        secoes_expansao = []
-        
-        # Seção de análise jurisprudencial
-        secoes_expansao.append("""
-        <h2>DA ANÁLISE JURISPRUDENCIAL APROFUNDADA</h2>
-        
-        <p>A jurisprudência dos tribunais superiores tem se consolidado no sentido de reconhecer a legitimidade de pretensões similares à ora deduzida, estabelecendo precedentes que fortalecem a fundamentação da presente ação.</p>
-        
-        <p>O Superior Tribunal de Justiça, em reiteradas decisões, tem aplicado os princípios constitucionais e legais de forma a garantir a proteção efetiva dos direitos fundamentais, especialmente quando se verifica violação ou ameaça a direitos legítimos.</p>
-        
-        <p>A uniformidade da jurisprudência confere segurança jurídica à pretensão deduzida, demonstrando que os tribunais superiores têm acolhido demandas com fundamentos análogos aos apresentados nesta ação.</p>
-        
-        <p>A evolução jurisprudencial na matéria evidencia o amadurecimento do entendimento judicial, que tem privilegiado a interpretação sistemática e teleológica das normas jurídicas aplicáveis.</p>
-        
-        <p>Os precedentes jurisprudenciais constituem importante fonte do direito, orientando a aplicação das normas legais de forma harmônica e consistente com os valores constitucionais.</p>
-        """)
-        
-        # Seção de direito comparado
-        secoes_expansao.append("""
-        <h2>DO DIREITO COMPARADO E EXPERIÊNCIA INTERNACIONAL</h2>
-        
-        <p>A experiência de outros países demonstra a importância da proteção dos direitos ora pleiteados, evidenciando a universalidade dos princípios que fundamentam a presente ação.</p>
-        
-        <p>O direito comparado oferece valiosos subsídios para a interpretação e aplicação das normas nacionais, especialmente em matérias relacionadas aos direitos fundamentais e à proteção da dignidade humana.</p>
-        
-        <p>A convergência entre os sistemas jurídicos nacionais e internacionais reforça a legitimidade da pretensão deduzida, demonstrando sua conformidade com os padrões internacionais de proteção de direitos.</p>
-        
-        <p>Os tratados internacionais ratificados pelo Brasil estabelecem padrões mínimos de proteção que devem ser observados na interpretação e aplicação do direito interno.</p>
-        
-        <p>A Convenção Americana sobre Direitos Humanos e outros instrumentos internacionais reforçam a fundamentação da presente ação, conferindo-lhe dimensão supranacional.</p>
-        """)
-        
-        # Seção de princípios constitucionais
-        secoes_expansao.append("""
-        <h2>DOS PRINCÍPIOS CONSTITUCIONAIS APLICÁVEIS</h2>
-        
-        <p>A Constituição Federal de 1988 estabelece um sistema de princípios fundamentais que devem orientar a interpretação e aplicação de todas as normas do ordenamento jurídico brasileiro.</p>
-        
-        <p>O princípio da dignidade da pessoa humana, previsto no artigo 1º, inciso III, da Constituição Federal, constitui fundamento basilar do Estado Democrático de Direito e deve ser observado em todas as relações jurídicas.</p>
-        
-        <p>O princípio da isonomia, consagrado no artigo 5º, caput, da Carta Magna, garante que todos são iguais perante a lei, sem distinção de qualquer natureza, assegurando-se a igualdade material e formal.</p>
-        
-        <p>O direito de ação, garantido pelo artigo 5º, inciso XXXV, da Constituição Federal, assegura a todos o acesso ao Poder Judiciário para a proteção de direitos ameaçados ou violados.</p>
-        
-        <p>O princípio do devido processo legal, previsto no artigo 5º, inciso LIV, garante que ninguém será privado da liberdade ou de seus bens sem o devido processo legal, assegurando-se o contraditório e a ampla defesa.</p>
-        """)
-        
-        # Inserir seções antes do fechamento
-        posicao_insercao = documento.find('<h2>TERMOS EM QUE</h2>')
-        if posicao_insercao == -1:
-            posicao_insercao = documento.find('</body>')
-        
-        if posicao_insercao > 0:
-            documento = documento[:posicao_insercao] + '\n'.join(secoes_expansao) + '\n' + documento[posicao_insercao:]
-        else:
-            documento += '\n'.join(secoes_expansao)
-        
-        return documento
-    
     def _aplicar_formatacao_final(self, documento: str) -> str:
         """Aplica formatação final profissional."""
         
         # Garantir espaçamento adequado
         documento = re.sub(r'\n\s*\n\s*\n+', '\n\n', documento)
-        
-        # Garantir que parágrafos tenham conteúdo mínimo
-        documento = re.sub(r'<p>\s*</p>', '', documento)
         
         # Garantir fechamento de tags
         if '</body>' not in documento:
@@ -492,10 +368,6 @@ class AgenteValidadorCorrigido:
                 melhorias.append('Estrutura HTML completa adicionada')
             elif tipo == 'css_ausente':
                 melhorias.append('Formatação CSS profissional aplicada')
-            elif tipo == 'secoes_insuficientes':
-                melhorias.append('Seções complementares adicionadas')
-            elif tipo == 'dados_simulados':
-                melhorias.append('Placeholders melhorados e profissionalizados')
         
         return melhorias
     
@@ -518,13 +390,6 @@ PROBLEMAS IDENTIFICADOS E CORRIGIDOS:
             relatorio += "Nenhum problema identificado.\n"
         
         relatorio += f"""
-MELHORIAS APLICADAS:
-- Estrutura HTML profissional
-- Formatação CSS adequada
-- Seções complementares
-- Expansão para tamanho mínimo
-- Correção de placeholders
-
 RESULTADO FINAL:
 Documento validado e formatado com qualidade profissional.
         """
@@ -559,3 +424,4 @@ Documento validado e formatado com qualidade profissional.
             """
         
         return documento
+
