@@ -36,7 +36,7 @@ class OrquestradorPrincipal:
             
             # Inicializar todos os agentes
             print("📊 Inicializando Agente Coletor de Dados...")
-            self.coletor_dados = AgenteColetorDados(openai_api_key)
+            self.coletor_dados = AgenteColetorDados()
             
             print("🔍 Inicializando Pesquisa Jurídica...")
             self.pesquisa_juridica = PesquisaJuridica()
@@ -45,7 +45,7 @@ class OrquestradorPrincipal:
             self.redator = AgenteRedator()
             
             print("✅ Inicializando Agente Validador...")
-            self.validador = AgenteValidador(openai_api_key)
+            self.validador = AgenteValidador()
             
             print("✅ Todos os agentes inicializados com sucesso!")
             
