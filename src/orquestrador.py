@@ -42,7 +42,7 @@ class OrquestradorPrincipal:
             self.pesquisa_juridica = PesquisaJuridica()
             
             print("✍️ Inicializando Agente Redator...")
-            self.redator = AgenteRedator(openai_api_key)
+            self.redator = AgenteRedator()
             
             print("✅ Inicializando Agente Validador...")
             self.validador = AgenteValidador(openai_api_key)
