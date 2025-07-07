@@ -1,7 +1,3 @@
-orquestrador.py
-Diferença
-Original
-Modificado
 # orquestrador.py - Orquestrador Principal sem erros de sintaxe
 
 import os
