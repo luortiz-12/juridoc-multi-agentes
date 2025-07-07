@@ -6,48 +6,39 @@ import traceback
 from typing import Dict, Any, List
 from datetime import datetime
 
-# Imports dos agentes
 from agente_coletor_dados import AgenteColetorDados
 from pesquisa_juridica import PesquisaJuridica
 from agente_redator import AgenteRedator
 from agente_validador import AgenteValidador
 
 class OrquestradorPrincipal:
-    """
-    Orquestrador que executa todos os 4 agentes em sequencia.
-    """
-    
     def __init__(self):
-        print("🎯 Inicializando Orquestrador Principal...")
+        print("Inicializando Orquestrador Principal...")
         
-        # Inicializar todos os agentes
         self.agente_coletor = AgenteColetorDados()
         self.pesquisa_juridica = PesquisaJuridica()
         self.agente_redator = AgenteRedator()
         self.agente_validador = AgenteValidador()
         
-        print("✅ Orquestrador Principal inicializado")
+        print("Orquestrador Principal inicializado")
     
     def processar_solicitacao_completa(self, dados_entrada: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Processa solicitacao executando todos os 4 agentes.
-        """
         try:
-            print("🚀 Iniciando processamento completo...")
+            print("Iniciando processamento completo...")
             inicio_processamento = datetime.now()
             
             agentes_executados = []
             
             # ETAPA 1: COLETOR DE DADOS
-            print("📊 ETAPA 1: Agente Coletor de Dados")
-            resultado_coletor = self.agente_coletor.estruturar_dados(dados_entrada)
+            print("ETAPA 1: Agente Coletor de Dados")
+            resultado_coletor = self.agente_coletor.coletar_e_processar(dados_entrada)
             agentes_executados.append("Coletor de Dados")
             
             dados_estruturados = resultado_coletor.get('dados_estruturados', {})
-            print(f"📊 Dados estruturados: OK")
+            print("Dados estruturados: OK")
             
             # ETAPA 2: PESQUISA JURIDICA
-            print("🔍 ETAPA 2: Pesquisa Juridica")
+            print("ETAPA 2: Pesquisa Juridica")
             fundamentos = dados_estruturados.get('fundamentos_necessarios', [])
             tipo_acao = dados_estruturados.get('tipo_acao', '')
             
@@ -56,10 +47,10 @@ class OrquestradorPrincipal:
                 tipo_acao=tipo_acao
             )
             agentes_executados.append("Pesquisa Juridica")
-            print(f"📚 Pesquisa concluida: OK")
+            print("Pesquisa concluida: OK")
             
             # ETAPA 3: REDATOR
-            print("✍️ ETAPA 3: Agente Redator")
+            print("ETAPA 3: Agente Redator")
             resultado_redacao = self.agente_redator.redigir_peticao_completa(
                 dados_estruturados=dados_estruturados,
                 pesquisa_juridica=resultado_pesquisa
@@ -67,10 +58,10 @@ class OrquestradorPrincipal:
             agentes_executados.append("Redator")
             
             documento_html = resultado_redacao.get('documento_html', '')
-            print(f"📄 Documento redigido: {len(documento_html)} caracteres")
+            print(f"Documento redigido: {len(documento_html)} caracteres")
             
             # ETAPA 4: VALIDADOR
-            print("✅ ETAPA 4: Agente Validador")
+            print("ETAPA 4: Agente Validador")
             resultado_validacao = self.agente_validador.validar_e_formatar(
                 documento_html=documento_html,
                 dados_originais=dados_estruturados
@@ -80,8 +71,8 @@ class OrquestradorPrincipal:
             documento_final = resultado_validacao.get('documento_validado', documento_html)
             score_qualidade = resultado_validacao.get('estatisticas', {}).get('score_qualidade', 0)
             
-            print(f"✅ Documento validado: {len(documento_final)} caracteres")
-            print(f"📊 Score de qualidade: {score_qualidade}%")
+            print(f"Documento validado: {len(documento_final)} caracteres")
+            print(f"Score de qualidade: {score_qualidade}%")
             
             # RESULTADO FINAL
             tempo_total = (datetime.now() - inicio_processamento).total_seconds()
@@ -89,8 +80,9 @@ class OrquestradorPrincipal:
             resultado_final = {
                 "status": "sucesso",
                 "documento_html": documento_final,
+                "documento_final": documento_final,
                 "dados_estruturados": dados_estruturados,
-                "pesquisa_realizada": self._resumir_pesquisa(resultado_pesquisa, fundamentos),
+                "pesquisa_realizada": f"Pesquisa realizada para {tipo_acao}. Fundamentos: {', '.join(fundamentos)}",
                 "agentes_executados": agentes_executados,
                 "estatisticas_completas": {
                     "tempo_processamento": f"{tempo_total:.1f}s",
@@ -108,25 +100,19 @@ class OrquestradorPrincipal:
                 "score_qualidade": score_qualidade
             }
             
-            print(f"🎉 PROCESSAMENTO COMPLETO FINALIZADO!")
-            print(f"⏱️ Tempo total: {tempo_total:.1f} segundos")
-            print(f"🤖 Agentes executados: {', '.join(agentes_executados)}")
-            print(f"📊 Score de qualidade: {score_qualidade}%")
+            print("PROCESSAMENTO COMPLETO FINALIZADO!")
+            print(f"Tempo total: {tempo_total:.1f} segundos")
+            print(f"Agentes executados: {', '.join(agentes_executados)}")
+            print(f"Score de qualidade: {score_qualidade}%")
             
             return resultado_final
             
         except Exception as e:
-            print(f"❌ ERRO no orquestrador: {e}")
+            print(f"ERRO no orquestrador: {e}")
             return self._gerar_resultado_emergencia(dados_entrada, agentes_executados)
     
-    def _resumir_pesquisa(self, resultado_pesquisa: Dict[str, Any], fundamentos: List[str]) -> str:
-        """Gera resumo da pesquisa realizada."""
-        area_direito = resultado_pesquisa.get('area_direito', 'nao identificada')
-        return f"Pesquisa realizada para {area_direito}. Fundamentos: {', '.join(fundamentos)}"
-    
     def _gerar_resultado_emergencia(self, dados_entrada: Dict[str, Any], agentes_executados: List[str]) -> Dict[str, Any]:
-        """Gera resultado de emergencia com dados reais."""
-        print("🚨 Gerando resultado de emergencia...")
+        print("Gerando resultado de emergencia...")
         
         nome_autor = dados_entrada.get('clienteNome', '[NOME A SER PREENCHIDO]')
         nome_reu = dados_entrada.get('nome_contrario_peticao', '[NOME DO REU A SER PREENCHIDO]')
@@ -171,6 +157,7 @@ class OrquestradorPrincipal:
         return {
             "status": "emergencia_com_dados_reais",
             "documento_html": documento_emergencia,
+            "documento_final": documento_emergencia,
             "agentes_executados": agentes_executados,
             "score_qualidade": 60,
             "timestamp": datetime.now().isoformat()
