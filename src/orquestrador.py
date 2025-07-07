@@ -83,7 +83,7 @@ class OrquestradorPrincipal:
                 "documento_final": documento_final,
                 "dados_estruturados": dados_estruturados,
                 "pesquisa_realizada": f"Pesquisa realizada para {tipo_acao}. Fundamentos: {', '.join(fundamentos)}",
-                "pesquisa_juridica": resultado_pesquisa,  # CAMPO ADICIONADO
+                "pesquisa_juridica": resultado_pesquisa,
                 "agentes_executados": agentes_executados,
                 "estatisticas_completas": {
                     "tempo_processamento": f"{tempo_total:.1f}s",
@@ -122,8 +122,7 @@ class OrquestradorPrincipal:
         pedidos = dados_entrada.get('verbas_pleiteadas_peticao', '[PEDIDOS A SEREM ESPECIFICADOS]')
         valor_causa = dados_entrada.get('valor_causa_peticao', '[VALOR A SER ARBITRADO]')
         
-        documento_emergencia = f"""
-<!DOCTYPE html>
+        documento_emergencia = f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -153,8 +152,7 @@ class OrquestradorPrincipal:
     
     <p>Termos em que, pede deferimento.</p>
 </body>
-</html>
-        """
+</html>"""
         
         return {
             "status": "emergencia_com_dados_reais",
@@ -164,3 +162,4 @@ class OrquestradorPrincipal:
             "agentes_executados": agentes_executados,
             "score_qualidade": 60,
             "timestamp": datetime.now().isoformat()
+        }
