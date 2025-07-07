@@ -83,6 +83,7 @@ class OrquestradorPrincipal:
                 "documento_final": documento_final,
                 "dados_estruturados": dados_estruturados,
                 "pesquisa_realizada": f"Pesquisa realizada para {tipo_acao}. Fundamentos: {', '.join(fundamentos)}",
+                "pesquisa_juridica": resultado_pesquisa,  # CAMPO ADICIONADO
                 "agentes_executados": agentes_executados,
                 "estatisticas_completas": {
                     "tempo_processamento": f"{tempo_total:.1f}s",
@@ -109,6 +110,7 @@ class OrquestradorPrincipal:
             
         except Exception as e:
             print(f"ERRO no orquestrador: {e}")
+            print(f"Traceback: {traceback.format_exc()}")
             return self._gerar_resultado_emergencia(dados_entrada, agentes_executados)
     
     def _gerar_resultado_emergencia(self, dados_entrada: Dict[str, Any], agentes_executados: List[str]) -> Dict[str, Any]:
@@ -158,7 +160,7 @@ class OrquestradorPrincipal:
             "status": "emergencia_com_dados_reais",
             "documento_html": documento_emergencia,
             "documento_final": documento_emergencia,
+            "pesquisa_juridica": {"status": "nao_realizada", "motivo": "erro_no_processamento"},
             "agentes_executados": agentes_executados,
             "score_qualidade": 60,
             "timestamp": datetime.now().isoformat()
-        }

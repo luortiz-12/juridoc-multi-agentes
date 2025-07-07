@@ -1,4 +1,4 @@
-# pesquisa_juridica.py - Pesquisa com formatação profissional (NOME CORRETO)
+# pesquisa_juridica.py - Pesquisa com logs detalhados dos sites acessados
 
 import os
 import json
@@ -26,11 +26,7 @@ except ImportError:
 
 class PesquisaJuridica:
     """
-    Pesquisa Jurídica com formatação profissional que:
-    - Extrai conteúdo limpo e bem formatado
-    - Organiza legislação, jurisprudência e doutrina
-    - Formata citações profissionalmente
-    - Sempre retorna conteúdo útil e legível
+    Pesquisa Jurídica com logs detalhados dos sites acessados.
     """
     
     def __init__(self):
@@ -49,17 +45,25 @@ class PesquisaJuridica:
         self.delay_entre_buscas = (0.5, 1.0)
         self.delay_entre_sites = (0.2, 0.5)
         self.timeout_site = 8
-        self.max_sites_por_query = 3  # Reduzido para velocidade
+        self.max_sites_por_query = 3
+        
+        # Log de sites acessados
+        self.sites_acessados = []
+        self.conteudos_extraidos = []
         
         print("✅ Sistema de pesquisa jurídica FORMATADA inicializado")
     
     def pesquisar_fundamentacao_completa(self, fundamentos: List[str], tipo_acao: str = "") -> Dict[str, Any]:
         """
-        Realiza pesquisa jurídica completa com formatação profissional.
+        Realiza pesquisa jurídica completa com logs detalhados.
         """
         try:
             print(f"🔍 Iniciando pesquisa jurídica FORMATADA para: {fundamentos}")
             print(f"📋 Tipo de ação: {tipo_acao}")
+            
+            # Limpar logs anteriores
+            self.sites_acessados = []
+            self.conteudos_extraidos = []
             
             inicio = time.time()
             
@@ -67,14 +71,16 @@ class PesquisaJuridica:
             area_direito = self._identificar_area_direito(fundamentos, tipo_acao)
             print(f"📚 Área identificada: {area_direito}")
             
-            # Realizar pesquisas em paralelo (mais rápido)
-            resultados = self._executar_pesquisas_rapidas(fundamentos, area_direito)
+            # Realizar pesquisas em paralelo
+            resultados = self._executar_pesquisas_com_logs(fundamentos, area_direito)
             
             # Formatar resultados profissionalmente
-            resultado_formatado = self._formatar_resultados_profissionalmente(resultados, area_direito)
+            resultado_formatado = self._formatar_resultados_com_logs(resultados, area_direito)
             
             tempo_total = time.time() - inicio
             print(f"✅ PESQUISA FORMATADA CONCLUÍDA em {tempo_total:.1f} segundos")
+            print(f"🌐 Total de sites acessados: {len(self.sites_acessados)}")
+            print(f"📄 Total de conteúdos extraídos: {len(self.conteudos_extraidos)}")
             
             return resultado_formatado
             
@@ -99,437 +105,333 @@ class PesquisaJuridica:
         else:
             return 'civil'
     
-    def _executar_pesquisas_rapidas(self, fundamentos: List[str], area_direito: str) -> Dict[str, Any]:
-        """Executa pesquisas rápidas em paralelo."""
-        
-        resultados = {
-            'legislacao': [],
-            'jurisprudencia': [],
-            'doutrina': []
-        }
-        
-        # Pesquisas mais rápidas e focadas
-        try:
-            with ThreadPoolExecutor(max_workers=2) as executor:  # Reduzido para 2
-                # Submeter apenas 2 pesquisas principais
-                future_legislacao = executor.submit(self._pesquisar_legislacao_rapida, fundamentos, area_direito)
-                future_jurisprudencia = executor.submit(self._pesquisar_jurisprudencia_rapida, fundamentos, area_direito)
-                
-                # Coletar resultados com timeout menor
-                try:
-                    resultados['legislacao'] = future_legislacao.result(timeout=15)
-                except Exception as e:
-                    print(f"⚠️ Erro na pesquisa de legislação: {e}")
-                    resultados['legislacao'] = []
-                
-                try:
-                    resultados['jurisprudencia'] = future_jurisprudencia.result(timeout=15)
-                except Exception as e:
-                    print(f"⚠️ Erro na pesquisa de jurisprudência: {e}")
-                    resultados['jurisprudencia'] = []
-        
-        except Exception as e:
-            print(f"⚠️ Erro no executor: {e}")
-        
-        # Doutrina via fallback (mais rápido)
-        resultados['doutrina'] = self._gerar_doutrina_fallback(area_direito, fundamentos)
-        
-        return resultados
-    
-    def _pesquisar_legislacao_rapida(self, fundamentos: List[str], area_direito: str) -> List[Dict[str, str]]:
-        """Pesquisa legislação de forma rápida."""
+    def _executar_pesquisas_com_logs(self, fundamentos: List[str], area_direito: str) -> Dict[str, Any]:
+        """Executa pesquisas com logs detalhados."""
         
         print("📚 Buscando LEGISLAÇÃO (modo rápido)...")
+        legislacao = self._buscar_legislacao_com_logs(fundamentos, area_direito)
         
-        # Usar fallback direto se Google não disponível
-        if not GOOGLE_SEARCH_AVAILABLE or not REQUESTS_AVAILABLE:
-            return self._gerar_legislacao_fallback(area_direito, fundamentos)
+        print("⚖️ Buscando JURISPRUDÊNCIA (modo rápido)...")
+        jurisprudencia = self._buscar_jurisprudencia_com_logs(fundamentos, area_direito)
+        
+        print("📖 Buscando DOUTRINA (modo rápido)...")
+        doutrina = self._buscar_doutrina_com_logs(fundamentos, area_direito)
+        
+        return {
+            'legislacao': legislacao,
+            'jurisprudencia': jurisprudencia,
+            'doutrina': doutrina,
+            'area_direito': area_direito
+        }
+    
+    def _buscar_legislacao_com_logs(self, fundamentos: List[str], area_direito: str) -> List[Dict[str, str]]:
+        """Busca legislação com logs detalhados."""
         
         legislacao_encontrada = []
         
-        # Apenas 1 query por área para velocidade
+        # Queries específicas por área
         if area_direito == 'trabalhista':
-            query = "CLT artigo site:planalto.gov.br"
-        elif area_direito == 'consumidor':
-            query = "CDC artigo site:planalto.gov.br"
+            queries = [
+                f"CLT artigo {fundamentos[0]} site:planalto.gov.br",
+                f"lei trabalhista {fundamentos[0]} site:lexml.gov.br"
+            ]
         else:
-            query = "código civil artigo site:planalto.gov.br"
+            queries = [
+                f"lei {fundamentos[0]} site:planalto.gov.br",
+                f"código civil {fundamentos[0]} site:lexml.gov.br"
+            ]
         
-        try:
-            time.sleep(random.uniform(*self.delay_entre_buscas))
+        for query in queries[:2]:  # Limitar para velocidade
+            print(f"🔍 Pesquisando Google: {query}")
             
-            urls = list(search(query, num_results=2, sleep_interval=0.5))
-            
-            for url in urls[:1]:  # Apenas 1 site para velocidade
-                conteudo = self._extrair_conteudo_legislacao_rapido(url)
-                if conteudo:
-                    legislacao_encontrada.append(conteudo)
-                    break  # Parar no primeiro sucesso
+            try:
+                if GOOGLE_SEARCH_AVAILABLE:
+                    urls = list(search(query, num_results=self.max_sites_por_query, sleep_interval=0.5))
                     
-        except Exception as e:
-            print(f"⚠️ Erro na query de legislação: {e}")
+                    for url in urls:
+                        print(f"🌐 Acessando site: {url}")
+                        self.sites_acessados.append(url)
+                        
+                        conteudo = self._extrair_conteudo_site(url)
+                        if conteudo:
+                            print(f"📄 Conteúdo extraído: {len(conteudo)} caracteres")
+                            self.conteudos_extraidos.append({
+                                'url': url,
+                                'tipo': 'legislacao',
+                                'tamanho': len(conteudo),
+                                'conteudo_preview': conteudo[:200] + '...'
+                            })
+                            
+                            legislacao_encontrada.append({
+                                'titulo': self._extrair_titulo_legislacao(conteudo),
+                                'artigo': self._extrair_artigo_legislacao(conteudo),
+                                'fonte': url,
+                                'conteudo': conteudo[:1000]  # Primeiros 1000 chars
+                            })
+                
+                # Delay entre queries
+                time.sleep(random.uniform(*self.delay_entre_buscas))
+                
+            except Exception as e:
+                print(f"❌ Erro na busca de legislação '{query}': {e}")
         
-        # Sempre retornar fallback se não encontrou
-        if not legislacao_encontrada:
-            legislacao_encontrada = self._gerar_legislacao_fallback(area_direito, fundamentos)
-        
+        print(f"📚 Legislação encontrada: {len(legislacao_encontrada)} itens")
         return legislacao_encontrada
     
-    def _extrair_conteudo_legislacao_rapido(self, url: str) -> Dict[str, str]:
-        """Extrai conteúdo de legislação de forma rápida."""
-        
-        try:
-            headers = {'User-Agent': random.choice(self.user_agents)}
-            response = requests.get(url, headers=headers, timeout=5)  # Timeout reduzido
-            
-            if response.status_code == 200:
-                # Processamento mais simples e rápido
-                texto_limpo = self._limpar_texto_simples(response.text)
-                
-                if len(texto_limpo) > 200:
-                    return {
-                        'tipo': 'legislacao',
-                        'titulo': self._extrair_titulo_simples(url),
-                        'conteudo': texto_limpo[:800],  # Limitar tamanho
-                        'fonte': url,
-                        'formatado': self._formatar_legislacao_simples(texto_limpo[:800], url)
-                    }
-                    
-        except Exception as e:
-            print(f"⚠️ Erro ao extrair legislação de {url}: {e}")
-            
-        return None
-    
-    def _pesquisar_jurisprudencia_rapida(self, fundamentos: List[str], area_direito: str) -> List[Dict[str, str]]:
-        """Pesquisa jurisprudência de forma rápida."""
-        
-        print("⚖️ Buscando JURISPRUDÊNCIA (modo rápido)...")
-        
-        # Usar fallback direto se Google não disponível
-        if not GOOGLE_SEARCH_AVAILABLE or not REQUESTS_AVAILABLE:
-            return self._gerar_jurisprudencia_fallback(area_direito, fundamentos)
+    def _buscar_jurisprudencia_com_logs(self, fundamentos: List[str], area_direito: str) -> List[Dict[str, str]]:
+        """Busca jurisprudência com logs detalhados."""
         
         jurisprudencia_encontrada = []
         
-        # Apenas 1 query para velocidade
+        # Queries específicas por área
         if area_direito == 'trabalhista':
-            query = "acórdão site:tst.jus.br"
+            queries = [
+                f"TST {fundamentos[0]} site:tst.jus.br",
+                f"jurisprudência trabalhista {fundamentos[0]} site:stf.jus.br"
+            ]
         else:
-            query = "acórdão site:stj.jus.br"
+            queries = [
+                f"STJ {fundamentos[0]} site:stj.jus.br",
+                f"jurisprudência {fundamentos[0]} site:stf.jus.br"
+            ]
         
-        try:
-            time.sleep(random.uniform(*self.delay_entre_buscas))
+        for query in queries[:2]:  # Limitar para velocidade
+            print(f"🔍 Pesquisando Google: {query}")
             
-            urls = list(search(query, num_results=2, sleep_interval=0.5))
-            
-            for url in urls[:1]:  # Apenas 1 site
-                conteudo = self._extrair_conteudo_jurisprudencia_rapido(url)
-                if conteudo:
-                    jurisprudencia_encontrada.append(conteudo)
-                    break  # Parar no primeiro sucesso
+            try:
+                if GOOGLE_SEARCH_AVAILABLE:
+                    urls = list(search(query, num_results=self.max_sites_por_query, sleep_interval=0.5))
                     
-        except Exception as e:
-            print(f"⚠️ Erro na query de jurisprudência: {e}")
+                    for url in urls:
+                        print(f"🌐 Acessando site: {url}")
+                        self.sites_acessados.append(url)
+                        
+                        conteudo = self._extrair_conteudo_site(url)
+                        if conteudo:
+                            print(f"📄 Conteúdo extraído: {len(conteudo)} caracteres")
+                            self.conteudos_extraidos.append({
+                                'url': url,
+                                'tipo': 'jurisprudencia',
+                                'tamanho': len(conteudo),
+                                'conteudo_preview': conteudo[:200] + '...'
+                            })
+                            
+                            jurisprudencia_encontrada.append({
+                                'ementa': self._extrair_ementa_jurisprudencia(conteudo),
+                                'tribunal': self._extrair_tribunal(url),
+                                'fonte': url,
+                                'conteudo': conteudo[:1000]  # Primeiros 1000 chars
+                            })
+                
+                # Delay entre queries
+                time.sleep(random.uniform(*self.delay_entre_buscas))
+                
+            except Exception as e:
+                print(f"❌ Erro na busca de jurisprudência '{query}': {e}")
         
-        # Sempre retornar fallback se não encontrou
-        if not jurisprudencia_encontrada:
-            jurisprudencia_encontrada = self._gerar_jurisprudencia_fallback(area_direito, fundamentos)
-        
+        print(f"⚖️ Jurisprudência encontrada: {len(jurisprudencia_encontrada)} itens")
         return jurisprudencia_encontrada
     
-    def _extrair_conteudo_jurisprudencia_rapido(self, url: str) -> Dict[str, str]:
-        """Extrai conteúdo de jurisprudência de forma rápida."""
+    def _buscar_doutrina_com_logs(self, fundamentos: List[str], area_direito: str) -> List[Dict[str, str]]:
+        """Busca doutrina com logs detalhados."""
+        
+        doutrina_encontrada = []
+        
+        # Queries para doutrina
+        queries = [
+            f"doutrina {fundamentos[0]} site:conjur.com.br",
+            f"artigo jurídico {fundamentos[0]} site:migalhas.com.br"
+        ]
+        
+        for query in queries[:2]:  # Limitar para velocidade
+            print(f"🔍 Pesquisando Google: {query}")
+            
+            try:
+                if GOOGLE_SEARCH_AVAILABLE:
+                    urls = list(search(query, num_results=self.max_sites_por_query, sleep_interval=0.5))
+                    
+                    for url in urls:
+                        print(f"🌐 Acessando site: {url}")
+                        self.sites_acessados.append(url)
+                        
+                        conteudo = self._extrair_conteudo_site(url)
+                        if conteudo:
+                            print(f"📄 Conteúdo extraído: {len(conteudo)} caracteres")
+                            self.conteudos_extraidos.append({
+                                'url': url,
+                                'tipo': 'doutrina',
+                                'tamanho': len(conteudo),
+                                'conteudo_preview': conteudo[:200] + '...'
+                            })
+                            
+                            doutrina_encontrada.append({
+                                'titulo': self._extrair_titulo_artigo(conteudo),
+                                'autor': self._extrair_autor_artigo(conteudo),
+                                'fonte': url,
+                                'conteudo': conteudo[:1000]  # Primeiros 1000 chars
+                            })
+                
+                # Delay entre queries
+                time.sleep(random.uniform(*self.delay_entre_buscas))
+                
+            except Exception as e:
+                print(f"❌ Erro na busca de doutrina '{query}': {e}")
+        
+        print(f"📖 Doutrina encontrada: {len(doutrina_encontrada)} itens")
+        return doutrina_encontrada
+    
+    def _extrair_conteudo_site(self, url: str) -> str:
+        """Extrai conteúdo de um site específico."""
         
         try:
-            headers = {'User-Agent': random.choice(self.user_agents)}
-            response = requests.get(url, headers=headers, timeout=5)
+            if not REQUESTS_AVAILABLE:
+                return ""
+            
+            headers = {
+                'User-Agent': random.choice(self.user_agents),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+                'Accept-Encoding': 'gzip, deflate',
+                'Connection': 'keep-alive',
+            }
+            
+            response = requests.get(url, headers=headers, timeout=self.timeout_site)
             
             if response.status_code == 200:
-                # Processamento mais simples
-                texto_limpo = self._limpar_texto_simples(response.text)
-                tribunal = self._identificar_tribunal(url)
+                soup = BeautifulSoup(response.content, 'html.parser')
                 
-                if len(texto_limpo) > 200:
-                    return {
-                        'tipo': 'jurisprudencia',
-                        'tribunal': tribunal,
-                        'ementa': texto_limpo[:600],
-                        'fonte': url,
-                        'formatado': self._formatar_jurisprudencia_simples(tribunal, texto_limpo[:600], url)
-                    }
-                    
-        except Exception as e:
-            print(f"⚠️ Erro ao extrair jurisprudência de {url}: {e}")
+                # Remover scripts e styles
+                for script in soup(["script", "style"]):
+                    script.decompose()
+                
+                # Extrair texto
+                texto = soup.get_text()
+                
+                # Limpar texto
+                linhas = (linha.strip() for linha in texto.splitlines())
+                chunks = (frase.strip() for linha in linhas for frase in linha.split("  "))
+                texto_limpo = ' '.join(chunk for chunk in chunks if chunk)
+                
+                return texto_limpo[:2000]  # Limitar tamanho
             
-        return None
+            return ""
+            
+        except Exception as e:
+            print(f"❌ Erro ao extrair conteúdo de {url}: {e}")
+            return ""
     
-    def _limpar_texto_simples(self, texto_html: str) -> str:
-        """Limpa texto HTML de forma simples e rápida."""
-        
-        try:
-            # Remover tags HTML básicas
-            texto = re.sub(r'<[^>]+>', ' ', texto_html)
-            # Remover caracteres especiais problemáticos
-            texto = re.sub(r'[^\w\s\.\,\;\:\-\(\)]', ' ', texto)
-            # Normalizar espaços
-            texto = ' '.join(texto.split())
-            return texto
-        except:
-            return "Conteúdo extraído com formatação básica"
+    def _extrair_titulo_legislacao(self, conteudo: str) -> str:
+        """Extrai título de legislação."""
+        # Buscar padrões de lei
+        match = re.search(r'(Lei nº? [\d\.\/]+|Decreto nº? [\d\.\/]+|CLT.*?Art\.?\s*\d+)', conteudo, re.IGNORECASE)
+        return match.group(1) if match else "Legislação encontrada"
     
-    def _extrair_titulo_simples(self, url: str) -> str:
-        """Extrai título simples baseado na URL."""
-        
-        if 'clt' in url.lower():
-            return "Consolidação das Leis do Trabalho - CLT"
-        elif 'codigo-civil' in url.lower():
-            return "Código Civil Brasileiro"
-        elif 'cdc' in url.lower() or '8078' in url:
-            return "Código de Defesa do Consumidor"
-        else:
-            return "Legislação Federal"
+    def _extrair_artigo_legislacao(self, conteudo: str) -> str:
+        """Extrai artigo específico da legislação."""
+        # Buscar artigos
+        match = re.search(r'Art\.?\s*\d+.*?(?=Art\.?\s*\d+|$)', conteudo, re.IGNORECASE | re.DOTALL)
+        return match.group(0)[:500] if match else conteudo[:500]
     
-    def _identificar_tribunal(self, url: str) -> str:
-        """Identifica tribunal pela URL."""
-        
-        if 'tst.jus.br' in url:
-            return "Tribunal Superior do Trabalho (TST)"
+    def _extrair_ementa_jurisprudencia(self, conteudo: str) -> str:
+        """Extrai ementa de jurisprudência."""
+        # Buscar ementa
+        match = re.search(r'EMENTA:?\s*(.*?)(?=ACÓRDÃO|RELATÓRIO|$)', conteudo, re.IGNORECASE | re.DOTALL)
+        return match.group(1)[:500] if match else conteudo[:500]
+    
+    def _extrair_tribunal(self, url: str) -> str:
+        """Extrai nome do tribunal da URL."""
+        if 'stf.jus.br' in url:
+            return 'STF'
         elif 'stj.jus.br' in url:
-            return "Superior Tribunal de Justiça (STJ)"
-        elif 'stf.jus.br' in url:
-            return "Supremo Tribunal Federal (STF)"
+            return 'STJ'
+        elif 'tst.jus.br' in url:
+            return 'TST'
         else:
-            return "Tribunal Superior"
+            return 'Tribunal'
     
-    def _formatar_resultados_profissionalmente(self, resultados: Dict[str, Any], area_direito: str) -> Dict[str, Any]:
-        """Formata todos os resultados profissionalmente."""
+    def _extrair_titulo_artigo(self, conteudo: str) -> str:
+        """Extrai título de artigo doutrinário."""
+        # Buscar título no início
+        linhas = conteudo.split('\n')[:10]
+        for linha in linhas:
+            if len(linha.strip()) > 20 and len(linha.strip()) < 200:
+                return linha.strip()
+        return "Artigo doutrinário"
+    
+    def _extrair_autor_artigo(self, conteudo: str) -> str:
+        """Extrai autor do artigo."""
+        # Buscar padrões de autor
+        match = re.search(r'Por:?\s*([A-Z][a-z]+ [A-Z][a-z]+)', conteudo)
+        return match.group(1) if match else "Autor não identificado"
+    
+    def _formatar_resultados_com_logs(self, resultados: Dict[str, Any], area_direito: str) -> Dict[str, Any]:
+        """Formata resultados incluindo logs detalhados."""
         
-        resultado_final = {
+        return {
+            'status': 'sucesso',
             'area_direito': area_direito,
-            'timestamp': datetime.now().isoformat(),
+            'legislacao_formatada': self._formatar_legislacao(resultados['legislacao']),
+            'jurisprudencia_formatada': self._formatar_jurisprudencia(resultados['jurisprudencia']),
+            'doutrina_formatada': self._formatar_doutrina(resultados['doutrina']),
             'total_fontes': len(resultados['legislacao']) + len(resultados['jurisprudencia']) + len(resultados['doutrina']),
-            'legislacao_formatada': self._compilar_legislacao_formatada(resultados['legislacao']),
-            'jurisprudencia_formatada': self._compilar_jurisprudencia_formatada(resultados['jurisprudencia']),
-            'doutrina_formatada': self._compilar_doutrina_formatada(resultados['doutrina']),
-            'resumo_executivo': self._gerar_resumo_executivo(resultados, area_direito)
+            'sites_acessados': self.sites_acessados,
+            'conteudos_extraidos': self.conteudos_extraidos,
+            'timestamp': datetime.now().isoformat()
         }
-        
-        return resultado_final
     
-    def _compilar_legislacao_formatada(self, legislacao: List[Dict[str, str]]) -> str:
-        """Compila legislação em formato profissional."""
-        
+    def _formatar_legislacao(self, legislacao: List[Dict[str, str]]) -> str:
+        """Formata legislação encontrada."""
         if not legislacao:
-            return "Legislação aplicável conforme área do direito identificada."
+            return "Legislação específica não encontrada nas pesquisas realizadas."
         
-        texto_compilado = "LEGISLAÇÃO APLICÁVEL:\n\n"
+        texto_formatado = "LEGISLAÇÃO APLICÁVEL:\n\n"
+        for item in legislacao:
+            texto_formatado += f"• {item['titulo']}\n"
+            texto_formatado += f"  {item['artigo']}\n"
+            texto_formatado += f"  Fonte: {item['fonte']}\n\n"
         
-        for i, lei in enumerate(legislacao, 1):
-            formatado = lei.get('formatado', '')
-            if formatado:
-                texto_compilado += f"{i}. {formatado}\n\n"
-        
-        return texto_compilado
+        return texto_formatado
     
-    def _compilar_jurisprudencia_formatada(self, jurisprudencia: List[Dict[str, str]]) -> str:
-        """Compila jurisprudência em formato profissional."""
-        
+    def _formatar_jurisprudencia(self, jurisprudencia: List[Dict[str, str]]) -> str:
+        """Formata jurisprudência encontrada."""
         if not jurisprudencia:
-            return "Jurisprudência consolidada dos tribunais superiores aplicável à matéria."
+            return "Jurisprudência específica não encontrada nas pesquisas realizadas."
         
-        texto_compilado = "JURISPRUDÊNCIA APLICÁVEL:\n\n"
+        texto_formatado = "JURISPRUDÊNCIA APLICÁVEL:\n\n"
+        for item in jurisprudencia:
+            texto_formatado += f"• {item['tribunal']}\n"
+            texto_formatado += f"  EMENTA: {item['ementa']}\n"
+            texto_formatado += f"  Fonte: {item['fonte']}\n\n"
         
-        for i, acordao in enumerate(jurisprudencia, 1):
-            formatado = acordao.get('formatado', '')
-            if formatado:
-                texto_compilado += f"{i}. {formatado}\n\n"
-        
-        return texto_compilado
+        return texto_formatado
     
-    def _compilar_doutrina_formatada(self, doutrina: List[Dict[str, str]]) -> str:
-        """Compila doutrina em formato profissional."""
-        
+    def _formatar_doutrina(self, doutrina: List[Dict[str, str]]) -> str:
+        """Formata doutrina encontrada."""
         if not doutrina:
-            return "Doutrina especializada sustenta o entendimento aplicável à questão."
+            return "Doutrina específica não encontrada nas pesquisas realizadas."
         
-        texto_compilado = "DOUTRINA ESPECIALIZADA:\n\n"
+        texto_formatado = "DOUTRINA APLICÁVEL:\n\n"
+        for item in doutrina:
+            texto_formatado += f"• {item['titulo']}\n"
+            texto_formatado += f"  Autor: {item['autor']}\n"
+            texto_formatado += f"  Fonte: {item['fonte']}\n\n"
         
-        for i, artigo in enumerate(doutrina, 1):
-            formatado = artigo.get('formatado', '')
-            if formatado:
-                texto_compilado += f"{i}. {formatado}\n\n"
-        
-        return texto_compilado
+        return texto_formatado
     
-    def _gerar_resumo_executivo(self, resultados: Dict[str, Any], area_direito: str) -> str:
-        """Gera resumo executivo da pesquisa."""
-        
-        total_fontes = len(resultados['legislacao']) + len(resultados['jurisprudencia']) + len(resultados['doutrina'])
-        
-        resumo = f"""
-RESUMO EXECUTIVO DA PESQUISA JURÍDICA:
-
-Área do Direito: {area_direito.title()}
-Total de Fontes Consultadas: {total_fontes}
-Data da Pesquisa: {datetime.now().strftime('%d/%m/%Y às %H:%M')}
-
-RESULTADOS:
-- Legislação: {len(resultados['legislacao'])} fonte(s) identificada(s)
-- Jurisprudência: {len(resultados['jurisprudencia'])} decisão(ões) relevante(s)
-- Doutrina: {len(resultados['doutrina'])} análise(s) especializada(s)
-
-A pesquisa jurídica forneceu fundamentação sólida para a questão apresentada.
-        """
-        
-        return resumo.strip()
-    
-    # Métodos de formatação simples
-    def _formatar_legislacao_simples(self, conteudo: str, url: str) -> str:
-        """Formata legislação de forma simples."""
-        
-        titulo = self._extrair_titulo_simples(url)
-        return f"**{titulo}**\n\n{conteudo}\n\n(Fonte: {url})"
-    
-    def _formatar_jurisprudencia_simples(self, tribunal: str, ementa: str, url: str) -> str:
-        """Formata jurisprudência de forma simples."""
-        
-        return f"**{tribunal}**\n\nEMENTA: {ementa}\n\n(Fonte: {url})"
-    
-    # Métodos de fallback
     def _gerar_fallback_formatado(self, fundamentos: List[str], tipo_acao: str) -> Dict[str, Any]:
-        """Gera fallback formatado quando pesquisa falha."""
+        """Gera fallback quando pesquisa falha."""
         
         area_direito = self._identificar_area_direito(fundamentos, tipo_acao)
         
         return {
+            'status': 'fallback',
             'area_direito': area_direito,
-            'timestamp': datetime.now().isoformat(),
-            'total_fontes': 3,
-            'legislacao_formatada': self._gerar_legislacao_fallback_formatada(area_direito),
-            'jurisprudencia_formatada': self._gerar_jurisprudencia_fallback_formatada(area_direito),
-            'doutrina_formatada': self._gerar_doutrina_fallback_formatada(area_direito),
-            'resumo_executivo': f"Pesquisa realizada com base na área do direito {area_direito} identificada."
+            'legislacao_formatada': f"Legislação aplicável à área de {area_direito} deve ser consultada.",
+            'jurisprudencia_formatada': f"Jurisprudência dos tribunais superiores sobre {area_direito}.",
+            'doutrina_formatada': f"Doutrina especializada em {area_direito}.",
+            'total_fontes': 0,
+            'sites_acessados': [],
+            'conteudos_extraidos': [],
+            'motivo_fallback': 'Erro na pesquisa online',
+            'timestamp': datetime.now().isoformat()
         }
-    
-    def _gerar_legislacao_fallback(self, area_direito: str, fundamentos: List[str]) -> List[Dict[str, str]]:
-        """Gera legislação fallback."""
-        
-        if area_direito == 'trabalhista':
-            return [{
-                'tipo': 'legislacao',
-                'titulo': 'Consolidação das Leis do Trabalho - CLT',
-                'formatado': '**Consolidação das Leis do Trabalho - CLT**\n\n• Art. 483 - O empregado poderá considerar rescindido o contrato e pleitear a devida indenização quando o empregador cometer falta grave.\n• Art. 59 - A duração normal do trabalho poderá ser acrescida de horas suplementares.'
-            }]
-        elif area_direito == 'consumidor':
-            return [{
-                'tipo': 'legislacao',
-                'titulo': 'Código de Defesa do Consumidor',
-                'formatado': '**Código de Defesa do Consumidor**\n\n• Art. 6º - São direitos básicos do consumidor a proteção da vida, saúde e segurança.\n• Art. 14 - O fornecedor de serviços responde pela reparação dos danos causados.'
-            }]
-        else:
-            return [{
-                'tipo': 'legislacao',
-                'titulo': 'Código Civil Brasileiro',
-                'formatado': '**Código Civil Brasileiro**\n\n• Art. 186 - Aquele que, por ação ou omissão voluntária, causar dano a outrem, comete ato ilícito.\n• Art. 927 - Aquele que, por ato ilícito, causar dano a outrem, fica obrigado a repará-lo.'
-            }]
-    
-    def _gerar_jurisprudencia_fallback(self, area_direito: str, fundamentos: List[str]) -> List[Dict[str, str]]:
-        """Gera jurisprudência fallback."""
-        
-        if area_direito == 'trabalhista':
-            return [{
-                'tipo': 'jurisprudencia',
-                'tribunal': 'Tribunal Superior do Trabalho (TST)',
-                'formatado': '**Tribunal Superior do Trabalho (TST)**\n\nEMENTA: A jurisprudência consolidada do TST reconhece o direito à rescisão indireta quando caracterizada falta grave do empregador, incluindo o não pagamento de horas extras e situações de assédio moral.'
-            }]
-        else:
-            return [{
-                'tipo': 'jurisprudencia',
-                'tribunal': 'Superior Tribunal de Justiça (STJ)',
-                'formatado': '**Superior Tribunal de Justiça (STJ)**\n\nEMENTA: O entendimento jurisprudencial consolidado reconhece a aplicabilidade dos princípios gerais do direito civil nas relações jurídicas, garantindo a reparação de danos quando caracterizada a responsabilidade civil.'
-            }]
-    
-    def _gerar_doutrina_fallback(self, area_direito: str, fundamentos: List[str]) -> List[Dict[str, str]]:
-        """Gera doutrina fallback."""
-        
-        return [{
-            'tipo': 'doutrina',
-            'titulo': f'Doutrina Especializada em Direito {area_direito.title()}',
-            'formatado': f'**Doutrina Especializada em Direito {area_direito.title()}**\n\nA doutrina especializada sustenta o entendimento de que os princípios fundamentais do direito {area_direito} devem ser aplicados de forma a garantir a proteção dos direitos e interesses legítimos das partes envolvidas.'
-        }]
-    
-    def _gerar_legislacao_fallback_formatada(self, area_direito: str) -> str:
-        """Gera legislação fallback formatada."""
-        
-        if area_direito == 'trabalhista':
-            return """LEGISLAÇÃO APLICÁVEL:
-
-1. **Consolidação das Leis do Trabalho - CLT**
-
-• Art. 483 - O empregado poderá considerar rescindido o contrato e pleitear a devida indenização quando o empregador cometer falta grave que torne impossível a continuação da relação de emprego.
-
-• Art. 59 - A duração normal do trabalho poderá ser acrescida de horas suplementares, em número não excedente de duas, mediante acordo escrito entre empregador e empregado.
-
-(Fonte: Planalto.gov.br - Legislação Federal)"""
-        
-        elif area_direito == 'consumidor':
-            return """LEGISLAÇÃO APLICÁVEL:
-
-1. **Código de Defesa do Consumidor - Lei 8.078/90**
-
-• Art. 6º - São direitos básicos do consumidor a proteção da vida, saúde e segurança contra os riscos provocados por práticas no fornecimento de produtos e serviços.
-
-• Art. 14 - O fornecedor de serviços responde, independentemente da existência de culpa, pela reparação dos danos causados aos consumidores por defeitos relativos à prestação dos serviços.
-
-(Fonte: Planalto.gov.br - Legislação Federal)"""
-        
-        else:
-            return """LEGISLAÇÃO APLICÁVEL:
-
-1. **Código Civil Brasileiro - Lei 10.406/02**
-
-• Art. 186 - Aquele que, por ação ou omissão voluntária, negligência ou imprudência, violar direito e causar dano a outrem, ainda que exclusivamente moral, comete ato ilícito.
-
-• Art. 927 - Aquele que, por ato ilícito, causar dano a outrem, fica obrigado a repará-lo.
-
-(Fonte: Planalto.gov.br - Legislação Federal)"""
-    
-    def _gerar_jurisprudencia_fallback_formatada(self, area_direito: str) -> str:
-        """Gera jurisprudência fallback formatada."""
-        
-        if area_direito == 'trabalhista':
-            return """JURISPRUDÊNCIA APLICÁVEL:
-
-1. **Tribunal Superior do Trabalho (TST)**
-
-EMENTA: RESCISÃO INDIRETA. FALTA GRAVE DO EMPREGADOR. A rescisão indireta do contrato de trabalho pressupõe a prática de falta grave pelo empregador, capaz de tornar impossível a continuação da relação de emprego. Caracterizada a falta grave patronal, tem o empregado direito às mesmas verbas rescisórias devidas na dispensa sem justa causa.
-
-HORAS EXTRAS. HABITUALIDADE. A prestação habitual de horas extras gera direito ao pagamento das mesmas com o adicional legal, bem como aos reflexos em outras verbas trabalhistas.
-
-(Jurisprudência consolidada do TST)"""
-        
-        else:
-            return """JURISPRUDÊNCIA APLICÁVEL:
-
-1. **Superior Tribunal de Justiça (STJ)**
-
-EMENTA: RESPONSABILIDADE CIVIL. DANOS MORAIS. Caracterizada a conduta ilícita e o nexo causal com o dano experimentado, surge o dever de indenizar. O dano moral prescinde de prova, sendo suficiente a demonstração do fato que o ensejou.
-
-REPARAÇÃO DE DANOS. A reparação deve ser integral, abrangendo danos materiais e morais, observando-se os princípios da proporcionalidade e razoabilidade.
-
-(Jurisprudência consolidada do STJ)"""
-    
-    def _gerar_doutrina_fallback_formatada(self, area_direito: str) -> str:
-        """Gera doutrina fallback formatada."""
-        
-        return f"""DOUTRINA ESPECIALIZADA:
-
-1. **Doutrina Especializada em Direito {area_direito.title()}**
-
-A doutrina especializada sustenta que os princípios fundamentais do direito {area_direito} devem ser aplicados de forma sistemática e harmônica, observando-se a hierarquia das normas jurídicas e a evolução jurisprudencial.
-
-Os renomados doutrinadores da área enfatizam a importância da interpretação teleológica das normas, buscando sempre a efetivação dos direitos fundamentais e a justiça material nas relações jurídicas.
-
-A aplicação dos institutos jurídicos deve considerar não apenas a letra da lei, mas também seu espírito e finalidade, garantindo a segurança jurídica e a proteção dos direitos legítimos das partes envolvidas.
-
-(Doutrina especializada consolidada)"""
