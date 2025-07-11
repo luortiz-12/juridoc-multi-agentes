@@ -96,6 +96,13 @@ class OrquestradorPrincipal:
                     "status": "completo",
                     "agentes_executados": agentes_executados
                 },
+                "relatorio_validacao": {
+                    "score_qualidade": score_qualidade,
+                    "status": "completo",
+                    "agentes_executados": agentes_executados,
+                    "tamanho_documento": len(documento_final),
+                    "problemas_corrigidos": resultado_validacao.get('problemas_corrigidos', 0)
+                },
                 "timestamp": datetime.now().isoformat(),
                 "tempo_processamento": f"{tempo_total:.1f}s",
                 "score_qualidade": score_qualidade
@@ -159,6 +166,7 @@ class OrquestradorPrincipal:
             "documento_html": documento_emergencia,
             "documento_final": documento_emergencia,
             "pesquisa_juridica": {"status": "nao_realizada", "motivo": "erro_no_processamento"},
+            "relatorio_validacao": {"status": "emergencia", "score_qualidade": 60},
             "agentes_executados": agentes_executados,
             "score_qualidade": 60,
             "timestamp": datetime.now().isoformat()
