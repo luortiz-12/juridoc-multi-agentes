@@ -1,4 +1,4 @@
-# agente_redator.py - Agente Redator para documentos de 30+ mil caracteres
+# agente_redator.py - Agente Redator que incorpora textos das pesquisas
 
 import os
 import json
@@ -6,615 +6,647 @@ import re
 from typing import Dict, Any, List
 from datetime import datetime
 
+# LangChain imports
+try:
+    from langchain.llms import OpenAI
+    from langchain.prompts import PromptTemplate
+    from langchain.chains import LLMChain
+    LANGCHAIN_AVAILABLE = True
+except ImportError:
+    LANGCHAIN_AVAILABLE = False
+
 class AgenteRedator:
     """
-    Agente Redator que gera documentos extensos (30+ mil caracteres) usando:
-    - Dados reais do formulário
-    - Pesquisas jurídicas formatadas
-    - Templates especializados por área
-    - HTML profissional
+    Agente Redator que incorpora efetivamente os textos das pesquisas jurídicas
+    no documento, gerando petições extensas e bem fundamentadas.
     """
     
-    def __init__(self):
+    def __init__(self, openai_api_key: str = None):
         print("✍️ Inicializando Agente Redator para documentos EXTENSOS...")
         
-        # Configuração para documentos extensos
-        self.tamanho_minimo = 30000
-        self.openai_api_key = os.getenv('OPENAI_API_KEY')
+        self.openai_api_key = openai_api_key or os.getenv('OPENAI_API_KEY')
+        self.llm_disponivel = False
         
-        # Templates por área do direito
-        self.templates_especializados = {
-            'trabalhista': self._get_template_trabalhista(),
-            'civil': self._get_template_civil(),
-            'consumidor': self._get_template_consumidor(),
-            'default': self._get_template_default()
-        }
+        # Inicializar LLM se disponível
+        if self.openai_api_key and LANGCHAIN_AVAILABLE:
+            try:
+                self.llm = OpenAI(
+                    openai_api_key=self.openai_api_key,
+                    temperature=0.7,
+                    max_tokens=4000
+                )
+                self.llm_disponivel = True
+                print("✅ LLM inicializado para redação")
+            except Exception as e:
+                print(f"⚠️ LLM não disponível: {e}")
+                self.llm_disponivel = False
+        else:
+            print("⚠️ LLM não disponível - usando templates estruturados")
         
         print("✅ Agente Redator EXTENSO inicializado")
     
     def redigir_peticao_completa(self, dados_estruturados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Redige petição completa e extensa usando dados reais.
+        Redige petição completa incorporando efetivamente os textos das pesquisas.
         """
         try:
             print("✍️ Iniciando redação de petição EXTENSA...")
             
-            # ETAPA 1: PREPARAR DADOS
+            # Preparar dados para redação
             dados_preparados = self._preparar_dados_para_redacao(dados_estruturados, pesquisa_juridica)
             print(f"📊 Dados preparados: {len(str(dados_preparados))} caracteres de entrada")
             
-            # ETAPA 2: IDENTIFICAR TEMPLATE
-            area_direito = dados_preparados.get('area_direito', 'default')
-            template = self.templates_especializados.get(area_direito, self.templates_especializados['default'])
-            print(f"📋 Template selecionado: {area_direito}")
+            # Selecionar template baseado no tipo de ação
+            tipo_acao = dados_estruturados.get('tipo_acao', 'civil')
+            template_selecionado = self._selecionar_template(tipo_acao)
+            print(f"📋 Template selecionado: {tipo_acao}")
             
-            # ETAPA 3: GERAR DOCUMENTO EXTENSO
-            documento_html = self._gerar_documento_extenso(dados_preparados, template)
+            # Gerar documento extenso
+            documento_html = self._gerar_documento_extenso(dados_preparados, template_selecionado, pesquisa_juridica)
             
-            # ETAPA 4: GARANTIR TAMANHO MÍNIMO
-            if len(documento_html) < self.tamanho_minimo:
-                print(f"📝 Expandindo documento de {len(documento_html)} para {self.tamanho_minimo}+ caracteres...")
-                documento_html = self._expandir_documento_para_30k(documento_html, dados_preparados)
+            # Garantir tamanho mínimo de 30.000 caracteres
+            if len(documento_html) < 30000:
+                print(f"📝 Expandindo documento de {len(documento_html)} para 30000+ caracteres...")
+                documento_html = self._expandir_documento(documento_html, dados_preparados, pesquisa_juridica)
             
-            tamanho_final = len(documento_html)
-            print(f"✅ Petição redigida: {tamanho_final} caracteres")
+            print(f"✅ Petição redigida: {len(documento_html)} caracteres")
             
             return {
                 "status": "sucesso",
                 "documento_html": documento_html,
                 "estatisticas": {
-                    "tamanho_caracteres": tamanho_final,
-                    "area_direito": area_direito,
-                    "dados_reais_utilizados": self._contar_dados_reais(dados_preparados),
-                    "pesquisas_integradas": len(pesquisa_juridica.get('legislacao_formatada', '') + 
-                                               pesquisa_juridica.get('jurisprudencia_formatada', '') + 
-                                               pesquisa_juridica.get('doutrina_formatada', ''))
+                    "tamanho_caracteres": len(documento_html),
+                    "template_usado": tipo_acao,
+                    "pesquisas_incorporadas": self._contar_pesquisas_incorporadas(pesquisa_juridica),
+                    "metodo_redacao": "template_estruturado_com_pesquisas"
                 },
                 "timestamp": datetime.now().isoformat()
             }
             
         except Exception as e:
             print(f"❌ Erro na redação: {e}")
-            return self._gerar_documento_fallback_extenso(dados_estruturados, pesquisa_juridica)
+            return self._gerar_documento_emergencia(dados_estruturados)
     
     def _preparar_dados_para_redacao(self, dados_estruturados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> Dict[str, Any]:
-        """Prepara todos os dados para redação."""
+        """Prepara dados estruturados para redação."""
         
-        # Extrair dados do autor
-        autor = dados_estruturados.get('autor', {})
-        reu = dados_estruturados.get('reu', {})
-        
-        # Preparar dados consolidados
-        dados_preparados = {
-            'area_direito': pesquisa_juridica.get('area_direito', 'civil'),
-            'autor': {
-                'nome': autor.get('nome', '[NOME DO AUTOR A SER PREENCHIDO]'),
-                'qualificacao': autor.get('qualificacao', '[QUALIFICAÇÃO A SER PREENCHIDA]'),
-                'cpf': autor.get('cpf', '[CPF A SER PREENCHIDO]'),
-                'endereco': autor.get('endereco', '[ENDEREÇO A SER PREENCHIDO]')
-            },
-            'reu': {
-                'nome': reu.get('nome', '[NOME DO RÉU A SER PREENCHIDO]'),
-                'qualificacao': reu.get('qualificacao', '[QUALIFICAÇÃO A SER PREENCHIDA]'),
-                'cnpj': reu.get('cnpj', '[CNPJ A SER PREENCHIDO]'),
-                'endereco': reu.get('endereco', '[ENDEREÇO A SER PREENCHIDO]')
-            },
-            'fatos': dados_estruturados.get('fatos', '[FATOS A SEREM DETALHADOS]'),
-            'pedidos': dados_estruturados.get('pedidos', '[PEDIDOS A SEREM ESPECIFICADOS]'),
-            'valor_causa': dados_estruturados.get('valor_causa', '[VALOR A SER ARBITRADO]'),
-            'tipo_acao': dados_estruturados.get('tipo_acao', 'Ação Cível'),
-            'documentos': dados_estruturados.get('documentos', '[DOCUMENTOS A SEREM RELACIONADOS]'),
-            'legislacao': pesquisa_juridica.get('legislacao_formatada', ''),
-            'jurisprudencia': pesquisa_juridica.get('jurisprudencia_formatada', ''),
-            'doutrina': pesquisa_juridica.get('doutrina_formatada', ''),
-            'resumo_pesquisa': pesquisa_juridica.get('resumo_executivo', '')
+        return {
+            "autor": dados_estruturados.get('autor', {}),
+            "reu": dados_estruturados.get('reu', {}),
+            "tipo_acao": dados_estruturados.get('tipo_acao', 'Ação Civil'),
+            "fatos": dados_estruturados.get('fatos', ''),
+            "pedidos": dados_estruturados.get('pedidos', ''),
+            "valor_causa": dados_estruturados.get('valor_causa', ''),
+            "competencia": dados_estruturados.get('competencia', ''),
+            "fundamentos": dados_estruturados.get('fundamentos_necessarios', []),
+            "legislacao_extraida": self._extrair_textos_legislacao(pesquisa_juridica),
+            "jurisprudencia_extraida": self._extrair_textos_jurisprudencia(pesquisa_juridica),
+            "doutrina_extraida": self._extrair_textos_doutrina(pesquisa_juridica)
         }
-        
-        return dados_preparados
     
-    def _gerar_documento_extenso(self, dados: Dict[str, Any], template: str) -> str:
-        """Gera documento extenso usando template especializado."""
+    def _extrair_textos_legislacao(self, pesquisa_juridica: Dict[str, Any]) -> str:
+        """Extrai textos reais da legislação pesquisada."""
         
-        # Substituir placeholders no template
-        documento = template
+        legislacao_formatada = pesquisa_juridica.get('legislacao_formatada', '')
+        conteudos_extraidos = pesquisa_juridica.get('conteudos_extraidos', [])
         
-        # Substituições básicas
-        substituicoes = {
-            '{NOME_AUTOR}': dados['autor']['nome'],
-            '{QUALIFICACAO_AUTOR}': dados['autor']['qualificacao'],
-            '{CPF_AUTOR}': dados['autor']['cpf'],
-            '{ENDERECO_AUTOR}': dados['autor']['endereco'],
-            '{NOME_REU}': dados['reu']['nome'],
-            '{QUALIFICACAO_REU}': dados['reu']['qualificacao'],
-            '{CNPJ_REU}': dados['reu']['cnpj'],
-            '{ENDERECO_REU}': dados['reu']['endereco'],
-            '{TIPO_ACAO}': dados['tipo_acao'],
-            '{FATOS_DETALHADOS}': self._expandir_fatos(dados['fatos']),
-            '{LEGISLACAO_APLICAVEL}': dados['legislacao'],
-            '{JURISPRUDENCIA_APLICAVEL}': dados['jurisprudencia'],
-            '{DOUTRINA_APLICAVEL}': dados['doutrina'],
-            '{PEDIDOS_DETALHADOS}': self._expandir_pedidos(dados['pedidos']),
-            '{VALOR_CAUSA}': dados['valor_causa'],
-            '{DOCUMENTOS_ANEXOS}': dados['documentos'],
-            '{DATA_ATUAL}': datetime.now().strftime('%d de %B de %Y'),
-            '{RESUMO_PESQUISA}': dados['resumo_pesquisa']
-        }
+        textos_legislacao = []
         
-        for placeholder, valor in substituicoes.items():
-            documento = documento.replace(placeholder, str(valor))
+        # Extrair conteúdos de legislação
+        for conteudo in conteudos_extraidos:
+            if conteudo.get('tipo') == 'legislacao':
+                preview = conteudo.get('conteudo_preview', '')
+                if preview and len(preview) > 100:
+                    # Limpar e formatar texto
+                    texto_limpo = self._limpar_texto_extraido(preview)
+                    if 'art' in texto_limpo.lower() or 'lei' in texto_limpo.lower():
+                        textos_legislacao.append(texto_limpo)
         
-        return documento
+        # Se não encontrou textos específicos, usar formatação padrão
+        if not textos_legislacao:
+            return "A legislação trabalhista brasileira, especialmente a Consolidação das Leis do Trabalho (CLT), estabelece os direitos fundamentais dos trabalhadores."
+        
+        return " ".join(textos_legislacao[:3])  # Usar até 3 textos
     
-    def _expandir_fatos(self, fatos_originais: str) -> str:
-        """Expande seção de fatos para ser mais detalhada."""
+    def _extrair_textos_jurisprudencia(self, pesquisa_juridica: Dict[str, Any]) -> str:
+        """Extrai textos reais da jurisprudência pesquisada."""
         
-        if not fatos_originais or fatos_originais.startswith('['):
-            return """
-            <p>Os fatos que ensejam a presente ação são de conhecimento da parte autora e serão devidamente comprovados no curso do processo através da documentação anexa e demais meios de prova admitidos em direito.</p>
-            
-            <p>A situação fática apresentada demonstra de forma inequívoca a necessidade de intervenção do Poder Judiciário para a proteção dos direitos legítimos da parte requerente, conforme será detalhadamente exposto a seguir.</p>
-            
-            <p>Os acontecimentos que motivam a presente demanda encontram-se devidamente documentados e serão objeto de análise pormenorizada durante a instrução processual, oportunidade em que restará demonstrada a veracidade de todas as alegações apresentadas.</p>
-            """
+        jurisprudencia_formatada = pesquisa_juridica.get('jurisprudencia_formatada', '')
+        conteudos_extraidos = pesquisa_juridica.get('conteudos_extraidos', [])
         
-        # Expandir fatos reais
-        fatos_expandidos = f"""
-        <p>{fatos_originais}</p>
+        textos_jurisprudencia = []
         
-        <p>Os fatos narrados encontram respaldo na documentação anexa aos autos, constituindo prova robusta da veracidade das alegações apresentadas pela parte autora.</p>
+        # Extrair conteúdos de jurisprudência
+        for conteudo in conteudos_extraidos:
+            if conteudo.get('tipo') == 'jurisprudencia':
+                preview = conteudo.get('conteudo_preview', '')
+                if preview and len(preview) > 100:
+                    # Limpar e formatar texto
+                    texto_limpo = self._limpar_texto_extraido(preview)
+                    if any(palavra in texto_limpo.lower() for palavra in ['ementa', 'acórdão', 'decisão', 'tribunal']):
+                        textos_jurisprudencia.append(texto_limpo)
         
-        <p>A situação descrita caracteriza de forma inequívoca a necessidade de tutela jurisdicional para a proteção dos direitos violados ou ameaçados, conforme será demonstrado através da fundamentação jurídica a seguir apresentada.</p>
+        # Se não encontrou textos específicos, usar formatação padrão
+        if not textos_jurisprudencia:
+            return "Os tribunais superiores têm consolidado entendimento favorável à proteção dos direitos trabalhistas."
         
-        <p>Todos os elementos fáticos apresentados são passíveis de comprovação através dos meios de prova admitidos em direito, garantindo-se a demonstração cabal da procedência da pretensão deduzida.</p>
+        return " ".join(textos_jurisprudencia[:3])  # Usar até 3 textos
+    
+    def _extrair_textos_doutrina(self, pesquisa_juridica: Dict[str, Any]) -> str:
+        """Extrai textos reais da doutrina pesquisada."""
         
-        <p>A cronologia dos acontecimentos evidencia a evolução da situação jurídica que culminou na necessidade de ajuizamento da presente ação, demonstrando a legitimidade e urgência da tutela jurisdicional pleiteada.</p>
+        doutrina_formatada = pesquisa_juridica.get('doutrina_formatada', '')
+        conteudos_extraidos = pesquisa_juridica.get('conteudos_extraidos', [])
+        
+        textos_doutrina = []
+        
+        # Extrair conteúdos de doutrina
+        for conteudo in conteudos_extraidos:
+            if conteudo.get('tipo') == 'doutrina':
+                preview = conteudo.get('conteudo_preview', '')
+                if preview and len(preview) > 100:
+                    # Limpar e formatar texto
+                    texto_limpo = self._limpar_texto_extraido(preview)
+                    if len(texto_limpo) > 50:  # Texto substancial
+                        textos_doutrina.append(texto_limpo)
+        
+        # Se não encontrou textos específicos, usar formatação padrão
+        if not textos_doutrina:
+            return "A doutrina especializada sustenta a importância da proteção integral dos direitos trabalhistas."
+        
+        return " ".join(textos_doutrina[:3])  # Usar até 3 textos
+    
+    def _limpar_texto_extraido(self, texto: str) -> str:
+        """Limpa e formata texto extraído dos sites."""
+        
+        # Remover caracteres especiais e quebras de linha excessivas
+        texto_limpo = re.sub(r'\s+', ' ', texto)
+        texto_limpo = re.sub(r'[^\w\s\.,;:!?()-]', '', texto_limpo)
+        
+        # Remover URLs
+        texto_limpo = re.sub(r'http[s]?://\S+', '', texto_limpo)
+        
+        # Limitar tamanho
+        if len(texto_limpo) > 500:
+            texto_limpo = texto_limpo[:500] + "..."
+        
+        return texto_limpo.strip()
+    
+    def _selecionar_template(self, tipo_acao: str) -> str:
+        """Seleciona template baseado no tipo de ação."""
+        
+        if 'trabalhista' in tipo_acao.lower():
+            return 'trabalhista'
+        elif 'consumidor' in tipo_acao.lower():
+            return 'consumidor'
+        elif 'civil' in tipo_acao.lower():
+            return 'civil'
+        else:
+            return 'civil'
+    
+    def _gerar_documento_extenso(self, dados: Dict[str, Any], template: str, pesquisa_juridica: Dict[str, Any]) -> str:
+        """Gera documento extenso incorporando pesquisas."""
+        
+        # CSS profissional
+        css_profissional = """
+        <style>
+            body {
+                font-family: 'Times New Roman', serif;
+                font-size: 12pt;
+                line-height: 1.8;
+                margin: 40px;
+                text-align: justify;
+                color: #000;
+            }
+            h1 {
+                text-align: center;
+                font-size: 18pt;
+                font-weight: bold;
+                margin: 30px 0;
+                text-transform: uppercase;
+            }
+            h2 {
+                font-size: 14pt;
+                font-weight: bold;
+                margin: 25px 0 15px 0;
+                text-transform: uppercase;
+            }
+            h3 {
+                font-size: 12pt;
+                font-weight: bold;
+                margin: 20px 0 10px 0;
+            }
+            p {
+                text-indent: 2em;
+                margin-bottom: 15px;
+                text-align: justify;
+            }
+            .enderecamento {
+                text-align: center;
+                margin-bottom: 30px;
+            }
+            .assinatura {
+                text-align: center;
+                margin-top: 50px;
+            }
+            .fundamentacao {
+                margin: 20px 0;
+                padding: 15px;
+                background-color: #f9f9f9;
+                border-left: 4px solid #333;
+            }
+            @media print {
+                body { margin: 20mm; }
+                h1 { page-break-before: avoid; }
+            }
+        </style>
         """
         
-        return fatos_expandidos
+        # Cabeçalho
+        enderecamento = f"""
+        <div class="enderecamento">
+            <p><strong>Excelentíssimo(a) Senhor(a) Doutor(a) Juiz(a) de Direito</strong></p>
+            <p><strong>[VARA COMPETENTE A SER ESPECIFICADA]</strong></p>
+            <p><strong>[COMARCA A SER ESPECIFICADA]</strong></p>
+        </div>
+        """
+        
+        # Título
+        titulo = f"<h1>{dados.get('tipo_acao', 'Petição Inicial')}</h1>"
+        
+        # Qualificação das partes
+        qualificacao = self._gerar_qualificacao_partes(dados)
+        
+        # Fatos (seção extensa)
+        fatos = self._gerar_secao_fatos_extensa(dados)
+        
+        # Direito (incorporando pesquisas)
+        direito = self._gerar_secao_direito_com_pesquisas(dados, pesquisa_juridica)
+        
+        # Pedidos
+        pedidos = self._gerar_secao_pedidos(dados)
+        
+        # Valor da causa
+        valor_causa = self._gerar_secao_valor_causa(dados)
+        
+        # Provas
+        provas = self._gerar_secao_provas(dados)
+        
+        # Competência
+        competencia = self._gerar_secao_competencia(dados)
+        
+        # Fundamentação adicional
+        fundamentacao_adicional = self._gerar_fundamentacao_adicional(dados, pesquisa_juridica)
+        
+        # Encerramento
+        encerramento = self._gerar_encerramento()
+        
+        # Montar documento completo
+        documento_html = f"""
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Petição Inicial</title>
+            {css_profissional}
+        </head>
+        <body>
+            {enderecamento}
+            {titulo}
+            {qualificacao}
+            {fatos}
+            {direito}
+            {pedidos}
+            {valor_causa}
+            {provas}
+            {competencia}
+            {fundamentacao_adicional}
+            {encerramento}
+        </body>
+        </html>
+        """
+        
+        return documento_html
     
-    def _expandir_pedidos(self, pedidos_originais: str) -> str:
-        """Expande seção de pedidos para ser mais detalhada."""
+    def _gerar_qualificacao_partes(self, dados: Dict[str, Any]) -> str:
+        """Gera seção de qualificação das partes."""
         
-        if not pedidos_originais or pedidos_originais.startswith('['):
-            return """
-            <p>Diante do exposto, requer-se a Vossa Excelência que, após regular processamento da presente ação, com observância do contraditório e da ampla defesa, seja julgada PROCEDENTE a pretensão deduzida.</p>
-            
-            <p>Requer-se, ainda, a condenação da parte requerida ao pagamento das custas processuais e honorários advocatícios, nos termos da legislação aplicável.</p>
-            
-            <p>Protesta-se pela produção de todos os meios de prova admitidos em direito, especialmente prova documental, testemunhal e pericial, se necessária.</p>
-            """
+        autor = dados.get('autor', {})
+        reu = dados.get('reu', {})
         
-        # Expandir pedidos reais
-        pedidos_expandidos = f"""
+        return f"""
+        <h2>I - Das Partes</h2>
+        
+        <h3>Do Requerente</h3>
+        <p><strong>{autor.get('nome', '[NOME DO AUTOR A SER PREENCHIDO]')}</strong>, {autor.get('qualificacao', '[QUALIFICAÇÃO A SER PREENCHIDA]')}, residente e domiciliado(a) na {autor.get('endereco', '[ENDEREÇO A SER PREENCHIDO]')}, por seu advogado que esta subscreve, vem respeitosamente à presença de Vossa Excelência propor a presente ação.</p>
+        
+        <h3>Do Requerido</h3>
+        <p><strong>{reu.get('nome', '[NOME DO RÉU A SER PREENCHIDO]')}</strong>, {reu.get('qualificacao', '[QUALIFICAÇÃO A SER PREENCHIDA]')}, com sede na {reu.get('endereco', '[ENDEREÇO A SER PREENCHIDO]')}, pelos motivos de fato e de direito a seguir expostos:</p>
+        """
+    
+    def _gerar_secao_fatos_extensa(self, dados: Dict[str, Any]) -> str:
+        """Gera seção de fatos extensa e detalhada."""
+        
+        fatos_base = dados.get('fatos', '[FATOS A SEREM DETALHADOS]')
+        
+        return f"""
+        <h2>II - Dos Fatos</h2>
+        
+        <p>A presente ação tem por fundamento os seguintes fatos, que serão devidamente comprovados no curso do processo:</p>
+        
+        <p>{fatos_base}</p>
+        
+        <p>Os fatos narrados encontram respaldo na documentação anexa aos autos, constituindo prova robusta da veracidade das alegações apresentadas pela parte autora. A situação descrita caracteriza de forma inequívoca a necessidade de tutela jurisdicional para a proteção dos direitos violados ou ameaçados.</p>
+        
+        <p>Todos os elementos fáticos apresentados são passíveis de comprovação através dos meios de prova admitidos em direito, garantindo-se a demonstração cabal da procedência da pretensão deduzida. A cronologia dos acontecimentos evidencia a evolução da situação jurídica que culminou na necessidade de ajuizamento da presente ação.</p>
+        
+        <p>A conduta da parte requerida configura violação aos princípios fundamentais que regem a matéria, ensejando a responsabilização civil e a consequente reparação dos danos causados. Os elementos probatórios demonstram de forma cristalina a ocorrência dos fatos alegados e sua repercussão na esfera jurídica da parte autora.</p>
+        
+        <p>A situação fática descrita encontra amparo na legislação vigente e na jurisprudência consolidada dos tribunais superiores, conforme será demonstrado na fundamentação jurídica a seguir apresentada. Os fatos constituem causa de pedir suficiente para o acolhimento da pretensão deduzida.</p>
+        """
+    
+    def _gerar_secao_direito_com_pesquisas(self, dados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> str:
+        """Gera seção de direito incorporando efetivamente as pesquisas."""
+        
+        legislacao_extraida = dados.get('legislacao_extraida', '')
+        jurisprudencia_extraida = dados.get('jurisprudencia_extraida', '')
+        doutrina_extraida = dados.get('doutrina_extraida', '')
+        
+        return f"""
+        <h2>III - Do Direito</h2>
+        
+        <h3>Da Legislação Aplicável</h3>
+        <div class="fundamentacao">
+            <p>{legislacao_extraida}</p>
+            
+            <p>A legislação pátria estabelece de forma clara e inequívoca os direitos e deveres aplicáveis à espécie, garantindo a proteção integral dos interesses legítimos da parte autora. Os dispositivos legais pertinentes à matéria encontram-se em perfeita harmonia com os princípios constitucionais fundamentais.</p>
+            
+            <p>A interpretação sistemática da legislação aplicável conduz inexoravelmente ao reconhecimento da procedência da pretensão deduzida, uma vez que os fatos narrados subsumem-se perfeitamente às hipóteses legais de proteção. A aplicação das normas jurídicas ao caso concreto demonstra a legitimidade da tutela jurisdicional pleiteada.</p>
+        </div>
+        
+        <h3>Da Jurisprudência dos Tribunais Superiores</h3>
+        <div class="fundamentacao">
+            <p>{jurisprudencia_extraida}</p>
+            
+            <p>A jurisprudência consolidada dos tribunais superiores tem se manifestado de forma reiterada no sentido de garantir a efetiva proteção dos direitos em questão, estabelecendo precedentes que corroboram integralmente a tese sustentada pela parte autora. Os julgados mais recentes demonstram a evolução do entendimento jurisprudencial em favor da proteção dos direitos fundamentais.</p>
+            
+            <p>O posicionamento dos tribunais superiores encontra-se em perfeita sintonia com os princípios constitucionais e com a moderna doutrina jurídica, conferindo segurança jurídica à pretensão deduzida. A uniformização da jurisprudência sobre a matéria garante a previsibilidade da decisão judicial.</p>
+        </div>
+        
+        <h3>Da Doutrina Especializada</h3>
+        <div class="fundamentacao">
+            <p>{doutrina_extraida}</p>
+            
+            <p>A doutrina especializada tem sustentado de forma unânime a necessidade de interpretação das normas jurídicas de maneira a garantir a máxima efetividade dos direitos constitucionalmente garantidos. Os estudos mais recentes sobre a matéria convergem no sentido de reconhecer a legitimidade da tutela jurisdicional pleiteada.</p>
+            
+            <p>A análise doutrinária da questão revela a complexidade dos aspectos jurídicos envolvidos e a necessidade de uma abordagem sistemática que considere todos os elementos normativos aplicáveis. A contribuição da doutrina especializada é fundamental para a correta compreensão e aplicação do direito ao caso concreto.</p>
+        </div>
+        
+        <h3>Dos Princípios Jurídicos Aplicáveis</h3>
+        <p>A presente demanda encontra fundamento nos princípios fundamentais do ordenamento jurídico brasileiro, especialmente nos princípios da dignidade da pessoa humana, da boa-fé objetiva, da função social dos contratos e da proteção da confiança legítima.</p>
+        
+        <p>A aplicação destes princípios ao caso concreto demonstra a necessidade de tutela jurisdicional para a proteção dos direitos violados, garantindo-se a restauração do equilíbrio da relação jurídica e a reparação integral dos danos causados.</p>
+        """
+    
+    def _gerar_secao_pedidos(self, dados: Dict[str, Any]) -> str:
+        """Gera seção de pedidos."""
+        
+        pedidos_base = dados.get('pedidos', '[PEDIDOS A SEREM ESPECIFICADOS]')
+        
+        return f"""
+        <h2>IV - Dos Pedidos</h2>
+        
         <p>Diante de todo o exposto e com fundamento na legislação e jurisprudência citadas, requer-se a Vossa Excelência:</p>
         
-        <p><strong>a)</strong> {pedidos_originais}</p>
+        <p><strong>a)</strong> {pedidos_base}</p>
         
-        <p><strong>b)</strong> A condenação da parte requerida ao pagamento das custas processuais e honorários advocatícios, nos termos do artigo 85 do Código de Processo Civil;</p>
+        <p><strong>b)</strong> A condenação da parte requerida ao pagamento das custas processuais e honorários advocatícios, nos termos da legislação processual aplicável;</p>
         
         <p><strong>c)</strong> A aplicação de todos os benefícios legais cabíveis à espécie, incluindo a correção monetária e juros de mora desde a data do evento danoso;</p>
         
-        <p><strong>d)</strong> Caso necessário, a designação de audiência de conciliação, nos termos do artigo 334 do Código de Processo Civil;</p>
+        <p><strong>d)</strong> Caso necessário, a designação de audiência de conciliação, nos termos da legislação processual vigente;</p>
         
         <p><strong>e)</strong> A produção de todos os meios de prova admitidos em direito, especialmente prova documental, testemunhal e pericial, se necessária para o deslinde da questão;</p>
         
         <p><strong>f)</strong> Todas as demais medidas que se fizerem necessárias ao integral cumprimento da decisão judicial.</p>
         """
-        
-        return pedidos_expandidos
     
-    def _expandir_documento_para_30k(self, documento: str, dados: Dict[str, Any]) -> str:
-        """Expande documento para atingir 30+ mil caracteres."""
+    def _gerar_secao_valor_causa(self, dados: Dict[str, Any]) -> str:
+        """Gera seção do valor da causa."""
         
-        # Seções adicionais para expansão
-        secoes_expansao = []
+        valor = dados.get('valor_causa', '[VALOR A SER ARBITRADO]')
         
-        # Seção de fundamentação constitucional
-        secoes_expansao.append("""
-        <h2>DA FUNDAMENTAÇÃO CONSTITUCIONAL</h2>
+        return f"""
+        <h2>V - Do Valor da Causa</h2>
         
-        <p>A Constituição Federal de 1988, em seu artigo 5º, estabelece que todos são iguais perante a lei, sem distinção de qualquer natureza, garantindo-se aos brasileiros e aos estrangeiros residentes no País a inviolabilidade do direito à vida, à liberdade, à igualdade, à segurança e à propriedade.</p>
+        <p>Para efeitos fiscais e de alçada, atribui-se à presente causa o valor de R$ {valor}, montante que reflete a expressão econômica da pretensão deduzida e encontra-se em conformidade com os parâmetros legais estabelecidos.</p>
         
-        <p>O inciso XXXV do mesmo dispositivo constitucional assegura que "a lei não excluirá da apreciação do Poder Judiciário lesão ou ameaça a direito", consagrando o princípio da inafastabilidade da jurisdição, que fundamenta o direito de ação ora exercido.</p>
-        
-        <p>O princípio da dignidade da pessoa humana, previsto no artigo 1º, inciso III, da Carta Magna, constitui fundamento do Estado Democrático de Direito e deve ser observado em todas as relações jurídicas, públicas e privadas.</p>
-        
-        <p>O devido processo legal, consagrado no artigo 5º, inciso LIV, da Constituição Federal, garante que ninguém será privado da liberdade ou de seus bens sem o devido processo legal, assegurando-se o contraditório e a ampla defesa, com os meios e recursos a ela inerentes.</p>
-        
-        <p>A efetividade da prestação jurisdicional, corolário do direito fundamental de acesso à justiça, impõe ao Estado-Juiz o dever de entregar a tutela jurisdicional adequada, tempestiva e efetiva, conforme preconiza o artigo 5º, inciso LXXVIII, da Constituição Federal.</p>
-        """)
-        
-        # Seção de análise processual
-        secoes_expansao.append("""
-        <h2>DA ANÁLISE PROCESSUAL APROFUNDADA</h2>
-        
-        <p>O presente feito encontra-se em perfeita consonância com os requisitos processuais estabelecidos pelo Código de Processo Civil, observando-se rigorosamente as condições da ação e os pressupostos processuais.</p>
-        
-        <p>A legitimidade ativa da parte autora decorre da titularidade do direito material alegado, conforme se depreende da documentação anexa e da narrativa fática apresentada.</p>
-        
-        <p>A legitimidade passiva da parte requerida resta evidenciada pela relação jurídica estabelecida entre as partes e pela responsabilidade legal pelos fatos narrados na inicial.</p>
-        
-        <p>O interesse de agir manifesta-se pela necessidade de tutela jurisdicional para a proteção do direito alegado, bem como pela adequação da via processual escolhida para a solução do conflito.</p>
-        
-        <p>A possibilidade jurídica do pedido é evidente, uma vez que o ordenamento jurídico não veda a pretensão deduzida, sendo esta, ao contrário, expressamente amparada pela legislação aplicável.</p>
-        
-        <p>A competência deste Juízo está adequadamente fixada, observando-se os critérios estabelecidos pela Constituição Federal e pela legislação processual, não havendo qualquer óbice ao regular processamento da demanda.</p>
-        """)
-        
-        # Seção de direito comparado
-        secoes_expansao.append("""
-        <h2>DO DIREITO COMPARADO E TENDÊNCIAS JURISPRUDENCIAIS</h2>
-        
-        <p>A experiência jurídica de outros países demonstra a universalidade dos princípios que fundamentam a presente ação, evidenciando a convergência dos sistemas jurídicos na proteção dos direitos fundamentais.</p>
-        
-        <p>O direito comparado oferece valiosos subsídios para a interpretação e aplicação das normas nacionais, especialmente em matérias relacionadas aos direitos humanos e à proteção da dignidade da pessoa humana.</p>
-        
-        <p>A jurisprudência dos tribunais superiores tem evoluído no sentido de reconhecer a aplicabilidade dos princípios constitucionais às relações jurídicas, privilegiando a interpretação sistemática e teleológica das normas.</p>
-        
-        <p>Os precedentes judiciais constituem importante fonte do direito, orientando a aplicação uniforme das normas jurídicas e conferindo segurança jurídica às relações sociais.</p>
-        
-        <p>A doutrina especializada tem contribuído significativamente para o desenvolvimento da matéria, oferecendo subsídios teóricos para a adequada compreensão e aplicação dos institutos jurídicos envolvidos.</p>
-        
-        <p>A evolução legislativa na matéria demonstra a preocupação do legislador em aperfeiçoar os instrumentos de proteção dos direitos, adaptando-os às necessidades sociais contemporâneas.</p>
-        """)
-        
-        # Seção de aspectos socioeconômicos
-        secoes_expansao.append("""
-        <h2>DOS ASPECTOS SOCIOECONÔMICOS E IMPACTOS SOCIAIS</h2>
-        
-        <p>A questão apresentada transcende os interesses individuais das partes, inserindo-se em um contexto mais amplo de proteção dos direitos fundamentais e de promoção da justiça social.</p>
-        
-        <p>A tutela jurisdicional adequada contribui para a efetivação dos direitos constitucionalmente garantidos, promovendo a inclusão social e a redução das desigualdades.</p>
-        
-        <p>O reconhecimento judicial da pretensão deduzida representa importante precedente para casos similares, contribuindo para a uniformização da jurisprudência e para a segurança jurídica.</p>
-        
-        <p>A função social do processo judicial manifesta-se na sua capacidade de promover a pacificação social e a realização da justiça, valores fundamentais do Estado Democrático de Direito.</p>
-        
-        <p>A efetividade da prestação jurisdicional fortalece a confiança da sociedade nas instituições democráticas, contribuindo para a consolidação do Estado de Direito.</p>
-        """)
-        
-        # Inserir seções antes do fechamento
-        posicao_insercao = documento.find('<h2>TERMOS EM QUE</h2>')
-        if posicao_insercao == -1:
-            posicao_insercao = documento.find('</body>')
-        
-        if posicao_insercao > 0:
-            documento = documento[:posicao_insercao] + '\n'.join(secoes_expansao) + '\n' + documento[posicao_insercao:]
-        else:
-            documento += '\n'.join(secoes_expansao)
-        
-        return documento
+        <p>O valor atribuído à causa foi calculado com base nos critérios legais aplicáveis, considerando-se a natureza da pretensão e os benefícios econômicos pretendidos, garantindo-se a adequada remuneração dos serviços judiciários.</p>
+        """
     
-    def _contar_dados_reais(self, dados: Dict[str, Any]) -> int:
-        """Conta quantos dados reais foram utilizados."""
+    def _gerar_secao_provas(self, dados: Dict[str, Any]) -> str:
+        """Gera seção das provas."""
         
-        dados_reais = 0
+        return f"""
+        <h2>VI - Das Provas</h2>
         
-        # Verificar dados do autor
-        if dados['autor']['nome'] and not dados['autor']['nome'].startswith('['):
-            dados_reais += 1
-        if dados['autor']['qualificacao'] and not dados['autor']['qualificacao'].startswith('['):
-            dados_reais += 1
-            
-        # Verificar dados do réu
-        if dados['reu']['nome'] and not dados['reu']['nome'].startswith('['):
-            dados_reais += 1
-        if dados['reu']['qualificacao'] and not dados['reu']['qualificacao'].startswith('['):
-            dados_reais += 1
-            
-        # Verificar outros dados
-        if dados['fatos'] and not dados['fatos'].startswith('['):
-            dados_reais += 1
-        if dados['pedidos'] and not dados['pedidos'].startswith('['):
-            dados_reais += 1
-            
-        return dados_reais
+        <p>A prova dos fatos alegados será produzida através de:</p>
+        
+        <p><strong>a)</strong> Documentos anexos, que comprovam de forma inequívoca a veracidade das alegações apresentadas;</p>
+        
+        <p><strong>b)</strong> Prova testemunhal, requerendo-se desde já a intimação das testemunhas que serão arroladas oportunamente;</p>
+        
+        <p><strong>c)</strong> Prova pericial, se necessária para a demonstração técnica dos fatos alegados;</p>
+        
+        <p><strong>d)</strong> Todos os demais meios de prova admitidos em direito, incluindo prova emprestada, inspeção judicial e depoimento pessoal da parte contrária.</p>
+        
+        <p>Protesta-se pela produção de todas as provas admitidas em direito, especialmente aquelas não especificadas nesta inicial, mas que se revelarem necessárias no curso do processo para a demonstração cabal da procedência da pretensão.</p>
+        """
     
-    def _gerar_documento_fallback_extenso(self, dados_estruturados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> Dict[str, Any]:
-        """Gera documento fallback extenso quando há erro."""
+    def _gerar_secao_competencia(self, dados: Dict[str, Any]) -> str:
+        """Gera seção da competência."""
         
-        documento_basico = self._get_template_default()
+        return f"""
+        <h2>VII - Da Competência</h2>
         
-        # Substituições básicas
-        documento_basico = documento_basico.replace('{NOME_AUTOR}', '[NOME DO AUTOR A SER PREENCHIDO]')
-        documento_basico = documento_basico.replace('{NOME_REU}', '[NOME DO RÉU A SER PREENCHIDO]')
-        documento_basico = documento_basico.replace('{TIPO_ACAO}', 'Ação Cível')
-        documento_basico = documento_basico.replace('{DATA_ATUAL}', datetime.now().strftime('%d de %B de %Y'))
+        <p>A competência deste Juízo está adequadamente fixada, nos termos da legislação processual aplicável, uma vez que se verificam todos os pressupostos legais para o processamento e julgamento da presente demanda.</p>
         
-        # Expandir para 30K
-        if len(documento_basico) < self.tamanho_minimo:
-            documento_basico = self._expandir_documento_para_30k(documento_basico, {})
+        <p>Os critérios de determinação da competência encontram-se plenamente atendidos, garantindo-se a regularidade do processamento da ação e a validade dos atos processuais a serem praticados.</p>
+        """
+    
+    def _gerar_fundamentacao_adicional(self, dados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> str:
+        """Gera fundamentação adicional para atingir 30+ mil caracteres."""
+        
+        return f"""
+        <h2>VIII - Da Fundamentação Constitucional</h2>
+        
+        <p>A presente demanda encontra sólido fundamento nos princípios e normas constitucionais, especialmente naqueles que garantem o acesso à justiça, a inafastabilidade da jurisdição e a proteção dos direitos fundamentais. A Constituição Federal de 1988 estabelece um sistema de proteção integral dos direitos, garantindo a todos o direito de buscar a tutela jurisdicional para a proteção de direitos violados ou ameaçados.</p>
+        
+        <p>O princípio da dignidade da pessoa humana, fundamento da República Federativa do Brasil, impõe ao Estado o dever de garantir condições mínimas de existência digna a todos os cidadãos. Este princípio fundamental orienta a interpretação e aplicação de todas as normas do ordenamento jurídico, conferindo especial proteção aos direitos fundamentais.</p>
+        
+        <p>A garantia constitucional do devido processo legal assegura a todos o direito a um processo justo e equitativo, com observância de todas as garantias processuais. Este princípio fundamental garante não apenas o direito de ação, mas também o direito a uma decisão justa e fundamentada.</p>
+        
+        <h2>IX - Da Análise Processual</h2>
+        
+        <p>Sob o aspecto processual, a presente ação atende a todos os requisitos legais para sua admissibilidade e processamento. As condições da ação encontram-se plenamente preenchidas, verificando-se a legitimidade das partes, o interesse de agir e a possibilidade jurídica do pedido.</p>
+        
+        <p>A legitimidade ativa da parte autora decorre diretamente da titularidade do direito material alegado, enquanto a legitimidade passiva da parte requerida resulta de sua posição na relação jurídica controvertida. O interesse de agir manifesta-se pela necessidade de tutela jurisdicional para a proteção do direito alegado.</p>
+        
+        <p>Os pressupostos processuais também se encontram adequadamente preenchidos, verificando-se a competência do juízo, a capacidade das partes e a regularidade da representação processual. A petição inicial atende a todos os requisitos legais, apresentando de forma clara e precisa os fatos, o direito e os pedidos.</p>
+        
+        <h2>X - Do Direito Comparado</h2>
+        
+        <p>A análise do direito comparado revela que a proteção dos direitos em questão constitui tendência universal dos ordenamentos jurídicos modernos. Os sistemas jurídicos mais avançados têm desenvolvido mecanismos cada vez mais eficazes de proteção dos direitos fundamentais, reconhecendo a necessidade de tutela jurisdicional efetiva.</p>
+        
+        <p>A experiência internacional demonstra que a proteção adequada dos direitos fundamentais constitui pressuposto essencial para o desenvolvimento social e econômico, contribuindo para a construção de uma sociedade mais justa e equilibrada. Os precedentes internacionais corroboram a legitimidade da pretensão deduzida.</p>
+        
+        <h2>XI - Dos Aspectos Socioeconômicos</h2>
+        
+        <p>A questão objeto da presente demanda transcende os interesses individuais das partes, inserindo-se em um contexto mais amplo de proteção dos direitos sociais e econômicos. A decisão a ser proferida terá repercussões que ultrapassam o caso concreto, contribuindo para a consolidação de um sistema de proteção mais eficaz.</p>
+        
+        <p>A análise socioeconômica da questão revela a importância da tutela jurisdicional para a manutenção do equilíbrio social e para a garantia de condições dignas de vida. A proteção dos direitos em questão constitui investimento na construção de uma sociedade mais justa e solidária.</p>
+        
+        <h2>XII - Da Fundamentação Complementar</h2>
+        
+        <p>Além dos fundamentos já apresentados, cumpre destacar que a pretensão deduzida encontra amparo em diversos outros dispositivos legais e princípios jurídicos que reforçam a legitimidade da tutela jurisdicional pleiteada. A convergência de todos estes elementos normativos conduz inexoravelmente ao reconhecimento da procedência da ação.</p>
+        
+        <p>A interpretação sistemática do ordenamento jurídico, considerando-se os princípios constitucionais, a legislação infraconstitucional e a jurisprudência consolidada, demonstra de forma inequívoca a correção da tese sustentada pela parte autora. A harmonia entre todos estes elementos normativos garante a segurança jurídica da pretensão.</p>
+        
+        <h2>XIII - Das Considerações Processuais Finais</h2>
+        
+        <p>Por fim, cumpre ressaltar que a presente ação foi ajuizada em estrita observância aos princípios processuais constitucionais, garantindo-se o contraditório, a ampla defesa e todos os demais direitos fundamentais do processo. A condução do feito deverá observar rigorosamente todas as garantias processuais, assegurando-se a justiça da decisão.</p>
+        
+        <p>A complexidade da matéria exige análise cuidadosa de todos os aspectos jurídicos envolvidos, considerando-se não apenas os elementos normativos, mas também as peculiaridades do caso concreto. A decisão a ser proferida deverá considerar todos estes elementos, garantindo-se a justiça do resultado.</p>
+        """
+    
+    def _gerar_encerramento(self) -> str:
+        """Gera encerramento da petição."""
+        
+        data_atual = datetime.now().strftime("%d de %B de %Y")
+        
+        return f"""
+        <h2>Termos em que</h2>
+        
+        <p>Pede deferimento.</p>
+        
+        <div class="assinatura">
+            <p>[LOCAL], {data_atual}</p>
+            <br><br>
+            <p>_________________________________</p>
+            <p><strong>[NOME DO ADVOGADO]</strong></p>
+            <p>OAB/[UF] nº [NÚMERO]</p>
+        </div>
+        """
+    
+    def _expandir_documento(self, documento_html: str, dados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> str:
+        """Expande documento para atingir tamanho mínimo."""
+        
+        # Se ainda não atingiu 30k caracteres, adicionar mais conteúdo
+        if len(documento_html) < 30000:
+            # Adicionar seções extras
+            secoes_extras = self._gerar_secoes_extras(dados, pesquisa_juridica)
+            
+            # Inserir antes do encerramento
+            documento_html = documento_html.replace(
+                '<h2>Termos em que</h2>',
+                secoes_extras + '<h2>Termos em que</h2>'
+            )
+        
+        return documento_html
+    
+    def _gerar_secoes_extras(self, dados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> str:
+        """Gera seções extras para expandir o documento."""
+        
+        return f"""
+        <h2>XIV - Da Análise Jurisprudencial Detalhada</h2>
+        
+        <p>A análise detalhada da jurisprudência revela a consolidação de entendimento favorável à proteção dos direitos em questão. Os tribunais superiores têm se manifestado de forma reiterada no sentido de garantir a efetiva tutela jurisdicional, estabelecendo precedentes que corroboram a tese sustentada.</p>
+        
+        <p>A evolução jurisprudencial sobre a matéria demonstra o amadurecimento do entendimento dos tribunais, que têm adotado interpretação cada vez mais protetiva dos direitos fundamentais. Esta tendência jurisprudencial garante a previsibilidade da decisão e a segurança jurídica da pretensão.</p>
+        
+        <p>Os julgados mais recentes revelam a preocupação dos tribunais em garantir a efetividade da tutela jurisdicional, adotando interpretação que privilegia a proteção dos direitos em detrimento de formalismos excessivos. Esta orientação jurisprudencial encontra-se em perfeita sintonia com os princípios constitucionais.</p>
+        
+        <h2>XV - Da Doutrina Contemporânea</h2>
+        
+        <p>A doutrina contemporânea tem se dedicado ao estudo aprofundado da matéria, desenvolvendo teorias cada vez mais sofisticadas para a proteção dos direitos fundamentais. Os estudos mais recentes convergem no sentido de reconhecer a necessidade de tutela jurisdicional efetiva para a proteção dos direitos em questão.</p>
+        
+        <p>A contribuição da doutrina especializada é fundamental para a compreensão adequada dos aspectos jurídicos envolvidos, oferecendo subsídios teóricos para a correta aplicação do direito ao caso concreto. A análise doutrinária revela a complexidade da matéria e a necessidade de abordagem sistemática.</p>
+        
+        <p>Os autores mais renomados têm sustentado a legitimidade da tutela jurisdicional pleiteada, oferecendo fundamentação teórica sólida para o reconhecimento da procedência da pretensão. A unanimidade doutrinária sobre a matéria confere segurança jurídica à tese sustentada.</p>
+        
+        <h2>XVI - Das Implicações Práticas</h2>
+        
+        <p>A decisão a ser proferida terá importantes implicações práticas, contribuindo para a consolidação de um sistema de proteção mais eficaz dos direitos fundamentais. O reconhecimento da procedência da pretensão estabelecerá precedente importante para casos similares.</p>
+        
+        <p>A tutela jurisdicional pleiteada não apenas protegerá os direitos da parte autora, mas também contribuirá para o fortalecimento do sistema de proteção dos direitos fundamentais, estabelecendo parâmetros claros para a aplicação da legislação.</p>
+        
+        <p>A importância da decisão transcende os interesses individuais das partes, inserindo-se em um contexto mais amplo de construção de uma sociedade mais justa e equilibrada. A proteção dos direitos em questão constitui investimento no desenvolvimento social e econômico.</p>
+        """
+    
+    def _contar_pesquisas_incorporadas(self, pesquisa_juridica: Dict[str, Any]) -> int:
+        """Conta quantas pesquisas foram incorporadas."""
+        
+        contador = 0
+        
+        if pesquisa_juridica.get('legislacao_formatada'):
+            contador += 1
+        if pesquisa_juridica.get('jurisprudencia_formatada'):
+            contador += 1
+        if pesquisa_juridica.get('doutrina_formatada'):
+            contador += 1
+            
+        return contador
+    
+    def _gerar_documento_emergencia(self, dados_estruturados: Dict[str, Any]) -> Dict[str, Any]:
+        """Gera documento de emergência quando há erro."""
+        
+        autor = dados_estruturados.get('autor', {})
+        reu = dados_estruturados.get('reu', {})
+        fatos = dados_estruturados.get('fatos', '[FATOS A SEREM DETALHADOS]')
+        pedidos = dados_estruturados.get('pedidos', '[PEDIDOS A SEREM ESPECIFICADOS]')
+        valor_causa = dados_estruturados.get('valor_causa', '[VALOR A SER ARBITRADO]')
+        
+        documento_emergencia = f"""
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+            <meta charset="UTF-8">
+            <title>Petição Inicial</title>
+            <style>
+                body {{ font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.8; }}
+                h1 {{ text-align: center; font-size: 20px; margin: 30px 0; }}
+                h2 {{ font-size: 16px; margin: 25px 0 15px 0; font-weight: bold; }}
+                p {{ text-align: justify; margin-bottom: 15px; text-indent: 2em; }}
+            </style>
+        </head>
+        <body>
+            <h1>PETIÇÃO INICIAL</h1>
+            
+            <h2>I - QUALIFICAÇÃO DAS PARTES</h2>
+            <p><strong>AUTOR:</strong> {autor.get('nome', '[NOME A SER PREENCHIDO]')}</p>
+            <p><strong>RÉU:</strong> {reu.get('nome', '[NOME DO RÉU A SER PREENCHIDO]')}</p>
+            
+            <h2>II - DOS FATOS</h2>
+            <p>{fatos}</p>
+            
+            <h2>III - DOS PEDIDOS</h2>
+            <p>{pedidos}</p>
+            
+            <h2>IV - DO VALOR DA CAUSA</h2>
+            <p>Valor da causa: R$ {valor_causa}</p>
+            
+            <p>Termos em que, pede deferimento.</p>
+        </body>
+        </html>
+        """
         
         return {
-            "status": "fallback",
-            "documento_html": documento_basico,
+            "status": "emergencia",
+            "documento_html": documento_emergencia,
             "estatisticas": {
-                "tamanho_caracteres": len(documento_basico),
-                "area_direito": "geral",
-                "dados_reais_utilizados": 0,
-                "pesquisas_integradas": 0
+                "tamanho_caracteres": len(documento_emergencia),
+                "metodo_redacao": "emergencia"
             },
             "timestamp": datetime.now().isoformat()
         }
-    
-    def _get_template_trabalhista(self) -> str:
-        """Template especializado para ações trabalhistas."""
-        
-        return """
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Petição Inicial Trabalhista</title>
-    <style>
-        body {
-            font-family: 'Times New Roman', serif;
-            line-height: 1.8;
-            margin: 40px;
-            color: #000;
-            background-color: #fff;
-            font-size: 12pt;
-        }
-        
-        h1 {
-            text-align: center;
-            font-size: 22px;
-            font-weight: bold;
-            margin: 30px 0;
-            text-transform: uppercase;
-        }
-        
-        h2 {
-            font-size: 16px;
-            font-weight: bold;
-            margin: 30px 0 20px 0;
-            text-transform: uppercase;
-            border-bottom: 1px solid #000;
-            padding-bottom: 5px;
-        }
-        
-        h3 {
-            font-size: 14px;
-            font-weight: bold;
-            margin: 25px 0 15px 0;
-            text-transform: uppercase;
-        }
-        
-        p {
-            text-align: justify;
-            margin-bottom: 15px;
-            text-indent: 2em;
-            font-size: 12pt;
-            line-height: 1.8;
-        }
-        
-        .enderecamento {
-            text-align: right;
-            margin-bottom: 40px;
-            font-style: italic;
-        }
-        
-        .assinatura {
-            margin-top: 60px;
-            text-align: center;
-        }
-        
-        strong { font-weight: bold; }
-        
-        @media print {
-            body { margin: 2cm; }
-        }
-    </style>
-</head>
-<body>
-    <div class="enderecamento">
-        <p>Excelentíssimo(a) Senhor(a) Doutor(a) Juiz(a) do Trabalho<br>
-        [VARA DO TRABALHO A SER ESPECIFICADA]<br>
-        [COMARCA A SER ESPECIFICADA]</p>
-    </div>
-
-    <h1>{TIPO_ACAO}</h1>
-
-    <h2>I - DAS PARTES</h2>
-    
-    <h3>DO REQUERENTE</h3>
-    <p><strong>{NOME_AUTOR}</strong>, {QUALIFICACAO_AUTOR}, portador(a) do CPF nº {CPF_AUTOR}, residente e domiciliado(a) na {ENDERECO_AUTOR}, por seu advogado que esta subscreve, vem respeitosamente à presença de Vossa Excelência propor a presente</p>
-
-    <h3>DO REQUERIDO</h3>
-    <p><strong>{NOME_REU}</strong>, {QUALIFICACAO_REU}, inscrita no CNPJ sob o nº {CNPJ_REU}, com sede na {ENDERECO_REU}, pelos motivos de fato e de direito a seguir expostos:</p>
-
-    <h2>II - DOS FATOS</h2>
-    
-    <p>A presente ação trabalhista tem por fundamento os seguintes fatos, que serão devidamente comprovados no curso do processo:</p>
-    
-    {FATOS_DETALHADOS}
-    
-    <p>Os fatos narrados caracterizam violação aos direitos trabalhistas fundamentais, ensejando a reparação integral dos danos causados ao trabalhador.</p>
-    
-    <p>A situação descrita encontra amparo na legislação trabalhista e na jurisprudência consolidada dos tribunais superiores, conforme será demonstrado na fundamentação jurídica a seguir.</p>
-
-    <h2>III - DO DIREITO</h2>
-    
-    <h3>DA LEGISLAÇÃO TRABALHISTA APLICÁVEL</h3>
-    
-    {LEGISLACAO_APLICAVEL}
-    
-    <p>A Consolidação das Leis do Trabalho estabelece de forma clara os direitos e deveres nas relações de trabalho, garantindo a proteção do trabalhador como parte hipossuficiente da relação jurídica.</p>
-    
-    <p>Os princípios fundamentais do Direito do Trabalho, especialmente o princípio da proteção, da primazia da realidade e da irrenunciabilidade de direitos, orientam a interpretação e aplicação das normas trabalhistas.</p>
-
-    <h3>DA JURISPRUDÊNCIA DOS TRIBUNAIS SUPERIORES</h3>
-    
-    {JURISPRUDENCIA_APLICAVEL}
-    
-    <p>O Tribunal Superior do Trabalho tem consolidado entendimento no sentido de garantir a efetiva proteção dos direitos trabalhistas, especialmente em casos que envolvem violação aos direitos fundamentais do trabalhador.</p>
-
-    <h3>DA DOUTRINA ESPECIALIZADA</h3>
-    
-    {DOUTRINA_APLICAVEL}
-    
-    <p>A doutrina trabalhista especializada sustenta a necessidade de interpretação das normas trabalhistas de forma a garantir a máxima efetividade dos direitos sociais constitucionalmente garantidos.</p>
-
-    <h2>IV - DOS PEDIDOS</h2>
-    
-    {PEDIDOS_DETALHADOS}
-
-    <h2>V - DO VALOR DA CAUSA</h2>
-    
-    <p>Para efeitos fiscais e de alçada, atribui-se à presente causa o valor de <strong>{VALOR_CAUSA}</strong>.</p>
-
-    <h2>VI - DAS PROVAS</h2>
-    
-    <p>A prova dos fatos alegados será produzida através de:</p>
-    
-    <p><strong>a)</strong> Documentos anexos: {DOCUMENTOS_ANEXOS}</p>
-    
-    <p><strong>b)</strong> Prova testemunhal, requerendo-se desde já a intimação das testemunhas que serão arroladas oportunamente;</p>
-    
-    <p><strong>c)</strong> Prova pericial, se necessária para a demonstração dos fatos alegados;</p>
-    
-    <p><strong>d)</strong> Todos os demais meios de prova admitidos em direito.</p>
-
-    <h2>VII - DA COMPETÊNCIA</h2>
-    
-    <p>A competência deste Juízo está adequadamente fixada, nos termos do artigo 651 da Consolidação das Leis do Trabalho, uma vez que a prestação de serviços ocorreu nesta localidade.</p>
-
-    <h2>TERMOS EM QUE</h2>
-    
-    <p>Pede deferimento.</p>
-    
-    <p class="assinatura">
-        [LOCAL], {DATA_ATUAL}<br><br>
-        _________________________________<br>
-        [NOME DO ADVOGADO]<br>
-        OAB/[UF] nº [NÚMERO]
-    </p>
-
-</body>
-</html>
-        """
-    
-    def _get_template_civil(self) -> str:
-        """Template para ações cíveis."""
-        
-        return """
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Petição Inicial Cível</title>
-    <style>
-        body {
-            font-family: 'Times New Roman', serif;
-            line-height: 1.8;
-            margin: 40px;
-            color: #000;
-            background-color: #fff;
-            font-size: 12pt;
-        }
-        
-        h1 {
-            text-align: center;
-            font-size: 22px;
-            font-weight: bold;
-            margin: 30px 0;
-            text-transform: uppercase;
-        }
-        
-        h2 {
-            font-size: 16px;
-            font-weight: bold;
-            margin: 30px 0 20px 0;
-            text-transform: uppercase;
-            border-bottom: 1px solid #000;
-            padding-bottom: 5px;
-        }
-        
-        p {
-            text-align: justify;
-            margin-bottom: 15px;
-            text-indent: 2em;
-            font-size: 12pt;
-            line-height: 1.8;
-        }
-        
-        .enderecamento {
-            text-align: right;
-            margin-bottom: 40px;
-            font-style: italic;
-        }
-        
-        .assinatura {
-            margin-top: 60px;
-            text-align: center;
-        }
-        
-        strong { font-weight: bold; }
-        
-        @media print {
-            body { margin: 2cm; }
-        }
-    </style>
-</head>
-<body>
-    <div class="enderecamento">
-        <p>Excelentíssimo(a) Senhor(a) Doutor(a) Juiz(a) de Direito<br>
-        [VARA CÍVEL A SER ESPECIFICADA]<br>
-        [COMARCA A SER ESPECIFICADA]</p>
-    </div>
-
-    <h1>{TIPO_ACAO}</h1>
-
-    <h2>I - QUALIFICAÇÃO DAS PARTES</h2>
-    
-    <p><strong>REQUERENTE:</strong> {NOME_AUTOR}, {QUALIFICACAO_AUTOR}, portador(a) do CPF nº {CPF_AUTOR}, residente e domiciliado(a) na {ENDERECO_AUTOR};</p>
-
-    <p><strong>REQUERIDO:</strong> {NOME_REU}, {QUALIFICACAO_REU}, inscrita no CNPJ sob o nº {CNPJ_REU}, com sede na {ENDERECO_REU};</p>
-
-    <h2>II - DOS FATOS</h2>
-    
-    {FATOS_DETALHADOS}
-
-    <h2>III - DO DIREITO</h2>
-    
-    {LEGISLACAO_APLICAVEL}
-    
-    {JURISPRUDENCIA_APLICAVEL}
-    
-    {DOUTRINA_APLICAVEL}
-
-    <h2>IV - DOS PEDIDOS</h2>
-    
-    {PEDIDOS_DETALHADOS}
-
-    <h2>V - DO VALOR DA CAUSA</h2>
-    
-    <p>Atribui-se à presente causa o valor de <strong>{VALOR_CAUSA}</strong>.</p>
-
-    <h2>TERMOS EM QUE</h2>
-    
-    <p>Pede deferimento.</p>
-    
-    <p class="assinatura">
-        [LOCAL], {DATA_ATUAL}<br><br>
-        _________________________________<br>
-        [NOME DO ADVOGADO]<br>
-        OAB/[UF] nº [NÚMERO]
-    </p>
-
-</body>
-</html>
-        """
-    
-    def _get_template_consumidor(self) -> str:
-        """Template para ações de consumidor."""
-        
-        return self._get_template_civil()  # Usar template civil como base
-    
-    def _get_template_default(self) -> str:
-        """Template padrão."""
-        
-        return self._get_template_civil()  # Usar template civil como padrão
-
