@@ -1,437 +1,640 @@
-# pesquisa_juridica.py - Pesquisa com logs detalhados dos sites acessados
+# pesquisa_juridica_completa.py - Pesquisa com Extração Completa e Navegação Profunda
 
 import os
-import json
-import re
 import time
 import random
+import requests
+from bs4 import BeautifulSoup
+from googlesearch import search
 from typing import Dict, Any, List
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import threading
-
-# Imports para pesquisa
-try:
-    from googlesearch import search
-    GOOGLE_SEARCH_AVAILABLE = True
-except ImportError:
-    GOOGLE_SEARCH_AVAILABLE = False
-
-try:
-    import requests
-    from bs4 import BeautifulSoup
-    REQUESTS_AVAILABLE = True
-except ImportError:
-    REQUESTS_AVAILABLE = False
+import re
+from urllib.parse import urljoin, urlparse
 
 class PesquisaJuridica:
     """
-    Pesquisa Jurídica com logs detalhados dos sites acessados.
+    Pesquisa Jurídica com Extração COMPLETA e Navegação PROFUNDA:
+    - Extrai conteúdo integral dos sites (não apenas resumos)
+    - Navega profundamente nos sites para encontrar conteúdo completo
+    - Segue links internos quando necessário
+    - Extrai textos longos e substanciais
     """
     
     def __init__(self):
-        print("🔍 Inicializando Pesquisa Jurídica FORMATADA...")
+        print("🔍 Inicializando Pesquisa Jurídica COMPLETA...")
         
+        # Configurações para extração completa
+        self.config = {
+            'tamanho_minimo_conteudo': 1000,      # Mínimo 1000 caracteres por conteúdo
+            'tamanho_maximo_conteudo': 30000,     # Máximo 30000 caracteres por conteúdo
+            'max_sites_por_query': 5,             # Máximo 5 sites por query
+            'max_paginas_por_site': 7,            # Máximo 7 páginas por site
+            'timeout_por_pagina': 15,             # 15 segundos por página
+            'delay_entre_paginas': (1, 3),        # 1-3 segundos entre páginas
+            'profundidade_navegacao': 2,          # Até 2 níveis de profundidade
+        }
+        
+        # User agents rotativos
         self.user_agents = [
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:89.0) Gecko/20100101 Firefox/89.0'
         ]
         
-        self.cache_pesquisa = {}
-        self.cache_lock = threading.Lock()
+        # Sites prioritários por tipo
+        self.sites_prioritarios = {
+            'legislacao': [
+                'planalto.gov.br',
+                'lexml.gov.br',
+                'senado.leg.br',
+                'camara.leg.br'
+            ],
+            'jurisprudencia': [
+                'stf.jus.br',
+                'stj.jus.br',
+                'tst.jus.br',
+                'trf1.jus.br',
+                'trf2.jus.br',
+                'trf3.jus.br',
+                'trf4.jus.br',
+                'trf5.jus.br'
+            ],
+            'doutrina': [
+                'conjur.com.br',
+                'migalhas.com.br',
+                'jota.info',
+                'jusbrasil.com.br'
+            ]
+        }
         
-        # Configurações otimizadas para velocidade
-        self.delay_entre_buscas = (0.5, 1.0)
-        self.delay_entre_sites = (0.2, 0.5)
-        self.timeout_site = 8
-        self.max_sites_por_query = 3
-        
-        # Log de sites acessados
-        self.sites_acessados = []
-        self.conteudos_extraidos = []
-        
-        print("✅ Sistema de pesquisa jurídica FORMATADA inicializado")
+        print("✅ Sistema de pesquisa jurídica COMPLETA inicializado")
     
-    def pesquisar_fundamentacao_completa(self, fundamentos: List[str], tipo_acao: str = "") -> Dict[str, Any]:
+    def pesquisar_fundamentacao_completa(self, fundamentos: List[str], tipo_acao: str) -> Dict[str, Any]:
         """
-        Realiza pesquisa jurídica completa com logs detalhados.
+        Realiza pesquisa completa com extração integral de conteúdo.
         """
         try:
-            print(f"🔍 Iniciando pesquisa jurídica FORMATADA para: {fundamentos}")
+            print(f"🔍 Iniciando pesquisa jurídica COMPLETA para: {fundamentos}")
             print(f"📋 Tipo de ação: {tipo_acao}")
             
-            # Limpar logs anteriores
-            self.sites_acessados = []
-            self.conteudos_extraidos = []
-            
-            inicio = time.time()
+            inicio_pesquisa = datetime.now()
             
             # Identificar área do direito
             area_direito = self._identificar_area_direito(fundamentos, tipo_acao)
             print(f"📚 Área identificada: {area_direito}")
             
-            # Realizar pesquisas em paralelo
-            resultados = self._executar_pesquisas_com_logs(fundamentos, area_direito)
+            # Realizar pesquisas por tipo
+            resultados = {
+                'legislacao': self._pesquisar_legislacao_completa(fundamentos, area_direito),
+                'jurisprudencia': self._pesquisar_jurisprudencia_completa(fundamentos, area_direito),
+                'doutrina': self._pesquisar_doutrina_completa(fundamentos, area_direito)
+            }
             
-            # Formatar resultados profissionalmente
-            resultado_formatado = self._formatar_resultados_com_logs(resultados, area_direito)
+            # Compilar resultados
+            resultado_final = self._compilar_resultados_completos(resultados, area_direito)
             
-            tempo_total = time.time() - inicio
-            print(f"✅ PESQUISA FORMATADA CONCLUÍDA em {tempo_total:.1f} segundos")
-            print(f"🌐 Total de sites acessados: {len(self.sites_acessados)}")
-            print(f"📄 Total de conteúdos extraídos: {len(self.conteudos_extraidos)}")
+            tempo_total = (datetime.now() - inicio_pesquisa).total_seconds()
+            print(f"✅ PESQUISA COMPLETA CONCLUÍDA em {tempo_total:.1f} segundos")
             
-            return resultado_formatado
+            return resultado_final
             
         except Exception as e:
-            print(f"❌ Erro na pesquisa formatada: {e}")
-            return self._gerar_fallback_formatado(fundamentos, tipo_acao)
+            print(f"❌ Erro na pesquisa completa: {e}")
+            return self._gerar_resultado_fallback(fundamentos, tipo_acao)
     
-    def _identificar_area_direito(self, fundamentos: List[str], tipo_acao: str) -> str:
-        """Identifica área do direito baseada nos fundamentos."""
+    def _pesquisar_legislacao_completa(self, fundamentos: List[str], area_direito: str) -> List[Dict[str, Any]]:
+        """
+        Pesquisa legislação com extração completa de artigos e dispositivos.
+        """
+        print("📚 Buscando LEGISLAÇÃO (extração completa)...")
         
-        texto_analise = " ".join(fundamentos + [tipo_acao]).lower()
+        resultados = []
+        sites_prioritarios = self.sites_prioritarios['legislacao']
         
-        if any(palavra in texto_analise for palavra in 
-               ['trabalhista', 'clt', 'rescisão', 'horas extras', 'assédio moral', 'empregado']):
-            return 'trabalhista'
-        elif any(palavra in texto_analise for palavra in 
-                ['consumidor', 'cdc', 'fornecedor', 'defeito', 'vício']):
-            return 'consumidor'
-        elif any(palavra in texto_analise for palavra in 
-                ['penal', 'crime', 'delito', 'código penal']):
-            return 'penal'
-        else:
-            return 'civil'
-    
-    def _executar_pesquisas_com_logs(self, fundamentos: List[str], area_direito: str) -> Dict[str, Any]:
-        """Executa pesquisas com logs detalhados."""
+        # Queries específicas para legislação
+        queries_legislacao = []
+        for fundamento in fundamentos[:3]:  # Máximo 3 fundamentos
+            for site in sites_prioritarios[:2]:  # Máximo 2 sites prioritários
+                queries_legislacao.append(f"{fundamento} artigo lei site:{site}")
         
-        print("📚 Buscando LEGISLAÇÃO (modo rápido)...")
-        legislacao = self._buscar_legislacao_com_logs(fundamentos, area_direito)
-        
-        print("⚖️ Buscando JURISPRUDÊNCIA (modo rápido)...")
-        jurisprudencia = self._buscar_jurisprudencia_com_logs(fundamentos, area_direito)
-        
-        print("📖 Buscando DOUTRINA (modo rápido)...")
-        doutrina = self._buscar_doutrina_com_logs(fundamentos, area_direito)
-        
-        return {
-            'legislacao': legislacao,
-            'jurisprudencia': jurisprudencia,
-            'doutrina': doutrina,
-            'area_direito': area_direito
-        }
-    
-    def _buscar_legislacao_com_logs(self, fundamentos: List[str], area_direito: str) -> List[Dict[str, str]]:
-        """Busca legislação com logs detalhados."""
-        
-        legislacao_encontrada = []
-        
-        # Queries específicas por área
-        if area_direito == 'trabalhista':
-            queries = [
-                f"CLT artigo {fundamentos[0]} site:planalto.gov.br",
-                f"lei trabalhista {fundamentos[0]} site:lexml.gov.br"
-            ]
-        else:
-            queries = [
-                f"lei {fundamentos[0]} site:planalto.gov.br",
-                f"código civil {fundamentos[0]} site:lexml.gov.br"
-            ]
-        
-        for query in queries[:2]:  # Limitar para velocidade
+        for query in queries_legislacao:
             print(f"🔍 Pesquisando Google: {query}")
             
             try:
-                if GOOGLE_SEARCH_AVAILABLE:
-                    urls = list(search(query, num_results=self.max_sites_por_query, sleep_interval=0.5))
+                # Buscar URLs no Google
+                urls_encontradas = list(search(query, num_results=self.config['max_sites_por_query'], sleep_interval=1))
+                
+                for url in urls_encontradas:
+                    # Extrair conteúdo completo do site
+                    conteudo_completo = self._extrair_conteudo_completo_site(url, 'legislacao')
                     
-                    for url in urls:
-                        print(f"🌐 Acessando site: {url}")
-                        self.sites_acessados.append(url)
+                    if conteudo_completo and len(conteudo_completo['texto']) >= self.config['tamanho_minimo_conteudo']:
+                        resultados.append(conteudo_completo)
                         
-                        conteudo = self._extrair_conteudo_site(url)
-                        if conteudo:
-                            print(f"📄 Conteúdo extraído: {len(conteudo)} caracteres")
-                            self.conteudos_extraidos.append({
-                                'url': url,
-                                'tipo': 'legislacao',
-                                'tamanho': len(conteudo),
-                                'conteudo_preview': conteudo[:200] + '...'
-                            })
-                            
-                            legislacao_encontrada.append({
-                                'titulo': self._extrair_titulo_legislacao(conteudo),
-                                'artigo': self._extrair_artigo_legislacao(conteudo),
-                                'fonte': url,
-                                'conteudo': conteudo[:1000]  # Primeiros 1000 chars
-                            })
+                        # Parar se já temos conteúdo suficiente
+                        if len(resultados) >= 5:
+                            break
                 
                 # Delay entre queries
-                time.sleep(random.uniform(*self.delay_entre_buscas))
+                time.sleep(random.uniform(*self.config['delay_entre_paginas']))
                 
             except Exception as e:
-                print(f"❌ Erro na busca de legislação '{query}': {e}")
+                print(f"⚠️ Erro na query '{query}': {e}")
+                continue
         
-        print(f"📚 Legislação encontrada: {len(legislacao_encontrada)} itens")
-        return legislacao_encontrada
+        print(f"📚 Legislação encontrada: {len(resultados)} itens completos")
+        return resultados
     
-    def _buscar_jurisprudencia_com_logs(self, fundamentos: List[str], area_direito: str) -> List[Dict[str, str]]:
-        """Busca jurisprudência com logs detalhados."""
+    def _pesquisar_jurisprudencia_completa(self, fundamentos: List[str], area_direito: str) -> List[Dict[str, Any]]:
+        """
+        Pesquisa jurisprudência com extração completa de ementas e decisões.
+        """
+        print("⚖️ Buscando JURISPRUDÊNCIA (extração completa)...")
         
-        jurisprudencia_encontrada = []
+        resultados = []
+        sites_prioritarios = self.sites_prioritarios['jurisprudencia']
         
-        # Queries específicas por área
-        if area_direito == 'trabalhista':
-            queries = [
-                f"TST {fundamentos[0]} site:tst.jus.br",
-                f"jurisprudência trabalhista {fundamentos[0]} site:stf.jus.br"
-            ]
-        else:
-            queries = [
-                f"STJ {fundamentos[0]} site:stj.jus.br",
-                f"jurisprudência {fundamentos[0]} site:stf.jus.br"
-            ]
+        # Queries específicas para jurisprudência
+        queries_jurisprudencia = []
+        for fundamento in fundamentos[:3]:
+            for site in sites_prioritarios[:3]:  # Máximo 3 tribunais
+                queries_jurisprudencia.append(f"jurisprudência {fundamento} site:{site}")
         
-        for query in queries[:2]:  # Limitar para velocidade
+        for query in queries_jurisprudencia:
             print(f"🔍 Pesquisando Google: {query}")
             
             try:
-                if GOOGLE_SEARCH_AVAILABLE:
-                    urls = list(search(query, num_results=self.max_sites_por_query, sleep_interval=0.5))
-                    
-                    for url in urls:
-                        print(f"🌐 Acessando site: {url}")
-                        self.sites_acessados.append(url)
-                        
-                        conteudo = self._extrair_conteudo_site(url)
-                        if conteudo:
-                            print(f"📄 Conteúdo extraído: {len(conteudo)} caracteres")
-                            self.conteudos_extraidos.append({
-                                'url': url,
-                                'tipo': 'jurisprudencia',
-                                'tamanho': len(conteudo),
-                                'conteudo_preview': conteudo[:200] + '...'
-                            })
-                            
-                            jurisprudencia_encontrada.append({
-                                'ementa': self._extrair_ementa_jurisprudencia(conteudo),
-                                'tribunal': self._extrair_tribunal(url),
-                                'fonte': url,
-                                'conteudo': conteudo[:1000]  # Primeiros 1000 chars
-                            })
+                urls_encontradas = list(search(query, num_results=self.config['max_sites_por_query'], sleep_interval=1))
                 
-                # Delay entre queries
-                time.sleep(random.uniform(*self.delay_entre_buscas))
+                for url in urls_encontradas:
+                    conteudo_completo = self._extrair_conteudo_completo_site(url, 'jurisprudencia')
+                    
+                    if conteudo_completo and len(conteudo_completo['texto']) >= self.config['tamanho_minimo_conteudo']:
+                        resultados.append(conteudo_completo)
+                        
+                        if len(resultados) >= 5:
+                            break
+                
+                time.sleep(random.uniform(*self.config['delay_entre_paginas']))
                 
             except Exception as e:
-                print(f"❌ Erro na busca de jurisprudência '{query}': {e}")
+                print(f"⚠️ Erro na query '{query}': {e}")
+                continue
         
-        print(f"⚖️ Jurisprudência encontrada: {len(jurisprudencia_encontrada)} itens")
-        return jurisprudencia_encontrada
+        print(f"⚖️ Jurisprudência encontrada: {len(resultados)} itens completos")
+        return resultados
     
-    def _buscar_doutrina_com_logs(self, fundamentos: List[str], area_direito: str) -> List[Dict[str, str]]:
-        """Busca doutrina com logs detalhados."""
+    def _pesquisar_doutrina_completa(self, fundamentos: List[str], area_direito: str) -> List[Dict[str, Any]]:
+        """
+        Pesquisa doutrina com extração completa de artigos e análises.
+        """
+        print("📖 Buscando DOUTRINA (extração completa)...")
         
-        doutrina_encontrada = []
+        resultados = []
+        sites_prioritarios = self.sites_prioritarios['doutrina']
         
-        # Queries para doutrina
-        queries = [
-            f"doutrina {fundamentos[0]} site:conjur.com.br",
-            f"artigo jurídico {fundamentos[0]} site:migalhas.com.br"
-        ]
+        # Queries específicas para doutrina
+        queries_doutrina = []
+        for fundamento in fundamentos[:3]:
+            for site in sites_prioritarios[:2]:
+                queries_doutrina.append(f"artigo {fundamento} {area_direito} site:{site}")
         
-        for query in queries[:2]:  # Limitar para velocidade
+        for query in queries_doutrina:
             print(f"🔍 Pesquisando Google: {query}")
             
             try:
-                if GOOGLE_SEARCH_AVAILABLE:
-                    urls = list(search(query, num_results=self.max_sites_por_query, sleep_interval=0.5))
-                    
-                    for url in urls:
-                        print(f"🌐 Acessando site: {url}")
-                        self.sites_acessados.append(url)
-                        
-                        conteudo = self._extrair_conteudo_site(url)
-                        if conteudo:
-                            print(f"📄 Conteúdo extraído: {len(conteudo)} caracteres")
-                            self.conteudos_extraidos.append({
-                                'url': url,
-                                'tipo': 'doutrina',
-                                'tamanho': len(conteudo),
-                                'conteudo_preview': conteudo[:200] + '...'
-                            })
-                            
-                            doutrina_encontrada.append({
-                                'titulo': self._extrair_titulo_artigo(conteudo),
-                                'autor': self._extrair_autor_artigo(conteudo),
-                                'fonte': url,
-                                'conteudo': conteudo[:1000]  # Primeiros 1000 chars
-                            })
+                urls_encontradas = list(search(query, num_results=self.config['max_sites_por_query'], sleep_interval=1))
                 
-                # Delay entre queries
-                time.sleep(random.uniform(*self.delay_entre_buscas))
+                for url in urls_encontradas:
+                    conteudo_completo = self._extrair_conteudo_completo_site(url, 'doutrina')
+                    
+                    if conteudo_completo and len(conteudo_completo['texto']) >= self.config['tamanho_minimo_conteudo']:
+                        resultados.append(conteudo_completo)
+                        
+                        if len(resultados) >= 5:
+                            break
+                
+                time.sleep(random.uniform(*self.config['delay_entre_paginas']))
                 
             except Exception as e:
-                print(f"❌ Erro na busca de doutrina '{query}': {e}")
+                print(f"⚠️ Erro na query '{query}': {e}")
+                continue
         
-        print(f"📖 Doutrina encontrada: {len(doutrina_encontrada)} itens")
-        return doutrina_encontrada
+        print(f"📖 Doutrina encontrada: {len(resultados)} itens completos")
+        return resultados
     
-    def _extrair_conteudo_site(self, url: str) -> str:
-        """Extrai conteúdo de um site específico."""
+    def _extrair_conteudo_completo_site(self, url: str, tipo_conteudo: str) -> Dict[str, Any]:
+        """
+        Extrai conteúdo COMPLETO de um site, navegando profundamente se necessário.
+        """
+        print(f"🌐 Extraindo conteúdo COMPLETO de: {url}")
         
         try:
-            if not REQUESTS_AVAILABLE:
-                return ""
-            
-            headers = {
+            # Configurar sessão
+            session = requests.Session()
+            session.headers.update({
                 'User-Agent': random.choice(self.user_agents),
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
                 'Accept-Encoding': 'gzip, deflate',
                 'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            })
+            
+            # Acessar página principal
+            response = session.get(url, timeout=self.config['timeout_por_pagina'])
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Extrair conteúdo da página principal
+            conteudo_principal = self._extrair_texto_pagina(soup, tipo_conteudo)
+            
+            # Se conteúdo é insuficiente, navegar profundamente
+            if len(conteudo_principal) < self.config['tamanho_minimo_conteudo']:
+                print(f"📄 Conteúdo insuficiente ({len(conteudo_principal)} chars), navegando profundamente...")
+                conteudo_adicional = self._navegar_profundamente(session, url, soup, tipo_conteudo)
+                conteudo_principal += "\n\n" + conteudo_adicional
+            
+            # Limpar e formatar texto
+            texto_final = self._limpar_texto_completo(conteudo_principal)
+            
+            # Limitar tamanho máximo
+            if len(texto_final) > self.config['tamanho_maximo_conteudo']:
+                texto_final = texto_final[:self.config['tamanho_maximo_conteudo']] + "..."
+            
+            print(f"📄 Conteúdo COMPLETO extraído: {len(texto_final)} caracteres")
+            
+            return {
+                'url': url,
+                'tipo': tipo_conteudo,
+                'texto': texto_final,
+                'tamanho': len(texto_final),
+                'titulo': self._extrair_titulo(soup),
+                'timestamp': datetime.now().isoformat()
             }
             
-            response = requests.get(url, headers=headers, timeout=self.timeout_site)
-            
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.content, 'html.parser')
-                
-                # Remover scripts e styles
-                for script in soup(["script", "style"]):
-                    script.decompose()
-                
-                # Extrair texto
-                texto = soup.get_text()
-                
-                # Limpar texto
-                linhas = (linha.strip() for linha in texto.splitlines())
-                chunks = (frase.strip() for linha in linhas for frase in linha.split("  "))
-                texto_limpo = ' '.join(chunk for chunk in chunks if chunk)
-                
-                return texto_limpo[:2000]  # Limitar tamanho
-            
-            return ""
-            
         except Exception as e:
-            print(f"❌ Erro ao extrair conteúdo de {url}: {e}")
-            return ""
+            print(f"❌ Erro ao extrair conteúdo completo de {url}: {e}")
+            return None
     
-    def _extrair_titulo_legislacao(self, conteudo: str) -> str:
-        """Extrai título de legislação."""
-        # Buscar padrões de lei
-        match = re.search(r'(Lei nº? [\d\.\/]+|Decreto nº? [\d\.\/]+|CLT.*?Art\.?\s*\d+)', conteudo, re.IGNORECASE)
-        return match.group(1) if match else "Legislação encontrada"
+    def _navegar_profundamente(self, session: requests.Session, url_base: str, soup: BeautifulSoup, tipo_conteudo: str) -> str:
+        """
+        Navega profundamente no site para encontrar conteúdo mais completo.
+        """
+        print("🔍 Navegando profundamente no site...")
+        
+        conteudo_adicional = ""
+        links_relevantes = self._encontrar_links_relevantes(soup, url_base, tipo_conteudo)
+        
+        for link in links_relevantes[:self.config['max_paginas_por_site']]:
+            try:
+                print(f"🌐 Acessando página adicional: {link}")
+                
+                response = session.get(link, timeout=self.config['timeout_por_pagina'])
+                response.raise_for_status()
+                
+                soup_adicional = BeautifulSoup(response.content, 'html.parser')
+                texto_adicional = self._extrair_texto_pagina(soup_adicional, tipo_conteudo)
+                
+                if len(texto_adicional) >= 500:  # Mínimo 500 caracteres por página adicional
+                    conteudo_adicional += "\n\n" + texto_adicional
+                    print(f"📄 Conteúdo adicional extraído: {len(texto_adicional)} caracteres")
+                
+                # Delay entre páginas
+                time.sleep(random.uniform(*self.config['delay_entre_paginas']))
+                
+                # Parar se já temos conteúdo suficiente
+                if len(conteudo_adicional) >= self.config['tamanho_minimo_conteudo']:
+                    break
+                    
+            except Exception as e:
+                print(f"⚠️ Erro ao acessar {link}: {e}")
+                continue
+        
+        return conteudo_adicional
     
-    def _extrair_artigo_legislacao(self, conteudo: str) -> str:
-        """Extrai artigo específico da legislação."""
-        # Buscar artigos
-        match = re.search(r'Art\.?\s*\d+.*?(?=Art\.?\s*\d+|$)', conteudo, re.IGNORECASE | re.DOTALL)
-        return match.group(0)[:500] if match else conteudo[:500]
+    def _encontrar_links_relevantes(self, soup: BeautifulSoup, url_base: str, tipo_conteudo: str) -> List[str]:
+        """
+        Encontra links relevantes na página para navegação profunda.
+        """
+        links_relevantes = []
+        base_domain = urlparse(url_base).netloc
+        
+        # Palavras-chave por tipo de conteúdo
+        palavras_chave = {
+            'legislacao': ['artigo', 'lei', 'decreto', 'código', 'dispositivo', 'parágrafo'],
+            'jurisprudencia': ['acórdão', 'ementa', 'decisão', 'súmula', 'jurisprudência', 'tribunal'],
+            'doutrina': ['artigo', 'análise', 'comentário', 'doutrina', 'estudo', 'parecer']
+        }
+        
+        palavras_tipo = palavras_chave.get(tipo_conteudo, [])
+        
+        # Buscar links com texto relevante
+        for link in soup.find_all('a', href=True):
+            href = link.get('href')
+            texto_link = link.get_text().lower()
+            
+            # Verificar se é link interno
+            if href.startswith('/'):
+                url_completa = urljoin(url_base, href)
+            elif base_domain in href:
+                url_completa = href
+            else:
+                continue
+            
+            # Verificar se o texto do link é relevante
+            if any(palavra in texto_link for palavra in palavras_tipo):
+                if url_completa not in links_relevantes and url_completa != url_base:
+                    links_relevantes.append(url_completa)
+        
+        return links_relevantes[:10]  # Máximo 10 links relevantes
     
-    def _extrair_ementa_jurisprudencia(self, conteudo: str) -> str:
-        """Extrai ementa de jurisprudência."""
-        # Buscar ementa
-        match = re.search(r'EMENTA:?\s*(.*?)(?=ACÓRDÃO|RELATÓRIO|$)', conteudo, re.IGNORECASE | re.DOTALL)
-        return match.group(1)[:500] if match else conteudo[:500]
+    def _extrair_texto_pagina(self, soup: BeautifulSoup, tipo_conteudo: str) -> str:
+        """
+        Extrai texto completo de uma página baseado no tipo de conteúdo.
+        """
+        texto_extraido = ""
+        
+        # Estratégias específicas por tipo
+        if tipo_conteudo == 'legislacao':
+            texto_extraido = self._extrair_texto_legislacao(soup)
+        elif tipo_conteudo == 'jurisprudencia':
+            texto_extraido = self._extrair_texto_jurisprudencia(soup)
+        elif tipo_conteudo == 'doutrina':
+            texto_extraido = self._extrair_texto_doutrina(soup)
+        
+        # Fallback: extração geral
+        if len(texto_extraido) < 200:
+            texto_extraido = self._extrair_texto_geral(soup)
+        
+        return texto_extraido
     
-    def _extrair_tribunal(self, url: str) -> str:
-        """Extrai nome do tribunal da URL."""
-        if 'stf.jus.br' in url:
-            return 'STF'
-        elif 'stj.jus.br' in url:
-            return 'STJ'
-        elif 'tst.jus.br' in url:
-            return 'TST'
+    def _extrair_texto_legislacao(self, soup: BeautifulSoup) -> str:
+        """
+        Extrai texto específico de páginas de legislação.
+        """
+        texto = ""
+        
+        # Buscar por seletores específicos de legislação
+        seletores_legislacao = [
+            '.artigo', '.paragrafo', '.inciso', '.alinea',
+            '[class*="artigo"]', '[class*="dispositivo"]',
+            '.texto-lei', '.conteudo-lei', '.texto-norma'
+        ]
+        
+        for seletor in seletores_legislacao:
+            elementos = soup.select(seletor)
+            for elemento in elementos:
+                texto += elemento.get_text() + "\n\n"
+        
+        # Se não encontrou, buscar por padrões de artigos
+        if len(texto) < 200:
+            # Buscar por padrões "Art. X" ou "Artigo X"
+            for p in soup.find_all(['p', 'div', 'span']):
+                texto_p = p.get_text()
+                if re.search(r'Art\.?\s*\d+|Artigo\s*\d+', texto_p):
+                    texto += texto_p + "\n\n"
+        
+        return texto
+    
+    def _extrair_texto_jurisprudencia(self, soup: BeautifulSoup) -> str:
+        """
+        Extrai texto específico de páginas de jurisprudência.
+        """
+        texto = ""
+        
+        # Buscar por seletores específicos de jurisprudência
+        seletores_jurisprudencia = [
+            '.ementa', '.acordao', '.decisao', '.voto',
+            '[class*="ementa"]', '[class*="acordao"]',
+            '.texto-decisao', '.conteudo-acordao'
+        ]
+        
+        for seletor in seletores_jurisprudencia:
+            elementos = soup.select(seletor)
+            for elemento in elementos:
+                texto += elemento.get_text() + "\n\n"
+        
+        # Buscar por padrões de jurisprudência
+        if len(texto) < 200:
+            for p in soup.find_all(['p', 'div']):
+                texto_p = p.get_text()
+                if any(palavra in texto_p.lower() for palavra in ['ementa', 'acórdão', 'decisão', 'relatório']):
+                    texto += texto_p + "\n\n"
+        
+        return texto
+    
+    def _extrair_texto_doutrina(self, soup: BeautifulSoup) -> str:
+        """
+        Extrai texto específico de páginas de doutrina.
+        """
+        texto = ""
+        
+        # Buscar por seletores específicos de artigos doutrinários
+        seletores_doutrina = [
+            '.artigo-conteudo', '.texto-artigo', '.conteudo-principal',
+            '[class*="content"]', '[class*="article"]',
+            '.post-content', '.entry-content'
+        ]
+        
+        for seletor in seletores_doutrina:
+            elementos = soup.select(seletor)
+            for elemento in elementos:
+                # Remover elementos indesejados
+                for tag_indesejada in elemento.find_all(['script', 'style', 'nav', 'footer', 'header']):
+                    tag_indesejada.decompose()
+                
+                texto += elemento.get_text() + "\n\n"
+        
+        return texto
+    
+    def _extrair_texto_geral(self, soup: BeautifulSoup) -> str:
+        """
+        Extração geral de texto quando métodos específicos falham.
+        """
+        # Remover elementos indesejados
+        for tag in soup.find_all(['script', 'style', 'nav', 'footer', 'header', 'aside']):
+            tag.decompose()
+        
+        # Buscar por conteúdo principal
+        conteudo_principal = soup.find('main') or soup.find('article') or soup.find('body')
+        
+        if conteudo_principal:
+            return conteudo_principal.get_text()
         else:
-            return 'Tribunal'
+            return soup.get_text()
     
-    def _extrair_titulo_artigo(self, conteudo: str) -> str:
-        """Extrai título de artigo doutrinário."""
-        # Buscar título no início
-        linhas = conteudo.split('\n')[:10]
-        for linha in linhas:
-            if len(linha.strip()) > 20 and len(linha.strip()) < 200:
-                return linha.strip()
-        return "Artigo doutrinário"
+    def _extrair_titulo(self, soup: BeautifulSoup) -> str:
+        """
+        Extrai título da página.
+        """
+        titulo = soup.find('title')
+        if titulo:
+            return titulo.get_text().strip()
+        
+        h1 = soup.find('h1')
+        if h1:
+            return h1.get_text().strip()
+        
+        return "Título não encontrado"
     
-    def _extrair_autor_artigo(self, conteudo: str) -> str:
-        """Extrai autor do artigo."""
-        # Buscar padrões de autor
-        match = re.search(r'Por:?\s*([A-Z][a-z]+ [A-Z][a-z]+)', conteudo)
-        return match.group(1) if match else "Autor não identificado"
+    def _limpar_texto_completo(self, texto: str) -> str:
+        """
+        Limpa e formata texto extraído mantendo conteúdo completo.
+        """
+        if not texto:
+            return ""
+        
+        # Remover caracteres especiais problemáticos
+        texto = re.sub(r'[^\w\s\.\,\;\:\!\?\(\)\[\]\-\+\=\%\$\@\#\n]', ' ', texto)
+        
+        # Normalizar espaços
+        texto = re.sub(r'\s+', ' ', texto)
+        
+        # Normalizar quebras de linha
+        texto = re.sub(r'\n+', '\n', texto)
+        
+        # Remover linhas muito curtas (menos de 10 caracteres)
+        linhas = texto.split('\n')
+        linhas_filtradas = [linha.strip() for linha in linhas if len(linha.strip()) >= 10]
+        
+        return '\n'.join(linhas_filtradas).strip()
     
-    def _formatar_resultados_com_logs(self, resultados: Dict[str, Any], area_direito: str) -> Dict[str, Any]:
-        """Formata resultados incluindo logs detalhados."""
+    def _identificar_area_direito(self, fundamentos: List[str], tipo_acao: str) -> str:
+        """
+        Identifica área do direito baseada nos fundamentos.
+        """
+        fundamentos_texto = ' '.join(fundamentos).lower()
+        tipo_acao_lower = tipo_acao.lower()
+        
+        if any(palavra in fundamentos_texto or palavra in tipo_acao_lower 
+               for palavra in ['trabalho', 'trabalhista', 'clt', 'emprego']):
+            return 'trabalhista'
+        elif any(palavra in fundamentos_texto or palavra in tipo_acao_lower 
+                 for palavra in ['consumidor', 'cdc', 'fornecedor']):
+            return 'consumidor'
+        elif any(palavra in fundamentos_texto or palavra in tipo_acao_lower 
+                 for palavra in ['civil', 'contrato', 'responsabilidade']):
+            return 'civil'
+        else:
+            return 'geral'
+    
+    def _compilar_resultados_completos(self, resultados: Dict[str, List], area_direito: str) -> Dict[str, Any]:
+        """
+        Compila resultados completos da pesquisa.
+        """
+        # Contar totais
+        total_legislacao = len(resultados['legislacao'])
+        total_jurisprudencia = len(resultados['jurisprudencia'])
+        total_doutrina = len(resultados['doutrina'])
+        total_sites = total_legislacao + total_jurisprudencia + total_doutrina
+        
+        # Compilar todos os conteúdos
+        todos_conteudos = []
+        todos_conteudos.extend(resultados['legislacao'])
+        todos_conteudos.extend(resultados['jurisprudencia'])
+        todos_conteudos.extend(resultados['doutrina'])
+        
+        # Gerar textos formatados completos
+        legislacao_formatada = self._formatar_legislacao_completa(resultados['legislacao'])
+        jurisprudencia_formatada = self._formatar_jurisprudencia_completa(resultados['jurisprudencia'])
+        doutrina_formatada = self._formatar_doutrina_completa(resultados['doutrina'])
+        
+        print(f"🌐 Total de sites acessados: {total_sites}")
+        print(f"📄 Total de conteúdos extraídos: {len(todos_conteudos)}")
         
         return {
-            'status': 'sucesso',
-            'area_direito': area_direito,
-            'legislacao_formatada': self._formatar_legislacao(resultados['legislacao']),
-            'jurisprudencia_formatada': self._formatar_jurisprudencia(resultados['jurisprudencia']),
-            'doutrina_formatada': self._formatar_doutrina(resultados['doutrina']),
-            'total_fontes': len(resultados['legislacao']) + len(resultados['jurisprudencia']) + len(resultados['doutrina']),
-            'sites_acessados': self.sites_acessados,
-            'conteudos_extraidos': self.conteudos_extraidos,
-            'timestamp': datetime.now().isoformat()
+            "status": "sucesso",
+            "area_direito": area_direito,
+            "legislacao_formatada": legislacao_formatada,
+            "jurisprudencia_formatada": jurisprudencia_formatada,
+            "doutrina_formatada": doutrina_formatada,
+            "conteudos_extraidos": todos_conteudos,
+            "sites_acessados": [conteudo['url'] for conteudo in todos_conteudos],
+            "estatisticas": {
+                "total_sites_acessados": total_sites,
+                "total_conteudos_extraidos": len(todos_conteudos),
+                "legislacao_encontrada": total_legislacao,
+                "jurisprudencia_encontrada": total_jurisprudencia,
+                "doutrina_encontrada": total_doutrina,
+                "caracteres_totais_extraidos": sum(conteudo['tamanho'] for conteudo in todos_conteudos)
+            },
+            "timestamp": datetime.now().isoformat()
         }
     
-    def _formatar_legislacao(self, legislacao: List[Dict[str, str]]) -> str:
-        """Formata legislação encontrada."""
+    def _formatar_legislacao_completa(self, legislacao: List[Dict[str, Any]]) -> str:
+        """
+        Formata legislação com conteúdo completo.
+        """
         if not legislacao:
             return "Legislação específica não encontrada nas pesquisas realizadas."
         
-        texto_formatado = "LEGISLAÇÃO APLICÁVEL:\n\n"
-        for item in legislacao:
-            texto_formatado += f"• {item['titulo']}\n"
-            texto_formatado += f"  {item['artigo']}\n"
-            texto_formatado += f"  Fonte: {item['fonte']}\n\n"
+        texto_formatado = "LEGISLAÇÃO APLICÁVEL (CONTEÚDO COMPLETO):\n\n"
+        
+        for i, item in enumerate(legislacao, 1):
+            texto_formatado += f"DISPOSITIVO LEGAL {i}:\n"
+            texto_formatado += f"Fonte: {item['titulo']}\n"
+            texto_formatado += f"Conteúdo Integral:\n{item['texto']}\n"
+            texto_formatado += "-" * 80 + "\n\n"
         
         return texto_formatado
     
-    def _formatar_jurisprudencia(self, jurisprudencia: List[Dict[str, str]]) -> str:
-        """Formata jurisprudência encontrada."""
+    def _formatar_jurisprudencia_completa(self, jurisprudencia: List[Dict[str, Any]]) -> str:
+        """
+        Formata jurisprudência com conteúdo completo.
+        """
         if not jurisprudencia:
             return "Jurisprudência específica não encontrada nas pesquisas realizadas."
         
-        texto_formatado = "JURISPRUDÊNCIA APLICÁVEL:\n\n"
-        for item in jurisprudencia:
-            texto_formatado += f"• {item['tribunal']}\n"
-            texto_formatado += f"  EMENTA: {item['ementa']}\n"
-            texto_formatado += f"  Fonte: {item['fonte']}\n\n"
+        texto_formatado = "JURISPRUDÊNCIA DOS TRIBUNAIS SUPERIORES (CONTEÚDO COMPLETO):\n\n"
+        
+        for i, item in enumerate(jurisprudencia, 1):
+            texto_formatado += f"PRECEDENTE JUDICIAL {i}:\n"
+            texto_formatado += f"Tribunal: {item['titulo']}\n"
+            texto_formatado += f"Decisão Completa:\n{item['texto']}\n"
+            texto_formatado += "-" * 80 + "\n\n"
         
         return texto_formatado
     
-    def _formatar_doutrina(self, doutrina: List[Dict[str, str]]) -> str:
-        """Formata doutrina encontrada."""
+    def _formatar_doutrina_completa(self, doutrina: List[Dict[str, Any]]) -> str:
+        """
+        Formata doutrina com conteúdo completo.
+        """
         if not doutrina:
             return "Doutrina específica não encontrada nas pesquisas realizadas."
         
-        texto_formatado = "DOUTRINA APLICÁVEL:\n\n"
-        for item in doutrina:
-            texto_formatado += f"• {item['titulo']}\n"
-            texto_formatado += f"  Autor: {item['autor']}\n"
-            texto_formatado += f"  Fonte: {item['fonte']}\n\n"
+        texto_formatado = "DOUTRINA ESPECIALIZADA (CONTEÚDO COMPLETO):\n\n"
+        
+        for i, item in enumerate(doutrina, 1):
+            texto_formatado += f"ANÁLISE DOUTRINÁRIA {i}:\n"
+            texto_formatado += f"Fonte: {item['titulo']}\n"
+            texto_formatado += f"Conteúdo Integral:\n{item['texto']}\n"
+            texto_formatado += "-" * 80 + "\n\n"
         
         return texto_formatado
     
-    def _gerar_fallback_formatado(self, fundamentos: List[str], tipo_acao: str) -> Dict[str, Any]:
-        """Gera fallback quando pesquisa falha."""
-        
-        area_direito = self._identificar_area_direito(fundamentos, tipo_acao)
-        
+    def _gerar_resultado_fallback(self, fundamentos: List[str], tipo_acao: str) -> Dict[str, Any]:
+        """
+        Gera resultado fallback quando pesquisa falha.
+        """
         return {
-            'status': 'fallback',
-            'area_direito': area_direito,
-            'legislacao_formatada': f"Legislação aplicável à área de {area_direito} deve ser consultada.",
-            'jurisprudencia_formatada': f"Jurisprudência dos tribunais superiores sobre {area_direito}.",
-            'doutrina_formatada': f"Doutrina especializada em {area_direito}.",
-            'total_fontes': 0,
-            'sites_acessados': [],
-            'conteudos_extraidos': [],
-            'motivo_fallback': 'Erro na pesquisa online',
-            'timestamp': datetime.now().isoformat()
+            "status": "fallback",
+            "area_direito": "geral",
+            "legislacao_formatada": "Legislação aplicável não pôde ser pesquisada no momento.",
+            "jurisprudencia_formatada": "Jurisprudência aplicável não pôde ser pesquisada no momento.",
+            "doutrina_formatada": "Doutrina aplicável não pôde ser pesquisada no momento.",
+            "conteudos_extraidos": [],
+            "sites_acessados": [],
+            "estatisticas": {
+                "total_sites_acessados": 0,
+                "total_conteudos_extraidos": 0,
+                "legislacao_encontrada": 0,
+                "jurisprudencia_encontrada": 0,
+                "doutrina_encontrada": 0,
+                "caracteres_totais_extraidos": 0
+            },
+            "timestamp": datetime.now().isoformat()
         }
