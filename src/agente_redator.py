@@ -134,7 +134,15 @@ class AgenteRedator:
         if 'constitucional' in fatos.lower(): pontos += 3
         if 'assédio' in fatos.lower(): pontos += 2
         if 'danos morais' in fatos.lower(): pontos += 1
-        if dados.get('valor_causa', 0) > 100000: pontos += 2
+        
+        # Converter valor_causa para int com tratamento de erro
+        try:
+            valor_causa = int(dados.get('valor_causa', 0))
+            if valor_causa > 100000: pontos += 2
+        except (ValueError, TypeError):
+            # Se não conseguir converter, ignora este critério
+            pass
+            
         if len(dados.get('documentos', [])) > 5: pontos += 1
         
         if pontos >= 6: return 'muito_alta'
@@ -259,8 +267,14 @@ class AgenteRedator:
         elif complexidade == 'alta': base += 10000
         elif complexidade == 'media': base += 5000
         
-        if valor_causa > 100000: base += 5000
-        elif valor_causa > 50000: base += 3000
+        # Converter valor_causa para float com tratamento de erro
+        try:
+            valor_causa_num = float(valor_causa) if valor_causa else 0
+            if valor_causa_num > 100000: base += 5000
+            elif valor_causa_num > 50000: base += 3000
+        except (ValueError, TypeError):
+            # Se não conseguir converter, ignora este critério
+            pass
         
         return base
     
