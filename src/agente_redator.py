@@ -1,4 +1,4 @@
-# agente_redator_final.py - Versão final, completa e robusta para deploy.
+# agente_redator.py - Versão final, compatível com o orquestrador e robusta para deploy.
 
 import os
 import re
@@ -6,13 +6,13 @@ import html
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
-class AgenteRedatorFinal:
+class AgenteRedator: # <-- NOME DA CLASSE MANTIDO COMO O ORIGINAL
     """
     Agente Redator que recebe os dados estruturados e a pesquisa jurídica para redigir 
     uma petição completa. Esta versão é ajustada para ser 100% compatível com a saída 
     do 'PesquisaJuridica' e é robusta contra falhas de entrada de dados.
     """
-    # Constantes para chaves e configurações
+    # Constantes para chaves e configurações, garantindo consistência e fácil manutenção.
     CHAVE_CONTEUDOS = 'conteudos_extraidos'
     CHAVE_TIPO = 'tipo'
     CHAVE_TEXTO = 'texto'
@@ -31,26 +31,26 @@ class AgenteRedatorFinal:
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
         if not self.openai_api_key:
             raise ValueError("OPENAI_API_KEY não encontrada nas variáveis de ambiente")
-        print("✍️  Iniciando Agente Redator (Versão Final)...")
+        print("✍️  Iniciando Agente Redator (Versão Corrigida e Robusta)...")
 
     def redigir_peticao_completa(self, dados_estruturados: Optional[Dict[str, Any]], pesquisa_juridica: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Ponto de entrada principal para redigir a petição completa.
-        Trata dados de entrada que possam ser nulos ou incompletos para evitar erros.
+        Trata dados de entrada que possam ser nulos ou incompletos para evitar erros em produção.
         """
         try:
             print("📝 Iniciando redação final da petição...")
             
-            # Garante que as variáveis de entrada sejam sempre dicionários, mesmo que vazios.
+            # Garante que as variáveis de entrada sejam sempre dicionários, mesmo que nulas.
             dados_estruturados = dados_estruturados or {}
             pesquisa_juridica = pesquisa_juridica or {}
 
-            # Extrai os textos da pesquisa bruta, já formatando-os para HTML.
+            # Extração dos textos da pesquisa bruta.
             textos_legislacao = self._extrair_textos_por_tipo(pesquisa_juridica, self.TIPO_LEGISLACAO, self.MAX_LEGISLACAO)
             textos_jurisprudencia = self._extrair_textos_por_tipo(pesquisa_juridica, self.TIPO_JURISPRUDENCIA, self.MAX_JURISPRUDENCIA)
             textos_doutrina = self._extrair_textos_por_tipo(pesquisa_juridica, self.TIPO_DOUTRINA, self.MAX_DOUTRINA)
 
-            # Gera o documento HTML completo a partir dos dados processados.
+            # Geração do documento HTML completo.
             documento_html = self._gerar_documento_html(
                 dados_estruturados,
                 textos_legislacao,
@@ -103,7 +103,7 @@ class AgenteRedatorFinal:
         texto_com_paragrafos = re.sub(r'\n\s*\n', '\n\n', texto_sem_espacos_extras)
         
         return texto_com_paragrafos.strip()
-
+    
     def _gerar_documento_html(self, dados: Dict[str, Any], legislacao: List[Dict], jurisprudencia: List[Dict], doutrina: List[Dict]) -> str:
         """Estrutura o documento HTML final chamando funções auxiliares para cada seção."""
         autor = dados.get('autor', {})
@@ -116,27 +116,11 @@ class AgenteRedatorFinal:
         secao_final = self._gerar_secoes_finais_html(dados.get('valor_causa', ''))
         rodape = self._gerar_rodape_html()
 
-        # Concatena todas as partes para formar o documento completo.
         return f"{cabecalho}<body>{secao_partes}{secao_fatos}{secao_direito}{secao_pedidos}{secao_final}{rodape}</body></html>"
 
     def _gerar_cabecalho_html(self, tipo_acao: str) -> str:
         """Gera a tag <head> do HTML, incluindo o título e todo o CSS para formatação."""
-        css = """
-        <style>
-            body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; margin: 2cm; text-align: justify; color: #000; }
-            h1 { text-align: center; font-size: 16pt; font-weight: bold; margin: 30px 0; text-transform: uppercase; }
-            h2 { font-size: 14pt; font-weight: bold; margin: 25px 0 15px 0; text-align: left; text-transform: uppercase; }
-            h3 { font-size: 12pt; font-weight: bold; margin: 20px 0 10px 0; text-align: left; text-transform: uppercase; }
-            p { text-indent: 2em; margin-bottom: 15px; text-align: justify; }
-            .enderecamento { margin-bottom: 30px; text-align: justify; }
-            .assinatura { text-align: center; margin-top: 50px; }
-            .transcricao { margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-left: 4px solid #ccc; font-style: italic; white-space: pre-wrap; word-wrap: break-word; }
-            .transcricao h4 { margin-top: 0; font-style: normal; font-weight: bold; }
-            .transcricao-legislacao { border-left-color: #28a745; }
-            .transcricao-jurisprudencia { border-left-color: #dc3545; }
-            .transcricao-doutrina { border-left-color: #ffc107; }
-        </style>
-        """
+        css = """<style>body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; margin: 2cm; text-align: justify; color: #000; } h1, h2, h3 { font-weight: bold; text-transform: uppercase; } h1 { font-size: 16pt; text-align: center; margin: 30px 0; } h2 { font-size: 14pt; margin: 25px 0 15px 0; text-align: left;} h3 { font-size: 12pt; margin: 20px 0 10px 0; text-align: left; } p { text-indent: 2em; margin-bottom: 15px; text-align: justify; } .enderecamento { margin-bottom: 30px; text-align: justify; } .assinatura { text-align: center; margin-top: 50px; } .transcricao { margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-left: 4px solid #ccc; font-style: italic; white-space: pre-wrap; word-wrap: break-word; } .transcricao h4 { margin-top: 0; font-style: normal; font-weight: bold; } .transcricao-legislacao { border-left-color: #28a745; } .transcricao-jurisprudencia { border-left-color: #dc3545; } .transcricao-doutrina { border-left-color: #ffc107; }</style>"""
         return f'<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>{tipo_acao}</title>{css}</head>'
 
     def _gerar_secao_partes_html(self, autor: Dict, reu: Dict, tipo_acao: str) -> str:
@@ -148,7 +132,7 @@ class AgenteRedatorFinal:
         <h1>{tipo_acao}</h1>
         <h2>I - DAS PARTES</h2>
         <h3>DO(A) RECLAMANTE</h3>
-        <p><strong>{autor.get('nome', '[NOME DO AUTOR]')}</strong>, {autor.get('qualificacao', '[QUALIFICAÇÃO]')}, residente e domiciliado(a) no {autor.get('endereco', '[ENDEREÇO]')}, vem, por seu advogado que esta subscreve, propor a presente AÇÃO TRABALHISTA.</p>
+        <p><strong>{autor.get('nome', '[NOME DO AUTOR]')}</strong>, {autor.get('qualificacao', '[QUALIFICAÇÃO]')} residente e domiciliado(a) no {autor.get('endereco', '[ENDEREÇO]')}, vem, por seu advogado que esta subscreve, propor a presente.</p>
         <h3>DO(A) RECLAMADO(A)</h3>
         <p><strong>{reu.get('nome', '[NOME DO RÉU]')}</strong>, {reu.get('qualificacao', '[QUALIFICAÇÃO]')}, com sede em {reu.get('endereco', '[ENDEREÇO]')}, pelos fatos e fundamentos a seguir.</p>
         """
@@ -185,7 +169,6 @@ class AgenteRedatorFinal:
     def _gerar_secao_pedidos_html(self, pedidos: str) -> str:
         """Gera a seção 'Dos Pedidos' com formatação de lista."""
         pedidos_html = "<h2>IV - DOS PEDIDOS</h2><p>Ante o exposto, requer a Vossa Excelência:</p>"
-        # Formata os pedidos para que fiquem mais parecidos com uma lista
         lista_pedidos = [p.strip() for p in pedidos.split(',') if p.strip()]
         pedidos_html += "<ul>"
         for pedido in lista_pedidos:
@@ -220,21 +203,17 @@ class AgenteRedatorFinal:
         autor_info = dados_estruturados.get('autor', {})
         reu_info = dados_estruturados.get('reu', {})
         documento_basico = f"""
-        <!DOCTYPE html>
-        <html lang="pt-BR">
-        <head><meta charset="UTF-8"><title>Petição Inicial de Emergência</title></head>
-        <body>
-            <h1>PETIÇÃO INICIAL</h1>
-            <h2>I - Das Partes</h2>
-            <p>Autor: {autor_info.get('nome', '[NOME A SER PREENCHIDO]')}</p>
-            <p>Réu: {reu_info.get('nome', '[NOME A SER PREENCHIDO]')}</p>
-            <h2>II - Dos Fatos</h2>
-            <p>{dados_estruturados.get('fatos', '[FATOS A SEREM PREENCHIDOS]')}</p>
-            <h2>III - Dos Pedidos</h2>
-            <p>{dados_estruturados.get('pedidos', '[PEDIDOS A SEREM PREENCHIDOS]')}</p>
-            <p>Pede deferimento.</p>
-        </body>
-        </html>
+        <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Petição Inicial de Emergência</title></head><body>
+        <h1>PETIÇÃO INICIAL</h1>
+        <h2>I - Das Partes</h2>
+        <p>Autor: {autor_info.get('nome', '[NOME A SER PREENCHIDO]')}</p>
+        <p>Réu: {reu_info.get('nome', '[NOME A SER PREENCHIDO]')}</p>
+        <h2>II - Dos Fatos</h2>
+        <p>{dados_estruturados.get('fatos', '[FATOS A SEREM PREENCHIDOS]')}</p>
+        <h2>III - Dos Pedidos</h2>
+        <p>{dados_estruturados.get('pedidos', '[PEDIDOS A SEREM PREENCHIDOS]')}</p>
+        <p>Pede deferimento.</p>
+        </body></html>
         """
         return {
             "status": "emergencia",
