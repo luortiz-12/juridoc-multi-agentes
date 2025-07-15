@@ -22,6 +22,75 @@ class AgenteRedator:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.client = openai.OpenAI()
+    
+    def redigir_peticao_completa(self, dados_estruturados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Método principal chamado pelo orquestrador.
+        Redige petição completa usando inteligência jurídica avançada.
+        """
+        try:
+            print("✍️ Iniciando redação inteligente da petição...")
+            
+            # Gerar documento HTML usando inteligência avançada
+            documento_html = self.gerar_documento_html_puro(dados_estruturados, pesquisa_juridica)
+            
+            # Calcular estatísticas
+            tamanho_documento = len(documento_html)
+            score_qualidade = self._calcular_score_qualidade(documento_html, dados_estruturados, pesquisa_juridica)
+            
+            print(f"✅ Petição redigida com sucesso: {tamanho_documento} caracteres")
+            print(f"📊 Score de qualidade: {score_qualidade}")
+            
+            # Retornar no formato esperado pelo orquestrador e main.py
+            return {
+                "status": "sucesso",
+                "documento_html": documento_html,
+                "dados_estruturados": dados_estruturados,  # Incluir para compatibilidade com main.py
+                "metadados": {
+                    "timestamp": datetime.now().isoformat(),
+                    "tamanho_caracteres": tamanho_documento,
+                    "score_qualidade": score_qualidade,
+                    "pesquisas_utilizadas": {
+                        "legislacao": len(pesquisa_juridica.get('legislacao', [])),
+                        "jurisprudencia": len(pesquisa_juridica.get('jurisprudencia', [])),
+                        "doutrina": len(pesquisa_juridica.get('doutrina', []))
+                    },
+                    "estrategia_aplicada": "inteligencia_juridica_avancada"
+                }
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Erro na redação da petição: {e}")
+            return {
+                "status": "erro",
+                "erro": str(e),
+                "documento_html": self._gerar_documento_emergencia(dados_estruturados),
+                "dados_estruturados": dados_estruturados,
+                "metadados": {
+                    "timestamp": datetime.now().isoformat(),
+                    "erro_ocorrido": True
+                }
+            }
+    
+    def _calcular_score_qualidade(self, documento_html: str, dados_estruturados: Dict, pesquisas: Dict) -> int:
+        """Calcula score de qualidade do documento gerado."""
+        score = 60  # Base
+        
+        # Tamanho adequado
+        if len(documento_html) > 25000: score += 15
+        elif len(documento_html) > 20000: score += 10
+        elif len(documento_html) > 15000: score += 5
+        
+        # Uso das pesquisas
+        if pesquisas.get('legislacao'): score += 5
+        if pesquisas.get('jurisprudencia'): score += 5
+        if pesquisas.get('doutrina'): score += 5
+        
+        # Estrutura HTML
+        if '<h1>' in documento_html or '<h2>' in documento_html: score += 5
+        if 'style=' in documento_html or '<style>' in documento_html: score += 5
+        
+        return min(score, 100)
         
     def analisar_contexto_juridico(self, dados_formulario: Dict, pesquisas: Dict) -> Dict:
         """
