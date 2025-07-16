@@ -10,7 +10,7 @@ port = os.environ.get("PORT", "5000")
 command = [
     "gunicorn",
     "--chdir", "src",
-    "--timeout", "120",
+    "--timeout", "700",
     "--bind", f"0.0.0.0:{port}",
     "main:app"
 ]
