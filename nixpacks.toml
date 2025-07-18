@@ -1,0 +1,4 @@
+# nixpacks.toml
+
+[start]
+cmd = "gunicorn --chdir src --timeout 500 -w 4 main:app"
