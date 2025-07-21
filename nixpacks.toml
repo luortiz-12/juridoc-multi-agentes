@@ -1,4 +1,9 @@
-# nixpacks.toml
+# nixpacks.toml - Configuração explícita para a Railway conforme a documentação oficial.
 
+# Define a fase de "start" (inicialização) da aplicação.
+# Esta configuração tem a prioridade mais alta e irá sobrepor qualquer detecção automática.
 [start]
-cmd = "gunicorn --chdir src --timeout 500 -w 4 main:app"
+
+# Comando exato a ser executado, com o timeout aumentado para 600 segundos (10 minutos).
+# Usamos 2 workers para otimizar o uso de memória no seu plano.
+cmd = "gunicorn --chdir src -w 2 --timeout 600 main:app"
