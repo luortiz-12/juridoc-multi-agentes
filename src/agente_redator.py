@@ -1,4 +1,4 @@
-# agente_redator.py - Agente Redator Inteligente e Otimizado
+# agente_redator.py - Agente Redator Inteligente, Otimizado e Funcional
 
 import json
 import logging
@@ -7,16 +7,15 @@ import os
 from typing import Dict, List, Any
 import re
 from datetime import datetime
-import traceback # <--- CORREÇÃO: Módulo traceback importado
+import traceback # <--- CORREÇÃO 1: Módulo traceback importado para tratamento de erros.
 
 class AgenteRedator:
     """
     Agente Redator Inteligente que:
-    1. Analisa o conteúdo do formulário e das pesquisas usando IA.
+    1. Analisa o contexto do caso usando IA para definir estratégias.
     2. Pré-processa legislação, jurisprudência e doutrina em blocos de HTML fundamentados.
     3. Usa os blocos pré-processados para redigir um documento final coeso e de alta qualidade.
-    4. Retorna APENAS HTML puro do documento.
-    5. É superior a um advogado na qualidade dos documentos.
+    4. Retorna APENAS o HTML puro do documento.
     
     SEMPRE USA IA - SEM FALLBACKS - COM TIMEOUTS AJUSTADOS
     """
@@ -24,9 +23,6 @@ class AgenteRedator:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         
-        # --- COMENTÁRIO: Configuração do cliente OpenAI ---
-        # Garante que a chave de API seja carregada e define um timeout global
-        # como uma camada de segurança.
         api_key = os.getenv('OPENAI_API_KEY')
         if not api_key:
             print("❌ ERRO: OPENAI_API_KEY não encontrada nas variáveis de ambiente")
@@ -50,8 +46,8 @@ class AgenteRedator:
             
             documento_html = self.gerar_documento_html_puro(dados_estruturados, pesquisa_juridica)
             
-            # --- CORREÇÃO: Chamada para a função de score agora funciona ---
             tamanho_documento = len(documento_html)
+            # --- CORREÇÃO 2: A chamada para a função de score agora funciona ---
             score_qualidade = self._calcular_score_qualidade(documento_html, dados_estruturados, pesquisa_juridica)
             
             print(f"✅ Petição redigida com IA: {tamanho_documento} caracteres")
@@ -94,19 +90,17 @@ class AgenteRedator:
 
     def _calcular_score_qualidade(self, documento_html: str, dados_estruturados: Dict, pesquisas: Dict) -> int:
         """
-        Método restaurado para calcular o score de qualidade do documento gerado.
+        CORREÇÃO 3: Método restaurado para calcular o score de qualidade do documento gerado.
         """
-        score = 60  # Base
-        
-        if len(documento_html) > 25000: score += 15
+        score = 60
+        if len(documento_html) > 30000: score += 15
         elif len(documento_html) > 20000: score += 10
-        elif len(documento_html) > 15000: score += 5
         
         if pesquisas.get('legislacao'): score += 5
         if pesquisas.get('jurisprudencia'): score += 5
         if pesquisas.get('doutrina'): score += 5
         
-        if '<h1>' in documento_html or '<h2>' in documento_html: score += 5
+        if '<h1>' in documento_html and '<h2>' in documento_html: score += 5
         if 'style=' in documento_html or '<style>' in documento_html: score += 5
         
         return min(score, 100)
@@ -172,12 +166,12 @@ class AgenteRedator:
               "legislacao": {{"modo": "citacao_inteligente", "max_artigos": 3}},
               "jurisprudencia": {{"modo": "resumo_elaborado", "max_casos": 2}},
               "doutrina": {{"modo": "elaboracao_propria", "max_autores": 2}},
-              "tamanho_alvo": 20000
+              "tamanho_alvo": 30000
             }}
 
             Instruções para a decisão:
             - Se os fatos envolverem assédio ou dano moral, o modo da jurisprudência deve ser 'transcricao_seletiva'.
-            - O 'tamanho_alvo' deve ser no mínimo 20000. Se houver menção a assédio, aumente para 30000.
+            - O 'tamanho_alvo' deve ser no mínimo 30000.
             - Retorne APENAS o objeto JSON.
             """
             
@@ -201,7 +195,7 @@ class AgenteRedator:
             'legislacao': {'modo': 'citacao_inteligente', 'max_artigos': 3},
             'jurisprudencia': {'modo': 'resumo_elaborado', 'max_casos': 2},
             'doutrina': {'modo': 'elaboracao_propria', 'max_autores': 2},
-            'tamanho_alvo': 20000
+            'tamanho_alvo': 30000
         }
 
     def processar_legislacao_inteligente(self, legislacao: List[Dict], estrategia: Dict, contexto_caso: str) -> str:
@@ -212,6 +206,7 @@ class AgenteRedator:
             print("⚖️ Processando legislação com IA...")
             if not legislacao: return ""
 
+            # --- OTIMIZAÇÃO: Envia apenas um trecho relevante do texto para a IA ---
             textos_legislacao = [f"FONTE: {item.get('url', '')}\nTEXTO: {item.get('texto', '')[:4000]}" for item in legislacao[:estrategia.get('max_artigos', 3)]]
             
             prompt_legislacao = f"""
@@ -236,7 +231,7 @@ class AgenteRedator:
             </div>
             """
             
-            return self._chamar_openai_com_log(prompt_legislacao, "gpt-4", 1500, 0.3, 120)
+            return self._chamar_openai_com_log(prompt_legislacao, "gpt-4", 2000, 0.3, 180)
         
         except Exception as e:
             print(f"❌ ERRO no processamento de legislação: {e}")
@@ -268,7 +263,7 @@ class AgenteRedator:
             3. Retorne um único bloco de HTML formatado profissionalmente.
             """
             
-            return self._chamar_openai_com_log(prompt_jurisprudencia, "gpt-4", 1500, 0.3, 120)
+            return self._chamar_openai_com_log(prompt_jurisprudencia, "gpt-4", 2000, 0.3, 180)
         
         except Exception as e:
             print(f"❌ ERRO no processamento de jurisprudência: {e}")
@@ -299,7 +294,7 @@ class AgenteRedator:
             4. Retorne um único bloco de HTML formatado profissionalmente.
             """
             
-            return self._chamar_openai_com_log(prompt_doutrina, "gpt-4", 1500, 0.4, 120)
+            return self._chamar_openai_com_log(prompt_doutrina, "gpt-4", 2000, 0.4, 180)
         
         except Exception as e:
             print(f"❌ ERRO no processamento de doutrina: {e}")
@@ -359,7 +354,7 @@ class AgenteRedator:
         try:
             print("🎯 Montando o documento final com IA...")
             
-            tamanho_alvo = estrategias.get('tamanho_alvo', 20000)
+            tamanho_alvo = estrategias.get('tamanho_alvo', 30000)
             
             prompt_documento = f"""
             Você é um advogado sênior, especialista em redação de petições. Sua tarefa é redigir uma petição inicial trabalhista completa, coesa e persuasiva, utilizando os blocos de informação fornecidos.
@@ -384,9 +379,9 @@ class AgenteRedator:
 
             INSTRUÇÕES FINAIS DE REDAÇÃO:
             1. Crie uma petição inicial completa com no mínimo {tamanho_alvo} caracteres.
-            2. Use os dados do caso para preencher as seções de Qualificação e Fatos.
-            3. Na seção "DO DIREITO", integre os três blocos de fundamentação de forma natural e coesa. Crie uma narrativa jurídica fluida.
-            4. Formule a seção "DOS PEDIDOS" de forma clara e objetiva.
+            2. Use os dados do caso para preencher as seções de Qualificação e Fatos de forma detalhada.
+            3. Na seção "DO DIREITO", integre os três blocos de fundamentação de forma natural e coesa. Crie uma narrativa jurídica fluida e robusta.
+            4. Formule a seção "DOS PEDIDOS" de forma clara e objetiva, baseada nos pedidos fornecidos.
             5. Retorne APENAS o código HTML completo do documento. Não inclua explicações ou comentários.
             6. Utilize um CSS inline profissional e elegante, com boa tipografia (ex: 'Times New Roman', serif), espaçamento adequado e uma estrutura limpa.
 
@@ -406,3 +401,4 @@ class AgenteRedator:
         elif 'jusbrasil.com.br' in url: return 'JusBrasil'
         elif 'jus.com.br' in url: return 'Jus Navigandi'
         else: return 'Doutrina especializada'
+
