@@ -27,8 +27,8 @@ class PesquisaJuridica:
         self.config = {
             'tamanho_minimo_conteudo': 1000,      # Mínimo 1000 caracteres por conteúdo
             'tamanho_maximo_conteudo': 30000,     # Máximo 30000 caracteres por conteúdo
-            'max_sites_por_query': 5,             # Máximo 5 sites por query
-            'max_paginas_por_site': 7,            # Máximo 7 páginas por site
+            'max_sites_por_query': 2,             # Máximo 2 sites por query
+            'max_paginas_por_site': 3,            # Máximo 3 páginas por site
             'timeout_por_pagina': 1,             # 1 segundos por página
             'delay_entre_paginas': (1, 2),        # 1-2 segundos entre páginas
             'profundidade_navegacao': 3,          # Até 3 níveis de profundidade
