@@ -1,4 +1,4 @@
-# agente_redator_timeout_corrigido.py - Agente Redator com Timeout Corrigido
+# agente_redator.py - Agente Redator Inteligente e Otimizado
 
 import json
 import logging
@@ -11,21 +11,21 @@ from datetime import datetime
 class AgenteRedator:
     """
     Agente Redator Inteligente que:
-    1. Analisa o conteúdo do formulário e das pesquisas
-    2. Decide inteligentemente quando transcrever na íntegra vs quando usar como base
-    3. Para leis: entende e cita com resumo (não transcrição completa)
-    4. Para jurisprudência: decide caso a caso se transcreve ou resume
-    5. Para doutrina: sempre usa como base para elaborar texto próprio
-    6. Retorna APENAS HTML puro do documento
-    7. É superior a um advogado na qualidade dos documentos
+    1. Analisa o conteúdo do formulário e das pesquisas usando IA.
+    2. Pré-processa legislação, jurisprudência e doutrina em blocos de HTML fundamentados.
+    3. Usa os blocos pré-processados para redigir um documento final coeso e de alta qualidade.
+    4. Retorna APENAS o HTML puro do documento.
+    5. É superior a um advogado na qualidade dos documentos.
     
-    SEMPRE USA IA - SEM FALLBACKS - COM TIMEOUT CORRIGIDO
+    SEMPRE USA IA - SEM FALLBACKS - COM TIMEOUTS AJUSTADOS
     """
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         
-        # Configurar OpenAI com logs claros e timeout
+        # --- COMENTÁRIO: Configuração do cliente OpenAI ---
+        # Garante que a chave de API seja carregada e define um timeout global
+        # como uma camada de segurança, embora cada chamada terá seu próprio timeout.
         api_key = os.getenv('OPENAI_API_KEY')
         if not api_key:
             print("❌ ERRO: OPENAI_API_KEY não encontrada nas variáveis de ambiente")
@@ -33,33 +33,29 @@ class AgenteRedator:
         
         print(f"✅ OPENAI_API_KEY encontrada: {api_key[:10]}...{api_key[-4:]}")
         
-        # Cliente OpenAI com timeout configurado
         self.client = openai.OpenAI(
             api_key=api_key,
-            timeout=120.0  # Timeout global de 2 minutos
+            timeout=300.0  # Timeout global de 5 minutos, para segurança.
         )
-        print("✅ Cliente OpenAI inicializado com timeout de 120 segundos")
-    
+        print("✅ Cliente OpenAI inicializado com sucesso.")
+
     def redigir_peticao_completa(self, dados_estruturados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> Dict[str, Any]:
         """
         Método principal chamado pelo orquestrador.
-        Redige petição completa usando SEMPRE IA.
+        Redige a petição completa usando SEMPRE IA.
         """
         try:
             print("✍️ Iniciando redação inteligente da petição com IA...")
-            print("🤖 Modo: SEMPRE IA - SEM FALLBACKS - TIMEOUT CORRIGIDO")
             
-            # Gerar documento HTML usando SEMPRE IA
+            # --- COMENTÁRIO: Execução do fluxo principal de redação ---
             documento_html = self.gerar_documento_html_puro(dados_estruturados, pesquisa_juridica)
             
-            # Calcular estatísticas
             tamanho_documento = len(documento_html)
             score_qualidade = self._calcular_score_qualidade(documento_html, dados_estruturados, pesquisa_juridica)
             
             print(f"✅ Petição redigida com IA: {tamanho_documento} caracteres")
             print(f"📊 Score de qualidade: {score_qualidade}")
             
-            # Retornar no formato esperado pelo orquestrador e main.py
             return {
                 "status": "sucesso",
                 "documento_html": documento_html,
@@ -73,16 +69,15 @@ class AgenteRedator:
                         "jurisprudencia": len(pesquisa_juridica.get('jurisprudencia', [])),
                         "doutrina": len(pesquisa_juridica.get('doutrina', []))
                     },
-                    "estrategia_aplicada": "inteligencia_juridica_ia_pura_timeout_corrigido",
+                    "estrategia_aplicada": "inteligencia_juridica_ia_pura",
                     "ia_funcionou": True
                 }
             }
-            
+        
         except Exception as e:
-            print(f"❌ ERRO na redação da petição: {e}")
-            self.logger.error(f"Erro na redação da petição: {e}")
+            print(f"❌ ERRO GERAL na redação da petição: {e}")
+            self.logger.error(f"Erro na redação da petição: {traceback.format_exc()}")
             
-            # SEM FALLBACK - Retorna erro
             return {
                 "status": "erro",
                 "erro": str(e),
@@ -95,355 +90,220 @@ class AgenteRedator:
                     "motivo_erro": str(e)
                 }
             }
-    
-    def _calcular_score_qualidade(self, documento_html: str, dados_estruturados: Dict, pesquisas: Dict) -> int:
-        """Calcula score de qualidade do documento gerado."""
-        score = 60  # Base
-        
-        # Tamanho adequado
-        if len(documento_html) > 25000: score += 15
-        elif len(documento_html) > 20000: score += 10
-        elif len(documento_html) > 15000: score += 5
-        
-        # Uso das pesquisas
-        if pesquisas.get('legislacao'): score += 5
-        if pesquisas.get('jurisprudencia'): score += 5
-        if pesquisas.get('doutrina'): score += 5
-        
-        # Estrutura HTML
-        if '<h1>' in documento_html or '<h2>' in documento_html: score += 5
-        if 'style=' in documento_html or '<style>' in documento_html: score += 5
-        
-        return min(score, 100)
-    
-    def _chamar_openai_com_log(self, prompt: str, model: str = "gpt-4", max_tokens: int = 1000, temperature: float = 0.3, timeout_especifico: int = None) -> str:
+
+    def _chamar_openai_com_log(self, prompt: str, model: str, max_tokens: int, temperature: float, timeout_especifico: int) -> str:
         """
-        Método centralizado para chamar OpenAI com logs claros e timeout configurado.
+        Método centralizado para chamar a API da OpenAI com logs e timeout específico.
         """
         try:
-            print(f"🤖 Chamando OpenAI - Modelo: {model}, Tokens: {max_tokens}")
-            print(f"📝 Prompt (primeiros 100 chars): {prompt[:100]}...")
-            print(f"⏱️ Timeout configurado: {timeout_especifico or 120} segundos")
+            print(f"🤖 Chamando OpenAI - Modelo: {model}, Tokens de Resposta: {max_tokens}, Timeout: {timeout_especifico}s")
+            print(f"📝 Prompt (primeiros 150 chars): {prompt[:150].strip().replace(chr(10), ' ')}...")
             
-            # Usar timeout específico se fornecido, senão usar o padrão do cliente
-            if timeout_especifico:
-                response = self.client.chat.completions.create(
-                    model=model,
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    timeout=timeout_especifico
-                )
-            else:
-                response = self.client.chat.completions.create(
-                    model=model,
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=max_tokens,
-                    temperature=temperature
-                )
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=float(timeout_especifico)
+            )
             
             resultado = response.choices[0].message.content.strip()
             print(f"✅ OpenAI respondeu com sucesso: {len(resultado)} caracteres")
-            
             return resultado
-            
+        
         except Exception as e:
-            print(f"❌ ERRO na chamada OpenAI: {e}")
-            print(f"🔧 Modelo: {model}, Tokens: {max_tokens}, Timeout: {timeout_especifico or 120}s")
+            print(f"❌ ERRO na chamada à API da OpenAI: {e}")
+            self.logger.error(f"Erro na chamada OpenAI: {traceback.format_exc()}")
             raise e
-    
-    def analisar_contexto_juridico(self, dados_formulario: Dict, pesquisas: Dict) -> Dict:
-        """
-        Analisa o contexto jurídico usando IA para determinar estratégias inteligentes.
-        """
-        try:
-            print("🧠 Analisando contexto jurídico com IA...")
-            
-            # Preparar dados para análise
-            fatos = dados_formulario.get('fatos', '')
-            area_direito = dados_formulario.get('area_direito', '')
-            tipo_acao = dados_formulario.get('tipo_acao', '')
-            valor_causa = dados_formulario.get('valor_causa', 0)
-            
-            # Usar IA para analisar contexto - PROMPT COMPLETO MANTIDO
-            prompt_analise = f"""
-            Você é um advogado expert. Analise este caso jurídico e determine estratégias inteligentes:
-            
-            DADOS DO CASO:
-            - Área do direito: {area_direito}
-            - Tipo de ação: {tipo_acao}
-            - Fatos: {fatos}
-            - Valor da causa: {valor_causa}
-            
-            PESQUISAS DISPONÍVEIS:
-            - Legislação: {len(pesquisas.get('legislacao', []))} itens
-            - Jurisprudência: {len(pesquisas.get('jurisprudencia', []))} itens
-            - Doutrina: {len(pesquisas.get('doutrina', []))} itens
-            
-            CONTEÚDO DAS PESQUISAS PARA ANÁLISE:
-            
-            LEGISLAÇÃO ENCONTRADA:
-            {self._preparar_resumo_pesquisas(pesquisas.get('legislacao', []), 'legislacao')}
-            
-            JURISPRUDÊNCIA ENCONTRADA:
-            {self._preparar_resumo_pesquisas(pesquisas.get('jurisprudencia', []), 'jurisprudencia')}
-            
-            DOUTRINA ENCONTRADA:
-            {self._preparar_resumo_pesquisas(pesquisas.get('doutrina', []), 'doutrina')}
-            
-            Retorne um JSON com estratégias para:
-            1. legislacao: como usar (citacao_inteligente/citacao_simples, max_artigos, transcrever_integral: false)
-            2. jurisprudencia: como usar (transcricao_seletiva/resumo_elaborado/citacao_resumida, max_casos)
-            3. doutrina: como usar (elaboracao_propria sempre, max_autores)
-            4. complexidade: muito_alta/alta/media/baixa
-            5. tamanho_alvo: número de caracteres alvo (mínimo 25000)
-            
-            Seja inteligente na análise. Para leis NUNCA transcrever integral, sempre resumir.
-            Para jurisprudência decidir caso a caso se transcreve ou resume baseado na relevância.
-            Para doutrina SEMPRE elaborar texto próprio.
-            """
-            
-            resposta_ia = self._chamar_openai_com_log(prompt_analise, "gpt-4", 1000, 0.2, 90)
-            
-            # Tentar parsear JSON da resposta
-            try:
-                estrategias = json.loads(resposta_ia)
-                print("✅ Estratégias analisadas pela IA com sucesso")
-                return estrategias
-            except:
-                print("⚠️ IA não retornou JSON válido, usando estratégias padrão")
-                return self._estrategias_padrao()
-                
-        except Exception as e:
-            print(f"❌ ERRO na análise de contexto: {e}")
-            raise e
-    
+
     def _preparar_resumo_pesquisas(self, pesquisas: List[Dict], tipo: str) -> str:
-        """Prepara resumo das pesquisas para análise pela IA."""
+        """
+        Cria um resumo conciso dos itens de pesquisa para serem usados no prompt de análise.
+        """
         if not pesquisas:
             return f"Nenhuma {tipo} encontrada."
         
         resumos = []
-        for i, item in enumerate(pesquisas[:5]):  # Limitar a 5 itens para não exceder tokens
-            texto = item.get('texto', '')[:500]  # Primeiros 500 chars
+        for i, item in enumerate(pesquisas[:3]):  # Limita a 3 itens para o resumo
+            texto_resumido = item.get('texto', '')[:300]
             url = item.get('url', '')
-            resumos.append(f"{i+1}. URL: {url}\nTexto: {texto}...")
+            resumos.append(f"{i+1}. URL: {url}\nTrecho: {texto_resumido}...")
         
         return "\n\n".join(resumos)
-    
-    def _estrategias_padrao(self) -> Dict:
-        """Estratégias padrão quando IA não consegue analisar."""
-        return {
-            'legislacao': {'modo': 'citacao_inteligente', 'max_artigos': 4, 'transcrever_integral': False},
-            'jurisprudencia': {'modo': 'resumo_elaborado', 'max_casos': 3},
-            'doutrina': {'modo': 'elaboracao_propria', 'max_autores': 3},
-            'complexidade': 'media',
-            'tamanho_alvo': 25000
-        }
-    
+
+    def analisar_contexto_juridico(self, dados_formulario: Dict, pesquisas: Dict) -> Dict:
+        """
+        Usa a IA para analisar o contexto e definir as estratégias de redação.
+        """
+        try:
+            print("🧠 Analisando contexto jurídico com IA...")
+            
+            prompt_analise = f"""
+            Você é um advogado estrategista. Analise o caso abaixo e retorne um JSON com as melhores estratégias de redação.
+
+            DADOS DO CASO:
+            - Fatos: {dados_formulario.get('fatos', '')[:1000]}
+            - Pedidos: {dados_formulario.get('pedidos', '')}
+            - Resumo da Pesquisa de Legislação: {self._preparar_resumo_pesquisas(pesquisas.get('legislacao', []), 'legislação')}
+            - Resumo da Pesquisa de Jurisprudência: {self._preparar_resumo_pesquisas(pesquisas.get('jurisprudencia', []), 'jurisprudência')}
+
+            Com base na análise, retorne um objeto JSON com a seguinte estrutura:
+            {{
+              "legislacao": {{"modo": "citacao_inteligente", "max_artigos": 3, "transcrever_integral": false}},
+              "jurisprudencia": {{"modo": "resumo_elaborado", "max_casos": 2}},
+              "doutrina": {{"modo": "elaboracao_propria", "max_autores": 2}},
+              "complexidade": "media",
+              "tamanho_alvo": 20000
+            }}
+
+            Instruções para a decisão:
+            - Se os fatos envolverem assédio ou dano moral, a complexidade é 'alta'.
+            - Se a jurisprudência do TST/STF for muito relevante, o modo deve ser 'transcricao_seletiva'.
+            - O 'tamanho_alvo' deve ser no mínimo 20000. Se a complexidade for 'alta', aumente para 30000.
+            - Retorne APENAS o objeto JSON.
+            """
+            
+            resposta_ia = self._chamar_openai_com_log(prompt_analise, "gpt-4", 800, 0.1, 90)
+            
+            # Extrai o JSON da resposta da IA, mesmo que tenha texto adicional.
+            match = re.search(r'\{.*\}', resposta_ia, re.DOTALL)
+            if match:
+                estrategias = json.loads(match.group(0))
+                print("✅ Estratégias analisadas pela IA com sucesso")
+                return estrategias
+            else:
+                print("⚠️ IA não retornou JSON válido, usando estratégias padrão")
+                return self._estrategias_padrao()
+        
+        except Exception as e:
+            print(f"❌ ERRO na análise de contexto com IA: {e}")
+            raise e
+
     def processar_legislacao_inteligente(self, legislacao: List[Dict], estrategia: Dict, contexto_caso: str) -> str:
         """
-        Processa legislação usando IA - NUNCA transcreve na íntegra.
-        PROMPT COMPLETO MANTIDO.
+        Usa a IA para criar um bloco HTML com resumos e aplicação da legislação ao caso.
         """
         try:
             print("⚖️ Processando legislação com IA...")
-            
-            if not legislacao:
-                return "<div class='fundamentacao-legal'><p>Fundamentação legal será aplicada conforme legislação vigente.</p></div>"
-            
-            # Preparar textos da legislação - CONTEÚDO COMPLETO
-            textos_legislacao = []
-            for item in legislacao[:estrategia.get('max_artigos', 4)]:
-                texto = item.get('texto', '')  # SEM LIMITAÇÃO - TEXTO COMPLETO
-                url = item.get('url', '')
-                textos_legislacao.append(f"FONTE: {url}\nTEXTO COMPLETO: {texto}")
+            if not legislacao: return ""
+
+            textos_legislacao = [f"FONTE: {item.get('url', '')}\nTEXTO: {item.get('texto', '')[:4000]}" for item in legislacao[:estrategia.get('max_artigos', 3)]]
             
             prompt_legislacao = f"""
-            Você é um advogado expert superior a qualquer advogado humano. Processe esta legislação para o caso específico:
-            
-            CASO ESPECÍFICO:
-            {contexto_caso}
-            
-            LEGISLAÇÃO ENCONTRADA (TEXTO COMPLETO):
+            Você é um advogado sênior. Analise os dispositivos legais abaixo e sua aplicação a um caso concreto.
+
+            CASO CONCRETO: "{contexto_caso[:1000]}"
+
+            DISPOSITIVOS LEGAIS:
             {chr(10).join(textos_legislacao)}
+
+            INSTRUÇÕES:
+            1. Para cada dispositivo, escreva um parágrafo explicando sua essência.
+            2. Em seguida, escreva um segundo parágrafo conectando o dispositivo diretamente aos fatos do caso.
+            3. NUNCA transcreva a lei. Crie um texto próprio.
+            4. Retorne um único bloco de HTML formatado profissionalmente, contendo todos os artigos analisados.
             
-            INSTRUÇÕES ESPECÍFICAS:
-            1. NUNCA transcreva leis na íntegra no documento final
-            2. SEMPRE analise o texto completo e crie resumo próprio com suas palavras
-            3. Extraia números dos artigos relevantes (Art. X, Art. Y)
-            4. Explique detalhadamente como cada lei se aplica ao caso específico
-            5. Use linguagem jurídica formal, técnica e persuasiva
-            6. Conecte cada dispositivo legal aos fatos do caso
-            7. Seja superior a um advogado humano na análise e aplicação
-            
-            Retorne HTML formatado profissionalmente:
-            - <div class="fundamentacao-legal"> para cada lei processada
-            - <h4> para título com número do artigo e nome da lei
-            - <p> para explicação detalhada da aplicação ao caso
-            - <p class="aplicacao-caso"> para conexão específica com os fatos
-            - <p class="fonte-legal"> para fonte
-            
-            Use TODO o conteúdo das leis para criar fundamentação sólida e superior.
+            Exemplo de formato para UM artigo:
+            <div class='fundamentacao-item'>
+              <h4>Do Art. 483 da CLT – A Rescisão Indireta</h4>
+              <p>O artigo 483 da Consolidação das Leis do Trabalho (CLT) estabelece as hipóteses em que o empregado pode considerar o contrato de trabalho rescindido por falta grave do empregador...</p>
+              <p class='aplicacao-caso'>No presente caso, a conduta da Reclamada de não pagar as horas extras e de permitir um ambiente com assédio moral se enquadra diretamente na alínea 'd' do referido artigo...</p>
+            </div>
             """
             
-            resultado_ia = self._chamar_openai_com_log(prompt_legislacao, "gpt-4", 1500, 0.3, 90)
-            print("✅ Legislação processada pela IA")
-            
-            return resultado_ia
-            
+            return self._chamar_openai_com_log(prompt_legislacao, "gpt-4", 1500, 0.3, 120)
+        
         except Exception as e:
             print(f"❌ ERRO no processamento de legislação: {e}")
             raise e
-    
+
     def processar_jurisprudencia_inteligente(self, jurisprudencia: List[Dict], estrategia: Dict, contexto_caso: str) -> str:
         """
-        Processa jurisprudência usando IA - decide quando transcrever vs resumir.
-        PROMPT COMPLETO MANTIDO.
+        Usa a IA para criar um bloco HTML com análise da jurisprudência, decidindo se resume ou transcreve trechos.
         """
         try:
             print("🏛️ Processando jurisprudência com IA...")
-            
-            if not jurisprudencia:
-                return "<div class='jurisprudencia'><p>Jurisprudência aplicável será considerada conforme precedentes.</p></div>"
-            
-            # Preparar textos da jurisprudência - CONTEÚDO COMPLETO
-            textos_jurisprudencia = []
-            for item in jurisprudencia[:estrategia.get('max_casos', 3)]:
-                texto = item.get('texto', '')  # SEM LIMITAÇÃO - TEXTO COMPLETO
-                url = item.get('url', '')
-                textos_jurisprudencia.append(f"FONTE: {url}\nDECISÃO COMPLETA: {texto}")
-            
-            modo = estrategia.get('modo', 'resumo_elaborado')
+            if not jurisprudencia: return ""
+
+            textos_jurisprudencia = [f"FONTE: {item.get('url', '')}\nDECISÃO: {item.get('texto', '')[:4000]}" for item in jurisprudencia[:estrategia.get('max_casos', 2)]]
             
             prompt_jurisprudencia = f"""
-            Você é um advogado expert superior a qualquer advogado humano. Processe esta jurisprudência para o caso específico:
-            
-            CASO ESPECÍFICO:
-            {contexto_caso}
-            
-            MODO DE PROCESSAMENTO: {modo}
-            
-            JURISPRUDÊNCIA ENCONTRADA (TEXTO COMPLETO):
+            Você é um advogado especialista em jurisprudência. Analise as decisões abaixo e sua aplicação a um caso concreto.
+
+            CASO CONCRETO: "{contexto_caso[:1000]}"
+
+            DECISÕES ENCONTRADAS:
             {chr(10).join(textos_jurisprudencia)}
-            
-            INSTRUÇÕES ESPECÍFICAS:
-            1. Analise CADA decisão completa e decida inteligentemente:
-               - Se for caso FUNDAMENTAL (TST/STF/STJ + extremamente relevante): transcreva trechos mais importantes
-               - Se for caso MUITO RELEVANTE: resuma detalhadamente com análise profunda
-               - Se for caso RELEVANTE: cite com resumo elaborado
-               - Se for caso COMUM: cite brevemente
-            
-            2. Para cada decisão, inclua obrigatoriamente:
-               - Tribunal que decidiu (extrair da URL e texto)
-               - Número do processo se disponível
-               - Resumo ou transcrição conforme relevância determinada
-               - Análise detalhada de como se aplica ao caso atual
-               - Conexão específica com os fatos do caso
-               - Fonte completa
-            
-            3. Use HTML formatado profissionalmente:
-               - <div class="jurisprudencia-integral"> para transcrições de casos fundamentais
-               - <div class="jurisprudencia-analisada"> para resumos elaborados
-               - <div class="jurisprudencia-citada"> para citações breves
-               - <blockquote> para trechos transcritos literalmente
-               - <p> para análises e conexões com o caso
-               - <h5> para identificação do tribunal e processo
-            
-            4. Seja superior a um advogado humano na análise jurisprudencial
-            5. Use TODO o conteúdo das decisões para fundamentação sólida
-            6. Conecte cada precedente aos fatos específicos do caso
+
+            INSTRUÇÕES:
+            1. Para cada decisão, identifique o tribunal e o ponto principal.
+            2. Se a decisão for de um Tribunal Superior (TST, STF) e diretamente aplicável, transcreva o trecho mais relevante dentro de um `<blockquote>`.
+            3. Para todas as decisões, escreva um parágrafo de análise, explicando como o precedente fortalece a tese do caso concreto.
+            4. Retorne um único bloco de HTML formatado profissionalmente.
+
+            Exemplo de formato:
+            <div class='fundamentacao-item'>
+              <h4>Entendimento do Tribunal Superior do Trabalho sobre Assédio Moral</h4>
+              <p>O TST possui entendimento consolidado de que o assédio moral, caracterizado por condutas abusivas, gera o dever de indenizar...</p>
+              <blockquote>"A prática de assédio moral pelo empregador gera direito à indenização por danos morais..."</blockquote>
+              <p class='aplicacao-caso'>Tal precedente é diretamente aplicável ao caso, uma vez que a Reclamante foi submetida a cobranças vexatórias e humilhantes de forma contínua...</p>
+            </div>
             """
             
-            resultado_ia = self._chamar_openai_com_log(prompt_jurisprudencia, "gpt-4", 2000, 0.3, 90)
-            print("✅ Jurisprudência processada pela IA")
-            
-            return resultado_ia
-            
+            return self._chamar_openai_com_log(prompt_jurisprudencia, "gpt-4", 1500, 0.3, 120)
+        
         except Exception as e:
             print(f"❌ ERRO no processamento de jurisprudência: {e}")
             raise e
-    
+
     def processar_doutrina_inteligente(self, doutrina: List[Dict], estrategia: Dict, contexto_caso: str) -> str:
         """
-        Processa doutrina usando IA - SEMPRE elabora texto próprio.
-        PROMPT COMPLETO MANTIDO.
+        Usa a IA para criar um bloco HTML com um texto autoral baseado na doutrina pesquisada.
         """
         try:
             print("📚 Processando doutrina com IA...")
-            
-            if not doutrina:
-                return "<div class='fundamentacao-doutrinaria'><p>Fundamentação doutrinária será aplicada conforme entendimento especializado.</p></div>"
-            
-            # Preparar textos da doutrina - CONTEÚDO COMPLETO
-            textos_doutrina = []
-            for item in doutrina[:estrategia.get('max_autores', 3)]:
-                texto = item.get('texto', '')  # SEM LIMITAÇÃO - TEXTO COMPLETO
-                url = item.get('url', '')
-                autor = self._extrair_autor_doutrina(url)
-                textos_doutrina.append(f"AUTOR: {autor}\nFONTE: {url}\nTEXTO COMPLETO: {texto}")
+            if not doutrina: return ""
+
+            textos_doutrina = [f"AUTOR: {self._extrair_autor_doutrina(item.get('url', ''))}\nTEXTO: {item.get('texto', '')[:4000]}" for item in doutrina[:estrategia.get('max_autores', 2)]]
             
             prompt_doutrina = f"""
-            Você é um advogado expert superior a qualquer advogado humano. Processe esta doutrina para o caso específico:
-            
-            CASO ESPECÍFICO:
-            {contexto_caso}
-            
-            DOUTRINA ENCONTRADA (TEXTO COMPLETO):
+            Você é um jurista renomado. Com base nos textos doutrinários abaixo, elabore um texto autoral sobre os temas abordados e sua aplicação ao caso concreto.
+
+            CASO CONCRETO: "{contexto_caso[:1000]}"
+
+            TEXTOS DOUTRINÁRIOS DE BASE:
             {chr(10).join(textos_doutrina)}
-            
-            INSTRUÇÕES ESPECÍFICAS:
-            1. NUNCA transcreva a doutrina na íntegra
-            2. SEMPRE elabore texto próprio baseado no conteúdo completo analisado
-            3. Use os conceitos doutrinários como base para argumentação jurídica sólida
-            4. Aplique os conceitos especificamente ao caso apresentado
-            5. Construa argumentação jurídica superior e persuasiva
-            6. Cite os autores adequadamente com referência completa
-            7. Conecte cada conceito doutrinário aos fatos do caso
-            8. Seja superior a um advogado humano na elaboração doutrinária
-            
-            Retorne HTML formatado profissionalmente:
-            - <div class="fundamentacao-doutrinaria"> como container principal
-            - <h4> para título da seção doutrinária
-            - <p> para parágrafos elaborados (4-6 parágrafos extensos)
-            - <p class="aplicacao-doutrinaria"> para aplicação ao caso específico
-            - <p><strong>Referências Doutrinárias:</strong> para citar autores e fontes
-            
-            Use suas próprias palavras baseadas na análise completa dos textos.
-            Crie argumentação jurídica sólida e superior conectada ao caso.
+
+            INSTRUÇÕES:
+            1. NUNCA transcreva os textos. Use-os como inspiração e base conceitual.
+            2. Elabore um texto autoral de 3 a 4 parágrafos, construindo uma argumentação coesa sobre os temas (ex: rescisão indireta, dano moral).
+            3. Conecte sua argumentação doutrinária diretamente aos fatos do caso.
+            4. Retorne um único bloco de HTML formatado profissionalmente.
+
+            Exemplo de formato:
+            <div class='fundamentacao-item'>
+              <h4>Da Configuração do Assédio Moral e o Dever de Indenizar</h4>
+              <p>A doutrina pátria é uníssona ao definir o assédio moral como a exposição prolongada e repetitiva do trabalhador a situações humilhantes e constrangedoras...</p>
+              <p class='aplicacao-caso'>No caso da Reclamante, as cobranças vexatórias realizadas pelo Sr. Gerson, de forma pública e reiterada, configuram um exemplo clássico da conduta descrita pela doutrina, atentando contra sua dignidade e tornando o ambiente de trabalho insustentável...</p>
+            </div>
             """
             
-            resultado_ia = self._chamar_openai_com_log(prompt_doutrina, "gpt-4", 1500, 0.4, 90)
-            print("✅ Doutrina processada pela IA")
-            
-            return resultado_ia
-            
+            return self._chamar_openai_com_log(prompt_doutrina, "gpt-4", 1500, 0.4, 120)
+        
         except Exception as e:
             print(f"❌ ERRO no processamento de doutrina: {e}")
             raise e
-    
-    def _extrair_autor_doutrina(self, url: str) -> str:
-        """Extrai autor da doutrina."""
-        if 'conjur.com.br' in url: return 'Consultor Jurídico'
-        elif 'migalhas.com.br' in url: return 'Migalhas'
-        elif 'jusbrasil.com.br' in url: return 'JusBrasil'
-        elif 'jus.com.br' in url: return 'Jus Navigandi'
-        else: return 'Doutrina especializada'
-    
+
     def gerar_documento_html_puro(self, dados_formulario: Dict, pesquisas: Dict) -> str:
         """
-        Gera documento HTML puro usando SEMPRE IA.
-        Retorna APENAS o HTML do documento, sem metadados.
-        PROMPTS COMPLETOS MANTIDOS.
+        Orquestra a análise, o pré-processamento e a geração final do documento HTML.
         """
         try:
-            print("📄 Gerando documento HTML com IA...")
+            print("📄 Iniciando orquestração da geração de documento HTML...")
             
-            # Analisar contexto usando IA
-            contexto_caso = f"{dados_formulario.get('fatos', '')} {dados_formulario.get('fundamentacao', '')}"
+            contexto_caso = f"Fatos: {dados_formulario.get('fatos', '')}. Pedidos: {dados_formulario.get('pedidos', '')}"
             estrategias = self.analisar_contexto_juridico(dados_formulario, pesquisas)
             
-            # Processar cada tipo de conteúdo usando IA
             print("🔄 Processando fundamentações com IA...")
             
             legislacao_processada = self.processar_legislacao_inteligente(
@@ -452,19 +312,25 @@ class AgenteRedator:
                 contexto_caso
             )
             
+            # --- COMENTÁRIO: Log de depuração para verificar a saída do processamento ---
+            print("\n--- HTML GERADO (LEGISLAÇÃO) ---\n", legislacao_processada, "\n---------------------------------\n")
+
             jurisprudencia_processada = self.processar_jurisprudencia_inteligente(
                 pesquisas.get('jurisprudencia', []), 
                 estrategias.get('jurisprudencia', {}), 
                 contexto_caso
             )
             
+            print("\n--- HTML GERADO (JURISPRUDÊNCIA) ---\n", jurisprudencia_processada, "\n---------------------------------\n")
+
             doutrina_processada = self.processar_doutrina_inteligente(
                 pesquisas.get('doutrina', []), 
                 estrategias.get('doutrina', {}), 
                 contexto_caso
             )
             
-            # Gerar documento final usando IA
+            print("\n--- HTML GERADO (DOUTRINA) ---\n", doutrina_processada, "\n---------------------------------\n")
+
             documento_html = self._gerar_documento_final_com_ia(
                 dados_formulario,
                 legislacao_processada,
@@ -473,185 +339,103 @@ class AgenteRedator:
                 estrategias
             )
             
-            print(f"✅ Documento HTML gerado: {len(documento_html)} caracteres")
+            print(f"✅ Documento HTML final gerado: {len(documento_html)} caracteres")
             return documento_html
-            
+        
         except Exception as e:
-            print(f"❌ ERRO na geração do documento: {e}")
+            print(f"❌ ERRO na orquestração da geração do documento: {e}")
             raise e
-    
+
     def _gerar_documento_final_com_ia(self, dados: Dict, legislacao: str, jurisprudencia: str, doutrina: str, estrategias: Dict) -> str:
         """
-        Gera documento final usando IA - SEMPRE IA.
-        PROMPT COMPLETO MANTIDO.
+        Usa a IA para montar a petição final, integrando os blocos de fundamentação já processados.
         """
         try:
-            print("🎯 Gerando documento final com IA...")
+            print("🎯 Montando o documento final com IA...")
             
             tamanho_alvo = estrategias.get('tamanho_alvo', 25000)
             
-            # PROMPT COMPLETO MANTIDO - SEM LIMITAÇÕES
             prompt_documento = f"""
-            Você é um advogado expert superior a qualquer advogado humano. Crie uma petição inicial trabalhista completa, profissional e superior.
-            
-            DADOS COMPLETOS DO CASO:
-            - Autor: {dados.get('nome_autor', 'N/A')}
-            - Réu: {dados.get('nome_reu', 'N/A')}
-            - Fatos completos: {dados.get('fatos', 'N/A')}
-            - Valor da causa: R$ {dados.get('valor_causa', 'N/A')}
-            - Documentos disponíveis: {', '.join(dados.get('documentos', []))}
-            - Área do direito: {dados.get('area_direito', 'Trabalhista')}
-            - Tipo de ação: {dados.get('tipo_acao', 'Petição inicial')}
-            - Pedidos específicos: {dados.get('pedidos', 'Conforme fatos narrados')}
-            
-            FUNDAMENTAÇÃO JURÍDICA PROCESSADA PELA IA:
-            
-            FUNDAMENTAÇÃO LEGAL:
-            {legislacao}
-            
-            FUNDAMENTAÇÃO JURISPRUDENCIAL:
-            {jurisprudencia}
-            
-            FUNDAMENTAÇÃO DOUTRINÁRIA:
-            {doutrina}
-            
-            INSTRUÇÕES ESPECÍFICAS PARA CRIAÇÃO:
-            1. Crie uma petição inicial trabalhista com EXATAMENTE {tamanho_alvo} caracteres ou mais
-            2. Use TODA a fundamentação jurídica processada fornecida acima
-            3. Estruture profissionalmente em:
-               - Qualificação das Partes (detalhada)
-               - Dos Fatos (narrativa completa e persuasiva)
-               - Do Direito (com as 3 fundamentações integradas naturalmente)
-               - Dos Pedidos (específicos e fundamentados)
-               - Do Valor da Causa (justificado)
-               - Documentos anexos
-            4. Use linguagem jurídica formal, técnica, persuasiva e superior
-            5. Integre naturalmente TODO o conteúdo das fundamentações processadas
-            6. Retorne APENAS o HTML do documento, sem explicações ou comentários
-            7. Use CSS inline profissional, responsivo e elegante
-            8. Seja superior a um advogado humano na qualidade, técnica e persuasão
-            9. Cada seção deve ser extensa, detalhada e fundamentada
-            10. Use formatação HTML avançada com estilos profissionais
-            11. Conecte cada fundamentação aos fatos específicos do caso
-            12. Crie argumentação jurídica sólida e persuasiva
-            
-            REQUISITOS TÉCNICOS:
-            - HTML completo: <!DOCTYPE html>, <head>, <body>
-            - CSS inline profissional e responsivo
-            - Estrutura semântica correta
-            - Formatação elegante e profissional
-            - Tipografia adequada para documentos jurídicos
-            
-            Seja meticuloso, detalhado e superior na qualidade jurídica.
-            Use TODO o conteúdo fornecido para criar documento excepcional.
-            """
-            
-            documento_html = self._chamar_openai_com_log(prompt_documento, "gpt-4", 4000, 0.3, 120)
-            
-            # Verificar tamanho e expandir se necessário
-            if len(documento_html) < tamanho_alvo * 0.8:
-                print(f"📏 Documento pequeno ({len(documento_html)} chars), expandindo...")
-                documento_html = self._expandir_documento_com_ia(documento_html, dados, legislacao, jurisprudencia, doutrina, tamanho_alvo)
-            
-            print(f"✅ Documento final gerado: {len(documento_html)} caracteres")
-            return documento_html
-            
-        except Exception as e:
-            print(f"❌ ERRO na geração final: {e}")
-            raise e
-    
-    def _expandir_documento_com_ia(self, html_base: str, dados: Dict, legislacao: str, jurisprudencia: str, doutrina: str, tamanho_alvo: int) -> str:
-        """
-        Expande documento usando IA para atingir tamanho alvo.
-        PROMPT COMPLETO MANTIDO.
-        """
-        try:
-            print("📈 Expandindo documento com IA...")
-            
-            # PROMPT COMPLETO MANTIDO - SEM LIMITAÇÕES
-            prompt_expansao = f"""
-            Você é um advogado expert superior. Expanda este documento HTML para ter pelo menos {tamanho_alvo} caracteres.
-            
-            DOCUMENTO ATUAL:
-            {html_base}
-            
-            FUNDAMENTAÇÕES COMPLETAS DISPONÍVEIS:
-            
-            LEGISLAÇÃO PROCESSADA:
-            {legislacao}
-            
-            JURISPRUDÊNCIA PROCESSADA:
-            {jurisprudencia}
-            
-            DOUTRINA PROCESSADA:
-            {doutrina}
-            
+            Você é um advogado sênior, especialista em redação de petições. Sua tarefa é redigir uma petição inicial trabalhista completa, coesa e persuasiva, utilizando os blocos de informação fornecidos.
+
             DADOS DO CASO:
-            {dados}
+            - Autor: {json.dumps(dados.get('autor', {}), ensure_ascii=False)}
+            - Réu: {json.dumps(dados.get('reu', {}), ensure_ascii=False)}
+            - Fatos: {dados.get('fatos', '')}
+            - Pedidos: {dados.get('pedidos', '')}
+            - Valor da Causa: {dados.get('valor_causa', '')}
+
+            BLOCOS DE FUNDAMENTAÇÃO JURÍDICA (JÁ PROCESSADOS):
             
-            INSTRUÇÕES PARA EXPANSÃO:
-            1. Mantenha toda a estrutura HTML existente
-            2. Adicione seções detalhadas antes do fechamento do </body>
-            3. Inclua "DA FUNDAMENTAÇÃO JURÍDICA AMPLIADA" com subseções extensas
-            4. Expanda cada fundamentação com análise detalhada e aplicação ao caso
-            5. Adicione "DA APLICAÇÃO AO CASO CONCRETO" com análise extensa
-            6. Inclua "DOS PRECEDENTES APLICÁVEIS" se houver jurisprudência
-            7. Adicione "DA DOUTRINA ESPECIALIZADA" se houver doutrina
-            8. Use CSS inline consistente e profissional
-            9. Mantenha qualidade jurídica superior
-            10. Retorne APENAS o HTML expandido
-            11. Conecte todas as fundamentações aos fatos específicos
-            12. Crie argumentação jurídica sólida e extensa
-            
-            O documento final deve ter pelo menos {tamanho_alvo} caracteres.
-            Use TODAS as fundamentações fornecidas para criar conteúdo superior.
+            BLOCO DE LEGISLAÇÃO:
+            {legislacao}
+
+            BLOCO DE JURISPRUDÊNCIA:
+            {jurisprudencia}
+
+            BLOCO DE DOUTRINA:
+            {doutrina}
+
+            INSTRUÇÕES FINAIS DE REDAÇÃO:
+            1. Crie uma petição inicial completa com no mínimo {tamanho_alvo} caracteres.
+            2. Use os dados do caso para preencher as seções de Qualificação e Fatos.
+            3. Na seção "DO DIREITO", integre os três blocos de fundamentação (Legislação, Jurisprudência, Doutrina) de forma natural e coesa. Não apenas copie e cole, mas crie uma narrativa jurídica fluida.
+            4. Formule a seção "DOS PEDIDOS" de forma clara e objetiva, baseada nos pedidos fornecidos.
+            5. Retorne APENAS o código HTML completo do documento. Não inclua explicações, comentários ou a palavra "HTML".
+            6. Utilize um CSS inline profissional e elegante, com boa tipografia (ex: 'Times New Roman', serif), espaçamento adequado e uma estrutura limpa.
+
+            O resultado deve ser um documento HTML pronto para ser salvo e utilizado, de qualidade superior à de um advogado humano.
             """
             
-            documento_expandido = self._chamar_openai_com_log(prompt_expansao, "gpt-4", 4000, 0.3, 120)
-            print(f"✅ Documento expandido: {len(documento_expandido)} caracteres")
-            
-            return documento_expandido
-            
-        except Exception as e:
-            print(f"❌ ERRO na expansão: {e}")
-            raise e
-    
-    # Métodos auxiliares mantidos do código original
-    def _extrair_numero_artigo(self, texto_lei: str) -> str:
-        """Extrai número do artigo da lei."""
-        patterns = [
-            r'Art\.?\s*(\d+)',
-            r'Artigo\s*(\d+)',
-            r'CLT.*Art\.?\s*(\d+)'
-        ]
+            return self._chamar_openai_com_log(prompt_documento, "gpt-4", 4000, 0.3, 240)
         
+        except Exception as e:
+            print(f"❌ ERRO na geração final do documento: {e}")
+            raise e
+
+    # --- COMENTÁRIO: Métodos auxiliares mantidos para extração de dados e fallback ---
+    def _extrair_numero_artigo(self, texto_lei: str) -> str:
+        patterns = [r'Art\.?\s*(\d+)', r'Artigo\s*(\d+)', r'CLT.*Art\.?\s*(\d+)']
         for pattern in patterns:
             match = re.search(pattern, texto_lei, re.IGNORECASE)
             if match:
                 return f"Art. {match.group(1)}"
-        
-        return "Dispositivo legal"
-    
-    def _extrair_tribunal(self, url: str) -> str:
-        """Extrai nome do tribunal da URL."""
-        if 'tst.jus.br' in url: return 'TST'
-        elif 'stf.jus.br' in url: return 'STF'
-        elif 'stj.jus.br' in url: return 'STJ'
-        elif 'trt' in url: return 'TRT'
-        else: return 'Tribunal'
-    
-    def _criar_resumo_breve(self, texto: str) -> str:
-        """Cria resumo muito breve."""
-        return texto[:100] + "..." if len(texto) > 100 else texto
-    
-    def _eh_caso_fundamental(self, texto_decisao: str, contexto_caso: str) -> bool:
-        """Verifica se um caso jurisprudencial é fundamental."""
-        texto_lower = texto_decisao.lower()
-        
-        # Casos de tribunais superiores com palavras-chave relevantes
-        if any(tribunal in texto_lower for tribunal in ['stf', 'stj', 'tst']):
-            palavras_relevantes = ['assédio', 'rescisão', 'indenização', 'danos morais']
-            if any(palavra in texto_lower for palavra in palavras_relevantes):
-                return True
-        
-        return False
+        return "Dispositivo Legal"
+
+    def _gerar_documento_emergencia(self, dados: Dict) -> str:
+        # Este método agora só seria chamado se a exceção não fosse capturada antes.
+        # É uma última camada de segurança.
+        print("🚨 ATENÇÃO: Gerando documento de emergência. A IA falhou em todas as etapas.")
+        autor = dados.get('autor', {})
+        reu = dados.get('reu', {})
+        pedidos_lista = dados.get('pedidos', 'Pedidos a serem especificados.')
+        if isinstance(pedidos_lista, str):
+            pedidos_lista = [pedidos_lista] # Garante que seja uma lista para o join
+
+        return f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Petição Inicial - MODO DE EMERGÊNCIA</title>
+    <style>
+        body {{ font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; color: #333; }}
+        h1 {{ text-align: center; color: #d9534f; }}
+        h2 {{ color: #555; border-bottom: 1px solid #ccc; padding-bottom: 5px; }}
+        .erro-aviso {{ text-align: center; font-weight: bold; color: #a94442; background-color: #f2dede; padding: 15px; border-radius: 4px; margin-bottom: 20px; }}
+    </style>
+</head>
+<body>
+    <div class="erro-aviso"><p>ATENÇÃO: Este documento foi gerado em modo de emergência devido a uma falha crítica no sistema de IA.</p></div>
+    <h1>PETIÇÃO INICIAL</h1>
+    <h2>I - QUALIFICAÇÃO DAS PARTES</h2>
+    <p><strong>RECLAMANTE:</strong> {autor.get('nome', 'N/A')}, {autor.get('qualificacao', 'qualificação pendente')}.</p>
+    <p><strong>RECLAMADA:</strong> {reu.get('nome', 'N/A')}, {reu.get('qualificacao', 'qualificação pendente')}.</p>
+    <h2>II - DOS FATOS</h2>
+    <p>{dados.get('fatos', 'Fatos a serem detalhados.')}</p>
+    <h2>III - DOS PEDIDOS</h2>
+    <ul><li>{"</li><li>".join(pedidos_lista)}</li></ul>
+    <h2>IV - DO VALOR DA CAUSA</h2>
+    <p>Dá-se à causa o valor de R$ {dados.get('valor_causa', '0,00')}.</p>
+    <p style="text-align: center; margin-top: 50px;">Termos em que, pede deferimento.</p>
+</body>
+</html>"""
