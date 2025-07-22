@@ -92,25 +92,22 @@ def gerar_peticao():
         
         tempo_total = (datetime.now() - inicio_tempo).total_seconds()
         
-        # --- ALTERAÇÃO E AJUSTE FINAL ---
+        # --- CORREÇÃO FINAL ---
         # OBJETIVO: Retornar apenas {"documento_html": "..."} em caso de sucesso e um erro claro em caso de falha.
         
-        # 1. Primeiro, verificamos se o fluxo geral no orquestrador falhou.
-        #    O orquestrador deve retornar um status de 'erro' em caso de falha de qualquer agente.
+        # 1. Verificamos se o fluxo geral no orquestrador falhou.
         if resultado_orquestrador.get("status") == "erro":
             print(f"\n❌ ERRO REPORTADO PELO ORQUESTRADOR:")
             print(json.dumps(resultado_orquestrador, indent=2, ensure_ascii=False))
-            # Repassa o erro detalhado do orquestrador para o cliente.
             return jsonify(resultado_orquestrador), 500
 
-        # 2. Se o fluxo foi bem-sucedido, o resultado do AgenteRedator estará na chave "documento_final".
-        #    Lembre-se que o AgenteRedator agora retorna um dicionário: {"documento_html": "..."}
-        resultado_redator = resultado_orquestrador.get("documento_final")
+        # 2. Se o fluxo foi bem-sucedido, o orquestrador nos entrega um dicionário com várias chaves.
+        #    A chave que contém o HTML final é "documento_final". O valor dessa chave deve ser a string HTML.
+        #    Vamos validar se essa chave existe e se o seu valor é uma string HTML válida.
+        documento_final_html = resultado_orquestrador.get("documento_final")
 
-        # 3. Validamos se a estrutura recebida do redator está correta.
-        if isinstance(resultado_redator, dict) and "documento_html" in resultado_redator:
-            documento_final_html = resultado_redator["documento_html"]
-            
+        if isinstance(documento_final_html, str) and documento_final_html.strip().startswith("<!DOCTYPE html>"):
+            # 3. Se a validação passar, a petição foi gerada com sucesso.
             print(f"\n✅ PETIÇÃO GERADA COM SUCESSO!")
             print(f"⏱️ Tempo total: {tempo_total:.1f} segundos")
             score_qualidade = resultado_orquestrador.get("relatorio_validacao", {}).get("score_qualidade", "N/A")
@@ -122,10 +119,9 @@ def gerar_peticao():
                 "documento_html": documento_final_html
             })
         else:
-            # Esta é a exceção que foi acionada anteriormente. Ocorre se o orquestrador disser 'sucesso',
-            # mas a chave 'documento_final' não contiver o dicionário esperado.
-            # Isso indica um erro de integração entre o orquestrador e o redator.
-            erro_msg = "Erro de integridade: A estrutura do resultado do agente redator é inválida."
+            # 5. Se a chave "documento_final" não existir ou não for uma string HTML válida,
+            #    significa que houve um erro de integração ou um passo falhou silenciosamente.
+            erro_msg = "Erro de integridade: O orquestrador concluiu o processo mas não produziu um documento HTML válido."
             print(f"❌ {erro_msg}")
             print(f"   Resultado recebido do orquestrador: {resultado_orquestrador}")
             raise Exception(erro_msg)
