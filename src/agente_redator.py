@@ -1,4 +1,4 @@
-# agente_redator.py - Agente Redator com Pré-Processamento Inteligente
+# agente_redator.py - Agente Redator com Pré-Processamento Inteligente e Otimizado
 
 import json
 import logging
@@ -12,8 +12,8 @@ import traceback
 class AgenteRedator:
     """
     Agente Redator Inteligente que implementa uma estratégia de duas etapas:
-    1. PRÉ-PROCESSAMENTO: Usa a IA para ler a pesquisa completa e extrair apenas os trechos mais relevantes.
-    2. REDAÇÃO FINAL: Usa a IA para redigir a petição, integrando os trechos já filtrados.
+    1. PRÉ-PROCESSAMENTO: Usa a IA para ler um trecho substancial da pesquisa (8.000 caracteres) e extrair os pontos mais relevantes.
+    2. REDAÇÃO FINAL: Usa a IA para redigir a petição, integrando e expandindo os trechos já filtrados para atingir o tamanho alvo.
     Isso garante alta qualidade, evita perda de contexto e previne timeouts.
     """
     
@@ -64,7 +64,7 @@ class AgenteRedator:
         except Exception as e:
             print(f"❌ ERRO GERAL na redação da petição: {e}")
             self.logger.error(f"Erro na redação da petição: {traceback.format_exc()}")
-            return {"status": "erro", "erro": str(e)}
+            return {"status": "erro", "erro": str(e), "dados_estruturados": dados_estruturados}
 
     def _calcular_score_qualidade(self, documento_html: str, dados_estruturados: Dict) -> int:
         """
@@ -74,11 +74,9 @@ class AgenteRedator:
         if len(documento_html) > 30000: score += 20
         elif len(documento_html) > 20000: score += 10
         
-        # Verifica se os nomes das partes foram inseridos
         if dados_estruturados.get('autor', {}).get('nome', '') in documento_html: score += 10
         if dados_estruturados.get('reu', {}).get('nome', '') in documento_html: score += 10
         
-        # Verifica se a fundamentação foi minimamente preenchida
         if len(re.findall(r'fundamentacao-item', documento_html)) > 1: score += 10
             
         return min(score, 100)
@@ -100,6 +98,8 @@ class AgenteRedator:
             )
             
             resultado = response.choices[0].message.content.strip()
+            # Limpa qualquer formatação de bloco de código que a IA possa adicionar
+            resultado = re.sub(r'^```html|```$', '', resultado).strip()
             print(f"✅ OpenAI respondeu com sucesso ({len(resultado)} chars)")
             return resultado
         
@@ -108,62 +108,39 @@ class AgenteRedator:
             self.logger.error(f"Erro na chamada OpenAI: {traceback.format_exc()}")
             raise e
 
-    def _extrair_conteudo_relevante(self, texto_completo: str, contexto_caso: str, tipo: str) -> str:
-        """
-        PRIMEIRA ETAPA DA IA: Filtra o conteúdo mais relevante de um documento de pesquisa.
-        """
-        print(f"🔍 Extraindo conteúdo relevante de '{tipo}'...")
-        prompt = f"""
-        Você é um assistente jurídico de elite. Sua tarefa é analisar o texto completo de um documento ({tipo}) e extrair APENAS os trechos mais relevantes para o caso em questão.
-
-        CASO: "{contexto_caso[:1500]}"
-
-        DOCUMENTO COMPLETO:
-        ---
-        {texto_completo}
-        ---
-
-        INSTRUÇÕES:
-        - Se for legislação, extraia os artigos que se aplicam diretamente aos fatos.
-        - Se for jurisprudência, extraia a ementa e os 2-3 parágrafos do voto que são cruciais para o caso.
-        - Se for doutrina, extraia os 2-3 parágrafos que definem os conceitos-chave do caso.
-        - Retorne APENAS os trechos extraídos, sem nenhuma explicação ou formatação adicional.
-        """
-        # Usamos um modelo mais rápido e um timeout menor para esta tarefa de extração
-        return self._chamar_openai_com_log(prompt, "gpt-4-turbo", 1500, 0.1, 120)
-
     def processar_fundamentacao(self, pesquisas: List[Dict], tipo: str, contexto_caso: str) -> str:
         """
-        SEGUNDA ETAPA DA IA: Pega os trechos relevantes e os transforma em um bloco de HTML fundamentado.
+        ETAPA DE PRÉ-PROCESSAMENTO: Pega os trechos relevantes e os transforma em um bloco de HTML fundamentado.
         """
         try:
             print(f"📄 Processando fundamentação de '{tipo}' com IA...")
             if not pesquisas: return ""
 
-            conteudo_relevante_agregado = ""
-            # Limita a análise aos 2 primeiros documentos para agilidade e custo
-            for item in pesquisas[:2]:
+            # --- AJUSTE CHAVE: Limitamos o texto de cada fonte para 8000 caracteres ---
+            # Isso é suficiente para o contexto e evita timeouts na extração.
+            conteudo_para_analise = ""
+            for item in pesquisas[:2]: # Analisa os 2 principais resultados
                 texto_completo = item.get('texto', '')
                 if texto_completo:
-                    trechos_relevantes = self._extrair_conteudo_relevante(texto_completo, contexto_caso, tipo)
-                    conteudo_relevante_agregado += f"\n\n--- Fonte: {item.get('url', 'N/A')} ---\n{trechos_relevantes}"
+                    conteudo_para_analise += f"\n\n--- Fonte: {item.get('url', 'N/A')} ---\n{texto_completo[:8000]}"
 
-            if not conteudo_relevante_agregado:
-                return f"<div class='fundamentacao-item erro'><p>Nenhum conteúdo relevante de {tipo} foi encontrado para este caso.</p></div>"
+            if not conteudo_para_analise:
+                return f"<div class='fundamentacao-item erro'><p>Nenhum conteúdo de {tipo} foi encontrado para análise.</p></div>"
 
             prompt_formatacao = f"""
-            Você é um advogado sênior. Com base nos trechos relevantes abaixo, crie um bloco de fundamentação jurídica em HTML.
+            Você é um advogado sênior. Com base nos trechos de pesquisa abaixo, crie um bloco de fundamentação jurídica em HTML para uma petição.
 
-            CASO: "{contexto_caso[:1000]}"
+            CONTEXTO DO CASO: "{contexto_caso[:1000]}"
             
-            TRECHOS RELEVANTES DE {tipo.upper()}:
-            {conteudo_relevante_agregado}
+            TRECHOS DE PESQUISA DE {tipo.upper()}:
+            {conteudo_para_analise}
 
             INSTRUÇÕES:
-            1. Crie um texto coeso e autoral, usando os trechos como base.
-            2. Se for jurisprudência, use `<blockquote>` para citações diretas.
-            3. Explique como cada ponto se aplica aos fatos do caso.
-            4. Retorne um único bloco de HTML formatado com a classe 'fundamentacao-item'.
+            1. Leia os trechos e identifique os pontos mais importantes (artigos de lei, ementas, conceitos doutrinários) que se aplicam ao contexto do caso.
+            2. Crie um texto jurídico coeso e autoral, em português do Brasil.
+            3. Se for jurisprudência, use `<blockquote>` para citações diretas dos trechos mais relevantes.
+            4. Explique detalhadamente como cada ponto se aplica aos fatos do caso.
+            5. Retorne um único bloco de HTML formatado profissionalmente, usando a classe 'fundamentacao-item' para cada tópico.
             """
             return self._chamar_openai_com_log(prompt_formatacao, "gpt-4", 2000, 0.3, 180)
 
@@ -192,7 +169,7 @@ class AgenteRedator:
 
     def _gerar_documento_final_com_ia(self, dados: Dict, legislacao: str, jurisprudencia: str, doutrina: str) -> str:
         """
-        ETAPA FINAL: Monta a petição completa, integrando os blocos de HTML já prontos.
+        ETAPA FINAL: Monta a petição completa, integrando e expandindo os blocos de HTML já prontos.
         """
         print("🎯 Montando o documento final com IA...")
         
@@ -202,7 +179,7 @@ class AgenteRedator:
         DADOS DO CASO:
         {json.dumps(dados, ensure_ascii=False, indent=2)}
 
-        BLOCOS DE FUNDAMENTAÇÃO JURÍDICA (JÁ PROCESSADOS E FORMATADOS EM HTML):
+        BLOCOS DE FUNDAMENTAÇÃO JURÍDICA (JÁ PROCESSADOS PELA IA):
         
         BLOCO DE LEGISLAÇÃO:
         {legislacao if legislacao else "<p>Nenhuma legislação específica foi processada.</p>"}
@@ -214,12 +191,11 @@ class AgenteRedator:
         {doutrina if doutrina else "<p>Nenhuma doutrina específica foi processada.</p>"}
 
         INSTRUÇÕES FINAIS DE REDAÇÃO:
-        1. Crie uma petição inicial completa com **pelo menos 30.000 caracteres**. Para isso, detalhe extensivamente cada seção.
-        2. Use os dados do caso para preencher as seções de Qualificação e Fatos de forma muito detalhada.
-        3. Na seção "DO DIREITO", integre os três blocos de fundamentação (Legislação, Jurisprudência, Doutrina) de forma natural e coesa. Expanda a análise, conectando os pontos e construindo uma narrativa jurídica robusta.
-        4. Formule a seção "DOS PEDIDOS" de forma clara e objetiva.
-        5. Retorne APENAS o código HTML completo do documento.
-        6. Utilize um CSS inline profissional e elegante (font-family: 'Times New Roman', serif; line-height: 1.6;).
+        1. Crie uma petição inicial completa com **pelo menos 30.000 caracteres**. Para isso, detalhe e expanda CADA seção (Fatos, Direito, Pedidos) de forma exaustiva e com linguagem jurídica formal.
+        2. Na seção "DO DIREITO", integre os três blocos de fundamentação fornecidos. **NÃO os insira como placeholders**. Use o conteúdo deles para construir uma argumentação jurídica robusta, detalhada e fluida, conectando cada ponto aos fatos do caso. Expanda a análise com seus conhecimentos.
+        3. Formule a seção "DOS PEDIDOS" de forma clara e objetiva, detalhando cada item.
+        4. **Retorne APENAS o código HTML completo do documento, começando com `<!DOCTYPE html>` e terminando com `</html>`. NÃO inclua explicações, comentários ou formatação de markdown como \`\`\`html.**
+        5. Utilize um CSS inline profissional e elegante (font-family: 'Times New Roman', serif; line-height: 1.6;).
         """
         
         return self._chamar_openai_com_log(prompt_documento, "gpt-4-turbo", 4000, 0.4, 240)
