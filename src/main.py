@@ -97,22 +97,32 @@ def gerar_peticao():
         
         print(f"\n✅ PETIÇÃO GERADA COM SUCESSO!")
         print(f"⏱️ Tempo total: {tempo_total:.1f} segundos")
-        print(f"📊 Score de qualidade: {resultado.get('score_qualidade', 'N/A')}")
+        # Acessa o score de qualidade do relatório de validação, se existir
+        score_qualidade = resultado.get("relatorio_validacao", {}).get("score_qualidade", "N/A")
+        print(f"📊 Score de qualidade: {score_qualidade}")
         print(f"{'='*80}\n")
         
-        # Retornar resultado completo
-        return jsonify({
-            "status": "sucesso",
-            "documento_html": resultado["documento_final"],
-            "dados_estruturados": resultado["dados_estruturados"],
-            "pesquisa_realizada": resultado["pesquisa_juridica"],
-            "relatorio_qualidade": resultado["relatorio_validacao"],
-            "score_qualidade": resultado["score_qualidade"],
-            "tempo_processamento": f"{tempo_total:.1f}s",
-            "agentes_executados": resultado["agentes_executados"],
-            "timestamp": datetime.now().isoformat()
-        })
+        # --- ALTERAÇÃO REALIZADA ---
+        # O agente redator já retorna um dicionário contendo apenas a chave "documento_html".
+        # O orquestrador, no entanto, adiciona outros dados para fins de log e validação.
+        # Para atender à solicitação de que a API retorne *apenas* o HTML,
+        # extraímos o valor da chave "documento_html" do resultado do redator
+        # e o retornamos diretamente.
         
+        # Acessa o dicionário retornado pelo AgenteRedator, que está dentro do resultado do orquestrador
+        resultado_redator = resultado.get("documento_final", {})
+        
+        # Verifica se o resultado do redator é um dicionário e contém a chave esperada
+        if isinstance(resultado_redator, dict) and "documento_html" in resultado_redator:
+            documento_final_html = resultado_redator["documento_html"]
+            # Retorna o JSON limpo, contendo apenas o documento HTML.
+            return jsonify({
+                "documento_html": documento_final_html
+            })
+        else:
+            # Se a estrutura estiver inesperada, retorna um erro claro.
+            raise Exception("A estrutura final do resultado do agente redator é inválida.")
+
     except Exception as e:
         erro_detalhado = traceback.format_exc()
         print(f"\n❌ ERRO NA GERAÇÃO DA PETIÇÃO:")
@@ -211,4 +221,3 @@ if __name__ == '__main__':
         port=int(os.getenv('PORT', 5000)),
         debug=False
     )
-
