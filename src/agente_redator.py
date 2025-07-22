@@ -1,4 +1,4 @@
-# agente_redator.py - Agente Redator com Pré-Processamento Inteligente e Citação Integral de Jurisprudência
+# agente_redator.py - Agente Redator com Pré-Processamento Inteligente e Expansão Forçada
 
 import json
 import logging
@@ -126,8 +126,6 @@ class AgenteRedator:
             if not conteudo_para_analise:
                 return f"<div class='fundamentacao-item erro'><p>Nenhum conteúdo de {tipo} foi encontrado para análise.</p></div>"
 
-            # --- AJUSTE CRÍTICO NO PROMPT ---
-            # Instruções específicas para cada tipo de pesquisa.
             prompt_formatacao = f"""
             Você é um advogado sênior. Com base nos trechos de pesquisa abaixo, crie um bloco de fundamentação jurídica em HTML para uma petição.
 
@@ -187,9 +185,9 @@ class AgenteRedator:
         {doutrina if doutrina else "<p>Nenhuma doutrina específica foi processada.</p>"}
 
         INSTRUÇÕES FINAIS DE REDAÇÃO (MUITO IMPORTANTE):
-        1. **META DE TAMANHO OBRIGATÓRIA:** O documento final deve ter **pelo menos 30.000 caracteres**. Para atingir esta meta, você deve ser prolixo, detalhista e exaustivo em CADA seção. Um documento curto será considerado uma falha.
-        2. **EXPANSÃO DOS FATOS:** Na seção "DOS FATOS", não se limite a repetir os dados. Detalhe o cotidiano da Reclamante, descreva o ambiente de trabalho, narre exemplos específicos de humilhação e explique o impacto do não pagamento das horas extras na sua vida. Crie uma narrativa rica e detalhada.
-        3. **EXPANSÃO DO DIREITO:** Na seção "DO DIREITO", integre os três blocos de fundamentação fornecidos. **NÃO os insira como placeholders**. Use o conteúdo deles (incluindo as citações em `<blockquote>` que você receberá) para construir uma argumentação jurídica robusta, detalhada e fluida, conectando cada ponto aos fatos do caso. Expanda a análise com seus conhecimentos. Crie subtópicos como "Da Rescisão Indireta", "Das Horas Extras Não Remuneradas", "Do Assédio Moral e o Dano Existencial".
+        1. **META DE TAMANHO OBRIGATÓRIA:** O documento final deve ter **pelo menos 30.000 caracteres**. Para atingir esta meta, você deve ser prolixo, detalhista e exaustivo em CADA seção. Um documento curto será considerado uma falha grave.
+        2. **EXPANSÃO DOS FATOS:** Na seção "DOS FATOS", não se limite a repetir os dados. Detalhe o cotidiano da Reclamante, descreva o ambiente de trabalho, narre exemplos específicos de humilhação e explique o impacto do não pagamento das horas extras na sua vida. Crie uma narrativa rica e detalhada com pelo menos 10 parágrafos.
+        3. **EXPANSÃO DO DIREITO:** Na seção "DO DIREITO", integre os três blocos de fundamentação fornecidos. **NÃO os insira como placeholders**. Use o conteúdo deles (incluindo as citações em `<blockquote>` que você receberá) para construir uma argumentação jurídica robusta, detalhada e fluida, conectando cada ponto aos fatos do caso. Expanda a análise com seus conhecimentos. Crie subtópicos como "Da Rescisão Indireta", "Das Horas Extras Não Remuneradas", "Do Assédio Moral e o Dano Existencial". Dedique pelo menos 10 parágrafos para esta seção.
         4. **DETALHAMENTO DOS PEDIDOS:** Na seção "DOS PEDIDOS", não apenas liste os pedidos. Crie um parágrafo para cada pedido, explicando o seu fundamento legal e o porquê de sua aplicação ao caso concreto.
         5. **FORMATAÇÃO ESTRITA:** **Retorne APENAS o código HTML completo do documento, começando com `<!DOCTYPE html>` e terminando com `</html>`. NÃO inclua explicações, comentários ou formatação de markdown como \`\`\`html.**
         6. **ESTILO:** Utilize um CSS inline profissional e elegante (font-family: 'Times New Roman', serif; line-height: 1.8; text-align: justify;).
