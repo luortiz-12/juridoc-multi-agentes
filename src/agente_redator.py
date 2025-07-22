@@ -1,4 +1,4 @@
-# agente_redator.py - Agente Redator com Pré-Processamento Inteligente e Expansão Forçada
+# agente_redator.py - Agente Redator com Geração Modular por Seções
 
 import json
 import logging
@@ -11,11 +11,12 @@ import traceback
 
 class AgenteRedator:
     """
-    Agente Redator Inteligente que implementa uma estratégia de duas etapas:
-    1. PRÉ-PROCESSAMENTO: Usa a IA para ler a pesquisa e criar blocos de fundamentação em HTML.
-       - Para jurisprudência, a IA é instruída a citar os trechos mais importantes na íntegra.
-       - Para legislação e doutrina, a IA cria textos autorais explicativos.
-    2. REDAÇÃO FINAL: Usa a IA para redigir a petição, integrando e expandindo massivamente os blocos já prontos para atingir o tamanho alvo.
+    Agente Redator com arquitetura modular de alta performance:
+    1. PRÉ-PROCESSAMENTO: Analisa a pesquisa e cria blocos de fundamentação em HTML,
+       citando jurisprudência na íntegra quando necessário.
+    2. REDAÇÃO MODULAR: Gera cada seção da petição (Fatos, Direito, Pedidos) com chamadas
+       de IA dedicadas e prompts específicos para garantir profundidade e atingir a meta de tamanho.
+    3. MONTAGEM FINAL: Concatena as seções geradas em um único documento HTML coeso.
     """
     
     def __init__(self):
@@ -35,11 +36,8 @@ class AgenteRedator:
         print("✅ Cliente OpenAI inicializado com sucesso.")
 
     def redigir_peticao_completa(self, dados_estruturados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Método principal que orquestra a geração da petição.
-        """
         try:
-            print("✍️ Iniciando redação inteligente da petição com IA...")
+            print("✍️ Iniciando redação modular da petição com IA...")
             
             documento_html = self.gerar_documento_html_puro(dados_estruturados, pesquisa_juridica)
             
@@ -57,7 +55,7 @@ class AgenteRedator:
                     "timestamp": datetime.now().isoformat(),
                     "tamanho_caracteres": tamanho_documento,
                     "score_qualidade": score_qualidade,
-                    "estrategia_aplicada": "ia_pre_processamento_com_citacao_e_redacao_final",
+                    "estrategia_aplicada": "ia_geracao_modular_por_secoes",
                     "ia_funcionou": True
                 }
             }
@@ -68,9 +66,6 @@ class AgenteRedator:
             return {"status": "erro", "erro": str(e), "dados_estruturados": dados_estruturados}
 
     def _calcular_score_qualidade(self, documento_html: str, dados_estruturados: Dict) -> int:
-        """
-        Calcula um score de qualidade básico para o documento gerado.
-        """
         score = 50
         if len(documento_html) > 30000: score += 20
         elif len(documento_html) > 15000: score += 10
@@ -83,9 +78,6 @@ class AgenteRedator:
         return min(score, 100)
 
     def _chamar_openai_com_log(self, prompt: str, model: str, max_tokens: int, temperature: float, timeout_especifico: int) -> str:
-        """
-        Método centralizado para chamar a API da OpenAI com logs e timeout.
-        """
         try:
             print(f"🤖 Chamando OpenAI - Modelo: {model}, Tokens: {max_tokens}, Timeout: {timeout_especifico}s")
             print(f"📝 Prompt (início): {prompt[:200].strip().replace(chr(10), ' ')}...")
@@ -109,10 +101,6 @@ class AgenteRedator:
             raise e
 
     def processar_fundamentacao(self, pesquisas: List[Dict], tipo: str, contexto_caso: str) -> str:
-        """
-        ETAPA DE PRÉ-PROCESSAMENTO: Pega os trechos relevantes e os transforma em um bloco de HTML fundamentado,
-        com citação integral para jurisprudência.
-        """
         try:
             print(f"📄 Processando fundamentação de '{tipo}' com IA...")
             if not pesquisas: return ""
@@ -130,7 +118,6 @@ class AgenteRedator:
             Você é um advogado sênior. Com base nos trechos de pesquisa abaixo, crie um bloco de fundamentação jurídica em HTML para uma petição.
 
             CONTEXTO DO CASO: "{contexto_caso[:1000]}"
-            
             TRECHOS DE PESQUISA DE {tipo.upper()}:
             {conteudo_para_analise}
 
@@ -138,65 +125,135 @@ class AgenteRedator:
             - Se o tipo for 'legislação', explique os artigos de lei mais importantes e como se aplicam ao caso. NÃO transcreva os artigos literalmente.
             - Se o tipo for 'jurisprudência', sua tarefa principal é identificar a ementa e os trechos mais importantes do voto. **TRANSCREVA ESSES TRECHOS NA ÍNTEGRA** dentro de `<blockquote>`. Após a citação, adicione um parágrafo de análise conectando o precedente ao caso concreto.
             - Se o tipo for 'doutrina', resuma os principais argumentos dos autores e explique sua relevância para o caso.
-            - Crie um texto jurídico coeso e autoral, em português do Brasil.
-            - Retorne um único bloco de HTML formatado profissionalmente, usando a classe 'fundamentacao-item' para cada tópico.
+            - Crie um texto jurídico coeso e autoral.
+            - Retorne um único bloco de HTML formatado profissionalmente.
             """
             return self._chamar_openai_com_log(prompt_formatacao, "gpt-4o", 2000, 0.3, 180)
 
         except Exception as e:
             print(f"❌ ERRO no processamento de {tipo}: {e}")
-            return f"<div class='fundamentacao-item erro'><p>Ocorreu um erro ao processar a {tipo}. A argumentação se baseará nos princípios gerais do direito.</p></div>"
+            return f"<div class='fundamentacao-item erro'><p>Ocorreu um erro ao processar a {tipo}.</p></div>"
+
+    def _gerar_secao_html(self, prompt: str) -> str:
+        """Função genérica para gerar uma seção da petição."""
+        # Usamos gpt-4o por seu custo-benefício e grande janela de contexto.
+        return self._chamar_openai_com_log(prompt, "gpt-4o", 4000, 0.4, 240)
 
     def gerar_documento_html_puro(self, dados_formulario: Dict, pesquisas: Dict) -> str:
         """
-        Orquestra a análise, o pré-processamento e a geração final do documento HTML.
+        Orquestra a geração modular do documento HTML.
         """
         contexto_caso = f"Fatos: {dados_formulario.get('fatos', '')}. Pedidos: {dados_formulario.get('pedidos', '')}"
         
         print("🔄 Iniciando pré-processamento das fundamentações...")
-        
         legislacao_html = self.processar_fundamentacao(pesquisas.get('legislacao', []), "legislação", contexto_caso)
         jurisprudencia_html = self.processar_fundamentacao(pesquisas.get('jurisprudencia', []), "jurisprudência", contexto_caso)
         doutrina_html = self.processar_fundamentacao(pesquisas.get('doutrina', []), "doutrina", contexto_caso)
 
-        return self._gerar_documento_final_com_ia(dados_formulario, legislacao_html, jurisprudencia_html, doutrina_html)
+        print("📝 Iniciando redação das seções individuais...")
 
-    def _gerar_documento_final_com_ia(self, dados: Dict, legislacao: str, jurisprudencia: str, doutrina: str) -> str:
-        """
-        ETAPA FINAL: Monta a petição completa, integrando e expandindo massivamente os blocos de HTML.
-        """
-        print("🎯 Montando o documento final com IA...")
+        # Geração da Seção de Fatos
+        prompt_fatos = f"""
+        Você é um advogado sênior redator. Redija a seção "DOS FATOS" de uma petição inicial trabalhista, com foco narrativo e detalhamento humano.
+
+        REQUISITOS:
+        - Mínimo de **8.000 caracteres** no total. Seja extremamente detalhado e prolixo.
+        - Narre em detalhes o cotidiano da Reclamante no ambiente de trabalho, com exemplos vívidos de situações humilhantes, pressão abusiva, e o impacto emocional e financeiro do não pagamento de horas extras.
+        - Crie uma narrativa rica, coesa e persuasiva.
+
+        DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
         
-        prompt_documento = f"""
-        Você é um advogado sênior, especialista em redação de petições. Sua tarefa é redigir uma petição inicial trabalhista EXTREMAMENTE DETALHADA, coesa, persuasiva e com pelo menos 30.000 caracteres.
-
-        DADOS DO CASO:
-        {json.dumps(dados, ensure_ascii=False, indent=2)}
-
-        BLOCOS DE FUNDAMENTAÇÃO JURÍDICA (JÁ PROCESSADOS PELA IA):
-        
-        BLOCO DE LEGISLAÇÃO:
-        {legislacao if legislacao else "<p>Nenhuma legislação específica foi processada.</p>"}
-
-        BLOCO DE JURISPRUDÊNCIA:
-        {jurisprudencia if jurisprudencia else "<p>Nenhuma jurisprudência específica foi processada.</p>"}
-
-        BLOCO DE DOUTRINA:
-        {doutrina if doutrina else "<p>Nenhuma doutrina específica foi processada.</p>"}
-
-        INSTRUÇÕES FINAIS DE REDAÇÃO (MUITO IMPORTANTE):
-        1. **META DE TAMANHO OBRIGATÓRIA:** O documento final deve ter **pelo menos 30.000 caracteres**. Para atingir esta meta, você deve ser prolixo, detalhista e exaustivo em CADA seção. Um documento curto será considerado uma falha grave.
-        2. **EXPANSÃO DOS FATOS:** Na seção "DOS FATOS", não se limite a repetir os dados. Detalhe o cotidiano da Reclamante, descreva o ambiente de trabalho, narre exemplos específicos de humilhação e explique o impacto do não pagamento das horas extras na sua vida. Crie uma narrativa rica e detalhada com pelo menos 10 parágrafos.
-        3. **EXPANSÃO DO DIREITO:** Na seção "DO DIREITO", integre os três blocos de fundamentação fornecidos. **NÃO os insira como placeholders**. Use o conteúdo deles (incluindo as citações em `<blockquote>` que você receberá) para construir uma argumentação jurídica robusta, detalhada e fluida, conectando cada ponto aos fatos do caso. Expanda a análise com seus conhecimentos. Crie subtópicos como "Da Rescisão Indireta", "Das Horas Extras Não Remuneradas", "Do Assédio Moral e o Dano Existencial". Dedique pelo menos 10 parágrafos para esta seção.
-        4. **DETALHAMENTO DOS PEDIDOS:** Na seção "DOS PEDIDOS", não apenas liste os pedidos. Crie um parágrafo para cada pedido, explicando o seu fundamento legal e o porquê de sua aplicação ao caso concreto.
-        5. **FORMATAÇÃO ESTRITA:** **Retorne APENAS o código HTML completo do documento, começando com `<!DOCTYPE html>` e terminando com `</html>`. NÃO inclua explicações, comentários ou formatação de markdown como \`\`\`html.**
-        6. **ESTILO:** Utilize um CSS inline profissional e elegante (font-family: 'Times New Roman', serif; line-height: 1.8; text-align: justify;).
+        Retorne APENAS o bloco de HTML para esta seção, começando com `<h2>DOS FATOS</h2>` e terminando com o último parágrafo dos fatos.
         """
+        secao_fatos_html = self._gerar_secao_html(prompt_fatos)
+
+        # Geração da Seção de Direito
+        prompt_direito = f"""
+        Você é um jurista. Redija a seção "DO DIREITO" de uma petição inicial trabalhista.
         
-        return self._chamar_openai_com_log(prompt_documento, "gpt-4o", 4000, 0.4, 240)
+        DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
+        BLOCOS DE FUNDAMENTAÇÃO PRÉ-PROCESSADOS:
+        Legislação: {legislacao_html}
+        Jurisprudência: {jurisprudencia_html}
+        Doutrina: {doutrina_html}
+        
+        INSTRUÇÕES:
+        1. Seja EXTREMAMENTE DETALHADO e prolixo. A seção deve ter no mínimo 15.000 caracteres.
+        2. Integre os blocos de fundamentação para construir uma argumentação robusta. Use as citações de jurisprudência (`<blockquote>`) que você recebeu.
+        3. Crie subtópicos como "Da Rescisão Indireta", "Das Horas Extras Não Remuneradas", "Do Assédio Moral e o Dano Existencial".
+        4. Expanda a análise com seus conhecimentos, conectando cada ponto aos fatos do caso.
+        5. Retorne APENAS o bloco de HTML para esta seção, começando com `<h2>DO DIREITO</h2>`.
+        """
+        secao_direito_html = self._gerar_secao_html(prompt_direito)
+
+        # Geração da Seção de Pedidos
+        prompt_pedidos = f"""
+        Você é um advogado sênior. Redija a seção "DOS PEDIDOS" de uma petição inicial trabalhista.
+        
+        DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
+        
+        INSTRUÇÕES:
+        1. Seja EXTREMAMENTE DETALHADO. A seção deve ter no mínimo 5.000 caracteres.
+        2. Para cada pedido, crie um item de lista (`<li>`) e um parágrafo explicativo detalhando o fundamento legal e o porquê de sua aplicação.
+        3. Inclua pedidos de praxe como justiça gratuita, honorários, etc.
+        4. Retorne APENAS o bloco de HTML para esta seção, começando com `<h2>DOS PEDIDOS</h2>`.
+        """
+        secao_pedidos_html = self._gerar_secao_html(prompt_pedidos)
+
+        print("🧩 Montando o documento final...")
+        
+        # Montagem do HTML final
+        documento_final_html = f"""
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Petição Inicial Trabalhista</title>
+    <style>
+        body {{ font-family: 'Times New Roman', serif; line-height: 1.8; text-align: justify; margin: 3cm; }}
+        h1 {{ text-align: center; font-size: 16pt; }}
+        h2 {{ text-align: left; font-size: 14pt; margin-top: 30px; font-weight: bold; }}
+        p {{ text-indent: 2em; margin-bottom: 15px; }}
+        blockquote {{ margin-left: 4cm; font-style: italic; }}
+        .qualificacao p {{ text-indent: 0; }}
+    </style>
+</head>
+<body>
+    <h1>EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO DE SÃO PAULO - SP</h1>
+    
+    <div class="qualificacao" style="margin-top: 50px;">
+        <p>
+            <strong>{dados_formulario.get('autor', {}).get('nome', '').upper()}</strong>, {dados_formulario.get('autor', {}).get('qualificacao', '')}, residente e domiciliada em {dados_formulario.get('autor', {}).get('endereco', '[ENDEREÇO A SER PREENCHIDO]')}, vem, com o devido respeito, por intermédio de seu advogado que esta subscreve (procuração anexa), propor a presente
+        </p>
+        
+        <h1 style="margin-top: 20px;">AÇÃO TRABALHISTA</h1>
+        
+        <p>
+            em face de <strong>{dados_formulario.get('reu', {}).get('nome', '').upper()}</strong>, {dados_formulario.get('reu', {}).get('qualificacao', '')}, com sede {dados_formulario.get('reu', {}).get('endereco', '')}, pelos fatos e fundamentos a seguir expostos.
+        </p>
+    </div>
+
+    {secao_fatos_html}
+    
+    {secao_direito_html}
+
+    {secao_pedidos_html}
+
+    <h2 style="font-size: 12pt; text-align:left;">DO VALOR DA CAUSA</h2>
+    <p>Dá-se à causa o valor de {dados_formulario.get('valor_causa', 'R$ 0,00')}.</p>
+
+    <p style="margin-top: 50px;">Nestes termos,<br>Pede deferimento.</p>
+    
+    <p style="text-align: center; margin-top: 50px;">[Local], {datetime.now().strftime('%d de %B de %Y')}.</p>
+
+    <p style="text-align: center; margin-top: 80px;">_________________________________________<br>ADVOGADO<br>OAB/SP Nº XXX.XXX</p>
+
+</body>
+</html>
+        """
+        return documento_final_html.strip()
 
     def _extrair_autor_doutrina(self, url: str) -> str:
-        """Extrai o nome do autor/fonte a partir da URL."""
         if 'conjur.com.br' in url: return 'Consultor Jurídico'
         if 'migalhas.com.br' in url: return 'Migalhas'
         return 'Doutrina especializada'
