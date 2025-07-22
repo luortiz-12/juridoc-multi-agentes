@@ -74,7 +74,6 @@ def gerar_peticao():
         print(f"🚀 NOVA SOLICITAÇÃO DE PETIÇÃO - {inicio_tempo.strftime('%d/%m/%Y %H:%M:%S')}")
         print(f"{'='*80}")
         
-        # Receber dados do formulário
         dados_entrada = request.get_json()
         
         if not dados_entrada:
@@ -87,45 +86,53 @@ def gerar_peticao():
         print("📋 Dados recebidos do formulário:")
         print(json.dumps(dados_entrada, indent=2, ensure_ascii=False))
         
-        # EXECUTAR FLUXO COMPLETO DOS AGENTES
         print(f"\n🔄 INICIANDO FLUXO COMPLETO DOS AGENTES...")
         
-        resultado = orquestrador.processar_solicitacao_completa(dados_entrada)
+        resultado_orquestrador = orquestrador.processar_solicitacao_completa(dados_entrada)
         
-        # Calcular tempo total
         tempo_total = (datetime.now() - inicio_tempo).total_seconds()
         
-        print(f"\n✅ PETIÇÃO GERADA COM SUCESSO!")
-        print(f"⏱️ Tempo total: {tempo_total:.1f} segundos")
-        # Acessa o score de qualidade do relatório de validação, se existir
-        score_qualidade = resultado.get("relatorio_validacao", {}).get("score_qualidade", "N/A")
-        print(f"📊 Score de qualidade: {score_qualidade}")
-        print(f"{'='*80}\n")
+        # --- ALTERAÇÃO E AJUSTE FINAL ---
+        # OBJETIVO: Retornar apenas {"documento_html": "..."} em caso de sucesso e um erro claro em caso de falha.
         
-        # --- ALTERAÇÃO REALIZADA ---
-        # O agente redator já retorna um dicionário contendo apenas a chave "documento_html".
-        # O orquestrador, no entanto, adiciona outros dados para fins de log e validação.
-        # Para atender à solicitação de que a API retorne *apenas* o HTML,
-        # extraímos o valor da chave "documento_html" do resultado do redator
-        # e o retornamos diretamente.
-        
-        # Acessa o dicionário retornado pelo AgenteRedator, que está dentro do resultado do orquestrador
-        resultado_redator = resultado.get("documento_final", {})
-        
-        # Verifica se o resultado do redator é um dicionário e contém a chave esperada
+        # 1. Primeiro, verificamos se o fluxo geral no orquestrador falhou.
+        #    O orquestrador deve retornar um status de 'erro' em caso de falha de qualquer agente.
+        if resultado_orquestrador.get("status") == "erro":
+            print(f"\n❌ ERRO REPORTADO PELO ORQUESTRADOR:")
+            print(json.dumps(resultado_orquestrador, indent=2, ensure_ascii=False))
+            # Repassa o erro detalhado do orquestrador para o cliente.
+            return jsonify(resultado_orquestrador), 500
+
+        # 2. Se o fluxo foi bem-sucedido, o resultado do AgenteRedator estará na chave "documento_final".
+        #    Lembre-se que o AgenteRedator agora retorna um dicionário: {"documento_html": "..."}
+        resultado_redator = resultado_orquestrador.get("documento_final")
+
+        # 3. Validamos se a estrutura recebida do redator está correta.
         if isinstance(resultado_redator, dict) and "documento_html" in resultado_redator:
             documento_final_html = resultado_redator["documento_html"]
-            # Retorna o JSON limpo, contendo apenas o documento HTML.
+            
+            print(f"\n✅ PETIÇÃO GERADA COM SUCESSO!")
+            print(f"⏱️ Tempo total: {tempo_total:.1f} segundos")
+            score_qualidade = resultado_orquestrador.get("relatorio_validacao", {}).get("score_qualidade", "N/A")
+            print(f"📊 Score de qualidade: {score_qualidade}")
+            print(f"{'='*80}\n")
+
+            # 4. Retornamos APENAS o JSON com o documento HTML, como solicitado.
             return jsonify({
                 "documento_html": documento_final_html
             })
         else:
-            # Se a estrutura estiver inesperada, retorna um erro claro.
-            raise Exception("A estrutura final do resultado do agente redator é inválida.")
+            # Esta é a exceção que foi acionada anteriormente. Ocorre se o orquestrador disser 'sucesso',
+            # mas a chave 'documento_final' não contiver o dicionário esperado.
+            # Isso indica um erro de integração entre o orquestrador e o redator.
+            erro_msg = "Erro de integridade: A estrutura do resultado do agente redator é inválida."
+            print(f"❌ {erro_msg}")
+            print(f"   Resultado recebido do orquestrador: {resultado_orquestrador}")
+            raise Exception(erro_msg)
 
     except Exception as e:
         erro_detalhado = traceback.format_exc()
-        print(f"\n❌ ERRO NA GERAÇÃO DA PETIÇÃO:")
+        print(f"\n❌ ERRO CRÍTICO NA GERAÇÃO DA PETIÇÃO:")
         print(erro_detalhado)
         
         return jsonify({
