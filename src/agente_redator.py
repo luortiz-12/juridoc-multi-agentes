@@ -48,7 +48,7 @@ class AgenteRedator:
             print(f"✅ Petição finalizada com IA: {tamanho_documento} caracteres")
             print(f"📊 Score de qualidade: {score_qualidade}")
             
-            # AJUSTE: Retornar apenas o documento HTML em um JSON simples, conforme solicitado.
+            # Retorna apenas o documento HTML em um JSON simples, conforme solicitado.
             return {
                 "documento_html": documento_html
             }
@@ -84,6 +84,17 @@ class AgenteRedator:
             )
             
             resultado = response.choices[0].message.content.strip()
+
+            # --- NOVO: DETECÇÃO DE RECUSA DA API ---
+            refusal_phrases = [
+                "i'm sorry, i can't assist",
+                "i am unable to",
+                "i cannot fulfill this request"
+            ]
+            if any(phrase in resultado.lower() for phrase in refusal_phrases):
+                print(f"❌ ERRO: A API se recusou a processar o prompt.")
+                raise Exception("API Refusal: O modelo se recusou a gerar o conteúdo para esta seção.")
+
             resultado = re.sub(r'^```html|```$', '', resultado).strip()
             print(f"✅ OpenAI respondeu com sucesso ({len(resultado)} chars)")
             return resultado
@@ -154,10 +165,11 @@ class AgenteRedator:
 
         # --- GERAÇÃO GRANULAR DA SEÇÃO "DO DIREITO" ---
         prompt_direito_legislacao = f"""
-        Redija a subseção sobre a **FUNDAMENTAÇÃO LEGAL** para a seção "DO DIREITO".
+        Redija uma subseção sobre a **FUNDAMENTAÇÃO LEGAL** para a seção "DO DIREITO".
         REQUISITOS:
         - Mínimo de **5.000 caracteres**.
         - Discorra detalhadamente sobre a rescisão indireta (art. 483 CLT) e horas extras (art. 59 CLT), conectando cada artigo aos fatos do caso.
+        - Utilize o conteúdo do bloco de legislação para embasar sua análise.
         - DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
         - BLOCO DE LEGISLAÇÃO PRÉ-PROCESSADO: {legislacao_html}
         - Retorne APENAS o bloco de HTML, começando com `<h3>Da Fundamentação Legal: Violações Contratuais Graves</h3>`.
@@ -165,10 +177,10 @@ class AgenteRedator:
         sub_direito_leg_html = self._gerar_secao_html(prompt_direito_legislacao, "DO DIREITO (LEGISLAÇÃO)")
 
         prompt_direito_jurisprudencia = f"""
-        Redija a subseção sobre a **JURISPRUDÊNCIA APLICÁVEL** para a seção "DO DIREITO".
+        Redija a subseção sobre a **JURISPRUDÊNCIA APLICÁVEL**.
         REQUISITOS:
         - Mínimo de **5.000 caracteres**.
-        - Integre as citações da jurisprudência (`<blockquote>`) fornecidas, analise cada uma e explique como reforçam o pedido da Reclamante.
+        - Integre as citações da jurisprudência (`<blockquote>`) fornecidas. Para cada citação, adicione um parágrafo de análise explicando sua relevância para o caso.
         - DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
         - BLOCO DE JURISPRUDÊNCIA PRÉ-PROCESSADO: {jurisprudencia_html}
         - Retorne APENAS o bloco de HTML, começando com `<h3>Da Jurisprudência Aplicável ao Caso</h3>`.
@@ -176,10 +188,10 @@ class AgenteRedator:
         sub_direito_jur_html = self._gerar_secao_html(prompt_direito_jurisprudencia, "DO DIREITO (JURISPRUDÊNCIA)")
 
         prompt_direito_doutrina = f"""
-        Redija a subseção sobre a **DOUTRINA** e o **DANO MORAL** para a seção "DO DIREITO".
+        Redija a subseção sobre a **DOUTRINA** e o **DANO MORAL**.
         REQUISITOS:
         - Mínimo de **5.000 caracteres**.
-        - Use os conceitos doutrinários para construir a tese do assédio moral e do dano existencial.
+        - Use os conceitos doutrinários fornecidos para construir a tese do assédio moral e do dano existencial.
         - DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
         - BLOCO DE DOUTRINA PRÉ-PROCESSADO: {doutrina_html}
         - Retorne APENAS o bloco de HTML, começando com `<h3>Do Assédio Moral e do Dano Existencial: Análise Doutrinária</h3>`.
