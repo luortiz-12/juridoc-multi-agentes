@@ -25,11 +25,7 @@ class AgenteRedator:
         self.api_key = api_key
         print(f"✅ Agente Redator recebeu a chave da API: {self.api_key[:5]}...{self.api_key[-4:]}")
         
-        # COMENTÁRIO: CORREÇÃO FINAL APLICADA AQUI.
-        # O argumento 'base_url' foi removido, pois não é aceite pela biblioteca da DeepSeek.
-        self.client = DeepSeekAPI(
-            api_key=self.api_key
-        )
+        self.client = DeepSeekAPI(api_key=self.api_key)
         print("✅ Cliente DeepSeek inicializado com sucesso.")
 
     def redigir_peticao_completa(self, dados_estruturados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> Dict[str, Any]:
@@ -49,7 +45,10 @@ class AgenteRedator:
             print(f"🤖 Chamando API DeepSeek - Modelo: {model}, Tokens: {max_tokens}, Timeout: {timeout_especifico}s")
             print(f"📝 Prompt (início): {prompt[:250].strip().replace(chr(10), ' ')}...")
             
-            response = self.client.chat.completions.create(
+            # COMENTÁRIO: CORREÇÃO FINAL APLICADA AQUI.
+            # O atributo '.chat' foi removido. A chamada correta para a biblioteca da DeepSeek
+            # é diretamente em 'self.client.completions.create'.
+            response = self.client.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
