@@ -43,7 +43,7 @@ urllib3==2.4.0
 Werkzeug==3.1.3
 zstandard==0.23.0
 gunicorn
-deepseek
+
 
 aiohttp==3.9.5 # <--- ADICIONADO: Dependência que estava faltando
 duckduckgo-search

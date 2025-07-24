@@ -1,9 +1,9 @@
-# agente_redator.py - Versão adaptada para usar a API da DeepSeek via injeção de dependência
+# agente_redator.py - Versão Final e Corrigida para DeepSeek usando o SDK da OpenAI
 
 import json
 import logging
-# COMENTÁRIO: A importação foi corrigida para usar o nome correto da classe: 'Client'.
-from deepseek import Client
+# COMENTÁRIO: Voltamos a importar a biblioteca da OpenAI, que é a forma correta de aceder à API da DeepSeek.
+import openai
 import os
 from typing import Dict, List, Any
 import re
@@ -12,8 +12,8 @@ import traceback
 
 class AgenteRedator:
     """
-    Agente Redator adaptado para usar os modelos da DeepSeek.
-    Recebe a chave da API durante a inicialização.
+    Agente Redator que usa a API da DeepSeek através do SDK oficial da OpenAI.
+    Esta é a abordagem correta e mais estável.
     """
     
     def __init__(self, api_key: str):
@@ -24,14 +24,15 @@ class AgenteRedator:
             raise ValueError("DEEPSEEK_API_KEY não configurada")
         
         self.api_key = api_key
-        print(f"✅ Agente Redator recebeu a chave da API: {self.api_key[:5]}...{self.api_key[-4:]}")
+        print(f"✅ Agente Redator recebeu a chave da API da DeepSeek: {self.api_key[:5]}...{self.api_key[-4:]}")
         
-        # COMENTÁRIO: A inicialização do cliente foi corrigida para usar a classe 'Client' e a base_url correta.
-        self.client = Client(
+        # COMENTÁRIO: A inicialização do cliente agora usa a classe OpenAI, mas aponta para o
+        # endpoint da DeepSeek através do argumento 'base_url'. Esta é a correção crucial.
+        self.client = openai.OpenAI(
             api_key=self.api_key,
             base_url="https://api.deepseek.com/v1"
         )
-        print("✅ Cliente DeepSeek inicializado com sucesso.")
+        print("✅ Cliente configurado para usar a API da DeepSeek com sucesso.")
 
     def redigir_peticao_completa(self, dados_estruturados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> Dict[str, Any]:
         try:
@@ -50,8 +51,8 @@ class AgenteRedator:
             print(f"🤖 Chamando API DeepSeek - Modelo: {model}, Tokens: {max_tokens}, Timeout: {timeout_especifico}s")
             print(f"📝 Prompt (início): {prompt[:250].strip().replace(chr(10), ' ')}...")
             
-            # COMENTÁRIO: CORREÇÃO FINAL APLICADA AQUI.
-            # A chamada correta para a biblioteca da DeepSeek é através de 'self.client.chat.completions.create'.
+            # COMENTÁRIO: A chamada volta a ser 'self.client.chat.completions.create',
+            # que é a sintaxe correta para a biblioteca da OpenAI.
             response = self.client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
@@ -78,6 +79,7 @@ class AgenteRedator:
 
     def _gerar_secao_html(self, prompt: str, secao_nome: str) -> str:
         print(f"📝 Gerando seção: {secao_nome}")
+        # COMENTÁRIO: O nome do modelo da DeepSeek é passado aqui.
         return self._chamar_api_com_log(prompt, "deepseek-chat", 4000, 0.4, 240)
 
     def gerar_documento_html_puro(self, dados_formulario: Dict, pesquisas: Dict) -> str:
