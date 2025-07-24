@@ -2,7 +2,8 @@
 
 import json
 import logging
-from deepseek import DeepSeekAPI
+# COMENTÁRIO: A importação foi corrigida para usar o nome correto da classe: 'Client'.
+from deepseek import Client
 import os
 from typing import Dict, List, Any
 import re
@@ -25,7 +26,11 @@ class AgenteRedator:
         self.api_key = api_key
         print(f"✅ Agente Redator recebeu a chave da API: {self.api_key[:5]}...{self.api_key[-4:]}")
         
-        self.client = DeepSeekAPI(api_key=self.api_key)
+        # COMENTÁRIO: A inicialização do cliente foi corrigida para usar a classe 'Client' e a base_url correta.
+        self.client = Client(
+            api_key=self.api_key,
+            base_url="https://api.deepseek.com/v1"
+        )
         print("✅ Cliente DeepSeek inicializado com sucesso.")
 
     def redigir_peticao_completa(self, dados_estruturados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> Dict[str, Any]:
@@ -46,9 +51,8 @@ class AgenteRedator:
             print(f"📝 Prompt (início): {prompt[:250].strip().replace(chr(10), ' ')}...")
             
             # COMENTÁRIO: CORREÇÃO FINAL APLICADA AQUI.
-            # O atributo '.chat' foi removido. A chamada correta para a biblioteca da DeepSeek
-            # é diretamente em 'self.client.completions.create'.
-            response = self.client.completions.create(
+            # A chamada correta para a biblioteca da DeepSeek é através de 'self.client.chat.completions.create'.
+            response = self.client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
