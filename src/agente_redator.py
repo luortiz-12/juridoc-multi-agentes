@@ -1,8 +1,9 @@
-# agente_redator.py - Agente Redator com Geração Modular e Granular
+# agente_redator.py - Versão adaptada para usar a API da DeepSeek
 
 import json
 import logging
-import openai
+# COMENTÁRIO: Trocamos a importação da biblioteca 'openai' pela 'deepseek'.
+import deepseek
 import os
 from typing import Dict, List, Any
 import re
@@ -11,72 +12,50 @@ import traceback
 
 class AgenteRedator:
     """
-    Agente Redator com arquitetura modular de alta performance:
-    1. PRÉ-PROCESSAMENTO: Analisa a pesquisa e cria blocos de fundamentação em HTML,
-       citando jurisprudência na íntegra quando necessário.
-    2. REDAÇÃO MODULAR: Gera cada seção da petição (Fatos, Direito, Pedidos) com chamadas
-       de IA dedicadas. A seção "DO DIREITO" é subdividida em três chamadas granulares
-       para garantir profundidade e evitar sobrecarga da IA.
-    3. MONTAGEM FINAL: Concatena as seções geradas em um único documento HTML coeso.
+    Agente Redator adaptado para usar os modelos da DeepSeek.
+    Mantém a arquitetura modular e granular com tolerância a falhas.
     """
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         
-        api_key = os.getenv('OPENAI_API_KEY')
+        # COMENTÁRIO: O código agora procura pela variável de ambiente 'DEEPSEEK_API_KEY'.
+        api_key = os.getenv('DEEPSEEK_API_KEY')
         if not api_key:
-            print("❌ ERRO: OPENAI_API_KEY não encontrada nas variáveis de ambiente")
-            raise ValueError("OPENAI_API_KEY não configurada")
+            print("❌ ERRO: DEEPSEEK_API_KEY não encontrada nas variáveis de ambiente")
+            raise ValueError("DEEPSEEK_API_KEY não configurada")
         
-        print(f"✅ OPENAI_API_KEY encontrada: {api_key[:10]}...{api_key[-4:]}")
+        print(f"✅ DEEPSEEK_API_KEY encontrada: {api_key[:5]}...{api_key[-4:]}")
         
-        self.client = openai.OpenAI(
+        # COMENTÁRIO: Inicializamos o cliente da DeepSeek. A sintaxe é muito similar à da OpenAI.
+        # A base_url aponta para o endpoint oficial da API da DeepSeek.
+        self.client = deepseek.DeepSeek(
             api_key=api_key,
-            timeout=300.0
+            base_url="https://api.deepseek.com/v1"
         )
-        print("✅ Cliente OpenAI inicializado com sucesso.")
+        print("✅ Cliente DeepSeek inicializado com sucesso.")
 
     def redigir_peticao_completa(self, dados_estruturados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            print("✍️ Iniciando redação modular e granular da petição com IA...")
-            
+            print("✍️ Iniciando redação modular com a API DeepSeek...")
             documento_html = self.gerar_documento_html_puro(dados_estruturados, pesquisa_juridica)
-            
-            tamanho_documento = len(documento_html)
-            score_qualidade = self._calcular_score_qualidade(documento_html, dados_estruturados)
-            
-            print(f"✅ Petição finalizada com IA: {tamanho_documento} caracteres")
-            print(f"📊 Score de qualidade: {score_qualidade}")
-            
-            # Retorna apenas o documento HTML em um JSON simples, conforme solicitado.
-            return {
-                "documento_html": documento_html
-            }
+            print(f"✅ Petição finalizada com DeepSeek: {len(documento_html)} caracteres")
+            return {"documento_html": documento_html}
         
         except Exception as e:
             print(f"❌ ERRO GERAL na redação da petição: {e}")
             self.logger.error(f"Erro na redação da petição: {traceback.format_exc()}")
             return {"status": "erro", "erro": str(e), "dados_estruturados": dados_estruturados}
 
-    def _calcular_score_qualidade(self, documento_html: str, dados_estruturados: Dict) -> int:
-        score = 50
-        if len(documento_html) > 30000: score += 20
-        elif len(documento_html) > 15000: score += 10
-        
-        if dados_estruturados.get('autor', {}).get('nome', '') in documento_html: score += 10
-        if dados_estruturados.get('reu', {}).get('nome', '') in documento_html: score += 10
-        
-        if "DO DIREITO" in documento_html and len(documento_html.split("DO DIREITO")[1]) > 1000: score += 10
-            
-        return min(score, 100)
-
-    def _chamar_openai_com_log(self, prompt: str, model: str, max_tokens: int, temperature: float, timeout_especifico: int) -> str:
+    def _chamar_api_com_log(self, prompt: str, model: str, max_tokens: int, temperature: float, timeout_especifico: int) -> str:
         try:
-            print(f"🤖 Chamando OpenAI - Modelo: {model}, Tokens: {max_tokens}, Timeout: {timeout_especifico}s")
-            print(f"📝 Prompt (início): {prompt[:200].strip().replace(chr(10), ' ')}...")
+            print(f"🤖 Chamando API DeepSeek - Modelo: {model}, Tokens: {max_tokens}, Timeout: {timeout_especifico}s")
+            print(f"📝 Prompt (início): {prompt[:250].strip().replace(chr(10), ' ')}...")
             
+            # COMENTÁRIO: A chamada para a API é praticamente idêntica à da OpenAI.
+            # A principal mudança é o nome do modelo, que agora é "deepseek-chat".
             response = self.client.chat.completions.create(
-                model=model,
+                model=model, # Ex: "deepseek-chat"
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
                 temperature=temperature,
@@ -85,127 +64,92 @@ class AgenteRedator:
             
             resultado = response.choices[0].message.content.strip()
 
-            # --- NOVO: DETECÇÃO DE RECUSA DA API ---
-            refusal_phrases = [
-                "i'm sorry, i can't assist",
-                "i am unable to",
-                "i cannot fulfill this request"
-            ]
+            refusal_phrases = ["i'm sorry", "i cannot", "i am unable", "não posso atender"]
             if any(phrase in resultado.lower() for phrase in refusal_phrases):
                 print(f"❌ ERRO: A API se recusou a processar o prompt.")
                 raise Exception("API Refusal: O modelo se recusou a gerar o conteúdo para esta seção.")
 
             resultado = re.sub(r'^```html|```$', '', resultado).strip()
-            print(f"✅ OpenAI respondeu com sucesso ({len(resultado)} chars)")
+            print(f"✅ DeepSeek respondeu com sucesso ({len(resultado)} chars)")
             return resultado
         
         except Exception as e:
-            print(f"❌ ERRO na chamada à API da OpenAI: {e}")
-            self.logger.error(f"Erro na chamada OpenAI: {traceback.format_exc()}")
+            # COMENTÁRIO: A biblioteca da DeepSeek pode ter tipos de erro diferentes (ex: deepseek.RateLimitError).
+            # Por segurança, capturamos a exceção genérica, mas o tratamento específico pode ser refinado.
+            print(f"❌ ERRO na chamada à API da DeepSeek: {e}")
+            self.logger.error(f"Erro na chamada DeepSeek: {traceback.format_exc()}")
             raise e
-
-    def processar_fundamentacao(self, pesquisas: List[Dict], tipo: str, contexto_caso: str) -> str:
-        try:
-            print(f"📄 Processando fundamentação de '{tipo}' com IA...")
-            if not pesquisas: return ""
-
-            conteudo_para_analise = ""
-            for item in pesquisas[:2]:
-                texto_completo = item.get('texto', '')
-                if texto_completo:
-                    conteudo_para_analise += f"\n\n--- Fonte: {item.get('url', 'N/A')} ---\n{texto_completo[:8000]}"
-
-            if not conteudo_para_analise:
-                return f"<p>Nenhum conteúdo de {tipo} foi encontrado para análise.</p>"
-
-            prompt_formatacao = f"""
-            Você é um advogado sênior. Com base nos trechos de pesquisa abaixo, crie um bloco de fundamentação jurídica em HTML para uma petição.
-
-            CONTEXTO DO CASO: "{contexto_caso[:1000]}"
-            TRECHOS DE PESQUISA DE {tipo.upper()}:
-            {conteudo_para_analise}
-
-            INSTRUÇÕES DETALHADAS:
-            - Se o tipo for 'legislação', explique os artigos de lei mais importantes e como se aplicam ao caso. NÃO transcreva os artigos literalmente.
-            - Se o tipo for 'jurisprudência', sua tarefa principal é identificar a ementa e os trechos mais importantes do voto. **TRANSCREVA ESSES TRECHOS NA ÍNTEGRA** dentro de `<blockquote>`. Após a citação, adicione um parágrafo de análise conectando o precedente ao caso concreto.
-            - Se o tipo for 'doutrina', resuma os principais argumentos dos autores e explique sua relevância para o caso.
-            - Crie um texto jurídico coeso e autoral.
-            - Retorne um único bloco de HTML formatado profissionalmente.
-            """
-            return self._chamar_openai_com_log(prompt_formatacao, "gpt-4o", 2000, 0.3, 180)
-
-        except Exception as e:
-            print(f"❌ ERRO no processamento de {tipo}: {e}")
-            return f"<div class='fundamentacao-item erro'><p>Ocorreu um erro ao processar a {tipo}.</p></div>"
 
     def _gerar_secao_html(self, prompt: str, secao_nome: str) -> str:
         """Função genérica para gerar uma seção da petição."""
         print(f"📝 Gerando seção: {secao_nome}")
-        return self._chamar_openai_com_log(prompt, "gpt-4o", 4000, 0.4, 240)
+        # COMENTÁRIO: Usando o modelo "deepseek-chat" como padrão.
+        return self._chamar_api_com_log(prompt, "deepseek-chat", 4000, 0.4, 240)
 
     def gerar_documento_html_puro(self, dados_formulario: Dict, pesquisas: Dict) -> str:
-        contexto_caso = f"Fatos: {dados_formulario.get('fatos', '')}. Pedidos: {dados_formulario.get('pedidos', '')}"
-        
-        print("🔄 Iniciando pré-processamento das fundamentações...")
-        legislacao_html = self.processar_fundamentacao(pesquisas.get('legislacao', []), "legislação", contexto_caso)
-        jurisprudencia_html = self.processar_fundamentacao(pesquisas.get('jurisprudencia', []), "jurisprudência", contexto_caso)
-        doutrina_html = self.processar_fundamentacao(pesquisas.get('doutrina', []), "doutrina", contexto_caso)
-
         print("📝 Iniciando redação das seções individuais...")
 
         prompt_fatos = f"""
-        Redija a seção **DOS FATOS** de uma petição inicial trabalhista.
+        Redija a seção **DOS FATOS** de uma petição inicial.
         REQUISITOS:
-        - Mínimo de **8.000 caracteres**. Seja prolixo e detalhista.
-        - Narre o cotidiano da Reclamante, com exemplos vívidos de humilhação e o impacto financeiro da falta de pagamento das horas extras.
+        - Use um tom formal e jurídico.
+        - Expanda a narrativa fornecida, adicionando detalhes para criar uma história coesa e persuasiva.
+        - Mínimo de 8.000 caracteres.
         - DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
         - Retorne APENAS o bloco de HTML para esta seção, começando com `<h2>DOS FATOS</h2>`.
         """
         secao_fatos_html = self._gerar_secao_html(prompt_fatos, "DOS FATOS")
 
-        # --- GERAÇÃO GRANULAR DA SEÇÃO "DO DIREITO" ---
         prompt_direito_legislacao = f"""
-        Redija uma subseção sobre a **FUNDAMENTAÇÃO LEGAL** para a seção "DO DIREITO".
-        REQUISITOS:
-        - Mínimo de **5.000 caracteres**.
-        - Discorra detalhadamente sobre a rescisão indireta (art. 483 CLT) e horas extras (art. 59 CLT), conectando cada artigo aos fatos do caso.
-        - Utilize o conteúdo do bloco de legislação para embasar sua análise.
-        - DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
-        - BLOCO DE LEGISLAÇÃO PRÉ-PROCESSADO: {legislacao_html}
-        - Retorne APENAS o bloco de HTML, começando com `<h3>Da Fundamentação Legal: Violações Contratuais Graves</h3>`.
+        Redija a subseção sobre a **FUNDAMENTAÇÃO LEGAL** para a seção "DO DIREITO".
+        CONTEXTO E FATOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
+        FUNDAMENTOS JURÍDICOS IDENTIFICADOS PARA PESQUISA: {', '.join(dados_formulario.get('fundamentos_necessarios', []))}
+        CONTEÚDO DA PESQUISA DE LEGISLAÇÃO (USE SE FOR RELEVANTE):
+        {pesquisas.get('legislacao_formatada', 'Nenhuma legislação específica foi encontrada na pesquisa.')}
+        INSTRUÇÕES:
+        1. Baseie sua argumentação nos **fatos do caso** e nos **fundamentos identificados**.
+        2. Se o conteúdo da pesquisa de legislação for útil e relevante, utilize-o para explicar os artigos de lei mais importantes e como se aplicam ao caso.
+        3. **Se o conteúdo da pesquisa for irrelevante, genérico ou vazio, ignore-o.** Redija a fundamentação legal com base apenas nos fatos e em seu conhecimento geral sobre a legislação aplicável ao caso.
+        4. Mínimo de 5.000 caracteres.
+        5. Retorne APENAS o bloco de HTML, começando com `<h3>Da Fundamentação Legal</h3>`.
         """
         sub_direito_leg_html = self._gerar_secao_html(prompt_direito_legislacao, "DO DIREITO (LEGISLAÇÃO)")
 
         prompt_direito_jurisprudencia = f"""
         Redija a subseção sobre a **JURISPRUDÊNCIA APLICÁVEL**.
-        REQUISITOS:
-        - Mínimo de **5.000 caracteres**.
-        - Integre as citações da jurisprudência (`<blockquote>`) fornecidas. Para cada citação, adicione um parágrafo de análise explicando sua relevância para o caso.
-        - DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
-        - BLOCO DE JURISPRUDÊNCIA PRÉ-PROCESSADO: {jurisprudencia_html}
-        - Retorne APENAS o bloco de HTML, começando com `<h3>Da Jurisprudência Aplicável ao Caso</h3>`.
+        CONTEXTO E FATOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
+        CONTEÚDO DA PESQUISA DE JURISPRUDÊNCIA (USE SE FOR RELEVANTE):
+        {pesquisas.get('jurisprudencia_formatada', 'Nenhuma jurisprudência específica foi encontrada na pesquisa.')}
+        INSTRUÇÕES:
+        1. Se o conteúdo da pesquisa de jurisprudência contiver julgados relevantes, transcreva os trechos mais importantes dentro de `<blockquote>` e, após cada citação, adicione um parágrafo de análise conectando o precedente ao caso concreto.
+        2. **Se o conteúdo da pesquisa for irrelevante ou vazio, ignore-o.** Em vez disso, redija um texto genérico explicando a importância da jurisprudência para o tema e mencione, com base no seu conhecimento geral, quais são os entendimentos consolidados dos tribunais sobre os fundamentos do caso.
+        3. Mínimo de 5.000 caracteres.
+        4. Retorne APENAS o bloco de HTML, começando com `<h3>Da Jurisprudência Aplicável</h3>`.
         """
         sub_direito_jur_html = self._gerar_secao_html(prompt_direito_jurisprudencia, "DO DIREITO (JURISPRUDÊNCIA)")
 
         prompt_direito_doutrina = f"""
         Redija a subseção sobre a **DOUTRINA** e o **DANO MORAL**.
-        REQUISITOS:
-        - Mínimo de **5.000 caracteres**.
-        - Use os conceitos doutrinários fornecidos para construir a tese do assédio moral e do dano existencial.
-        - DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
-        - BLOCO DE DOUTRINA PRÉ-PROCESSADO: {doutrina_html}
-        - Retorne APENAS o bloco de HTML, começando com `<h3>Do Assédio Moral e do Dano Existencial: Análise Doutrinária</h3>`.
+        CONTEXTO E FATOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
+        CONTEÚDO DA PESQUISA DE DOUTRINA (USE SE FOR RELEVANTE):
+        {pesquisas.get('doutrina_formatada', 'Nenhuma doutrina específica foi encontrada na pesquisa.')}
+        INSTRUÇÕES:
+        1. Se o conteúdo da pesquisa de doutrina for relevante, resuma os principais argumentos dos autores para construir a tese do caso (ex: dano moral, vínculo empregatício, etc.).
+        2. **Se o conteúdo da pesquisa for irrelevante ou vazio, ignore-o.** Redija a análise doutrinária com base apenas nos fatos e em seu conhecimento jurídico geral sobre os temas.
+        3. Mínimo de 5.000 caracteres.
+        4. Retorne APENAS o bloco de HTML, começando com `<h3>Da Análise Doutrinária</h3>`.
         """
         sub_direito_dout_html = self._gerar_secao_html(prompt_direito_doutrina, "DO DIREITO (DOUTRINA)")
         
         secao_direito_html = f"<h2>DO DIREITO</h2>{sub_direito_leg_html}{sub_direito_jur_html}{sub_direito_dout_html}"
 
         prompt_pedidos = f"""
-        Redija a seção **DOS PEDIDOS** de uma petição inicial trabalhista.
+        Redija a seção **DOS PEDIDOS** de uma petição inicial.
         REQUISITOS:
-        - Mínimo de **5.000 caracteres**.
-        - Para cada pedido, crie um item de lista (`<li>`) e um parágrafo explicativo detalhando o fundamento legal.
-        - DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
+        - Crie uma lista (`<ul>` e `<li>`) detalhada.
+        - Para cada item da lista, adicione um parágrafo (`<p>`) explicativo, detalhando o fundamento do pedido.
+        - Mínimo de 5.000 caracteres.
+        - DADOS DO CASO (use o campo 'pedidos' como base): {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
         - Retorne APENAS o bloco de HTML, começando com `<h2>DOS PEDIDOS</h2>`.
         """
         secao_pedidos_html = self._gerar_secao_html(prompt_pedidos, "DOS PEDIDOS")
@@ -229,14 +173,14 @@ class AgenteRedator:
     </style>
 </head>
 <body>
-    <h1>EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO DE SÃO PAULO - SP</h1>
+    <h1>EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO DE {dados_formulario.get('reu', {}).get('cidade', 'CIDADE COMPETENTE')} - {dados_formulario.get('reu', {}).get('estado', 'UF')}</h1>
     <div class="qualificacao" style="margin-top: 50px;">
         <p>
-            <strong>{dados_formulario.get('autor', {}).get('nome', '').upper()}</strong>, {dados_formulario.get('autor', {}).get('qualificacao', '')}, residente e domiciliada em {dados_formulario.get('autor', {}).get('endereco', '[ENDEREÇO A SER PREENCHIDO]')}, vem, com o devido respeito, por intermédio de seu advogado que esta subscreve (procuração anexa), propor a presente
+            <strong>{dados_formulario.get('autor', {}).get('nome', '').upper()}</strong>, {dados_formulario.get('autor', {}).get('qualificacao', '')}, residente e domiciliada em [ENDEREÇO A SER PREENCHIDO], vem, com o devido respeito, por intermédio de seu advogado que esta subscreve (procuração anexa), propor a presente
         </p>
         <h1 style="margin-top: 20px;">AÇÃO TRABALHISTA</h1>
         <p>
-            em face de <strong>{dados_formulario.get('reu', {}).get('nome', '').upper()}</strong>, {dados_formulario.get('reu', {}).get('qualificacao', '')}, com sede {dados_formulario.get('reu', {}).get('endereco', '')}, pelos fatos e fundamentos a seguir expostos.
+            em face de <strong>{dados_formulario.get('reu', {}).get('nome', '').upper()}</strong>, {dados_formulario.get('reu', {}).get('qualificacao', '')}, pelos fatos e fundamentos a seguir expostos.
         </p>
     </div>
     {secao_fatos_html}
