@@ -2,7 +2,8 @@
 
 import json
 import logging
-import deepseek
+# COMENTÁRIO: A importação foi corrigida para o formato correto da biblioteca DeepSeek.
+from deepseek import DeepSeek
 import os
 from typing import Dict, List, Any
 import re
@@ -15,13 +16,9 @@ class AgenteRedator:
     Recebe a chave da API durante a inicialização.
     """
     
-    # COMENTÁRIO: CORREÇÃO APLICADA AQUI.
-    # A definição do construtor foi alterada de `def __init__(self):` para
-    # `def __init__(self, api_key: str):` para que ele possa receber a chave da API do orquestrador.
     def __init__(self, api_key: str):
         self.logger = logging.getLogger(__name__)
         
-        # A verificação agora é feita sobre o argumento recebido, não mais lendo do ambiente.
         if not api_key:
             print("❌ ERRO: Nenhuma chave de API foi fornecida ao AgenteRedator.")
             raise ValueError("DEEPSEEK_API_KEY não configurada")
@@ -29,7 +26,8 @@ class AgenteRedator:
         self.api_key = api_key
         print(f"✅ Agente Redator recebeu a chave da API: {self.api_key[:5]}...{self.api_key[-4:]}")
         
-        self.client = deepseek.DeepSeek(
+        # COMENTÁRIO: A inicialização do cliente foi corrigida para usar a classe 'DeepSeek' diretamente.
+        self.client = DeepSeek(
             api_key=self.api_key,
             base_url="https://api.deepseek.com/v1"
         )
