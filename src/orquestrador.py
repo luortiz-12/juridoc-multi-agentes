@@ -1,4 +1,4 @@
-# orquestrador.py - Orquestrador Principal sem erros de sintaxe
+# orquestrador.py - Orquestrador Principal com Injeção de Dependência da API Key
 
 import os
 import json
@@ -15,12 +15,25 @@ class OrquestradorPrincipal:
     def __init__(self):
         print("Inicializando Orquestrador Principal...")
         
+        # COMENTÁRIO: A leitura da chave da API foi centralizada aqui.
+        # O orquestrador agora é o único responsável por obter este segredo do ambiente.
+        deepseek_api_key = os.getenv('DEEPSEEK_API_KEY')
+        if not deepseek_api_key:
+            # Este erro agora acontecerá aqui, de forma mais clara, se a chave não for encontrada.
+            raise ValueError("ERRO CRÍTICO: DEEPSEEK_API_KEY não encontrada no ambiente do Orquestrador.")
+        
+        print("✅ Chave da API encontrada pelo Orquestrador.")
+
         self.agente_coletor = AgenteColetorDados()
         self.pesquisa_juridica = PesquisaJuridica()
-        self.agente_redator = AgenteRedator()
+        
+        # COMENTÁRIO: Ao inicializar o AgenteRedator, agora passamos a chave da API diretamente para ele.
+        # Isso é conhecido como "injeção de dependência" e é uma prática muito mais robusta.
+        self.agente_redator = AgenteRedator(api_key=deepseek_api_key)
+        
         self.agente_validador = AgenteValidador()
         
-        print("Orquestrador Principal inicializado")
+        print("Orquestrador Principal inicializado com todos os agentes configurados.")
     
     def processar_solicitacao_completa(self, dados_entrada: Dict[str, Any]) -> Dict[str, Any]:
         try:
@@ -34,6 +47,9 @@ class OrquestradorPrincipal:
             resultado_coletor = self.agente_coletor.coletar_e_processar(dados_entrada)
             agentes_executados.append("Coletor de Dados")
             
+            if resultado_coletor.get("status") == "erro":
+                return resultado_coletor # Retorna o erro do coletor diretamente
+
             dados_estruturados = resultado_coletor.get('dados_estruturados', {})
             print("Dados estruturados: OK")
             
@@ -57,6 +73,9 @@ class OrquestradorPrincipal:
             )
             agentes_executados.append("Redator")
             
+            if resultado_redacao.get("status") == "erro":
+                return resultado_redacao
+
             documento_html = resultado_redacao.get('documento_html', '')
             print(f"Documento redigido: {len(documento_html)} caracteres")
             
@@ -79,50 +98,27 @@ class OrquestradorPrincipal:
             
             resultado_final = {
                 "status": "sucesso",
-                "documento_html": documento_final,
-                "documento_final": documento_final,
+                "documento_final": documento_final, # Mantido para consistência interna
                 "dados_estruturados": dados_estruturados,
-                "pesquisa_realizada": f"Pesquisa realizada para {tipo_acao}. Fundamentos: {', '.join(fundamentos)}",
                 "pesquisa_juridica": resultado_pesquisa,
                 "agentes_executados": agentes_executados,
-                "estatisticas_completas": {
-                    "tempo_processamento": f"{tempo_total:.1f}s",
-                    "tamanho_documento": len(documento_final),
-                    "score_qualidade": score_qualidade,
-                    "agentes_executados": len(agentes_executados)
-                },
-                "relatorio_qualidade": {
-                    "score_qualidade": score_qualidade,
-                    "status": "completo",
-                    "agentes_executados": agentes_executados
-                },
-                "relatorio_validacao": {
-                    "score_qualidade": score_qualidade,
-                    "status": "completo",
-                    "agentes_executados": agentes_executados,
-                    "tamanho_documento": len(documento_final),
-                    "problemas_corrigidos": resultado_validacao.get('problemas_corrigidos', 0)
-                },
-                "timestamp": datetime.now().isoformat(),
+                "relatorio_validacao": resultado_validacao,
+                "score_qualidade": score_qualidade,
                 "tempo_processamento": f"{tempo_total:.1f}s",
-                "score_qualidade": score_qualidade
+                "timestamp": datetime.now().isoformat()
             }
             
             print("PROCESSAMENTO COMPLETO FINALIZADO!")
-            print(f"Tempo total: {tempo_total:.1f} segundos")
-            print(f"Agentes executados: {', '.join(agentes_executados)}")
-            print(f"Score de qualidade: {score_qualidade}%")
-            
             return resultado_final
             
         except Exception as e:
             print(f"ERRO no orquestrador: {e}")
             print(f"Traceback: {traceback.format_exc()}")
             return self._gerar_resultado_emergencia(dados_entrada, agentes_executados)
-    
+
     def _gerar_resultado_emergencia(self, dados_entrada: Dict[str, Any], agentes_executados: List[str]) -> Dict[str, Any]:
+        # ... (código de emergência permanece o mesmo)
         print("Gerando resultado de emergencia...")
-        
         nome_autor = dados_entrada.get('clienteNome', '[NOME A SER PREENCHIDO]')
         nome_reu = dados_entrada.get('nome_contrario_peticao', '[NOME DO REU A SER PREENCHIDO]')
         fatos = dados_entrada.get('fatos_peticao', '[FATOS A SEREM DETALHADOS]')
