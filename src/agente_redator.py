@@ -2,8 +2,8 @@
 
 import json
 import logging
-# COMENTÁRIO: A importação foi corrigida para o formato correto da biblioteca DeepSeek.
-from deepseek import DeepSeek
+# COMENTÁRIO: A importação foi corrigida para usar o nome correto da classe: 'DeepSeekAPI'.
+from deepseek import DeepSeekAPI
 import os
 from typing import Dict, List, Any
 import re
@@ -26,8 +26,8 @@ class AgenteRedator:
         self.api_key = api_key
         print(f"✅ Agente Redator recebeu a chave da API: {self.api_key[:5]}...{self.api_key[-4:]}")
         
-        # COMENTÁRIO: A inicialização do cliente foi corrigida para usar a classe 'DeepSeek' diretamente.
-        self.client = DeepSeek(
+        # COMENTÁRIO: A inicialização do cliente foi corrigida para usar a classe 'DeepSeekAPI' diretamente.
+        self.client = DeepSeekAPI(
             api_key=self.api_key,
             base_url="https://api.deepseek.com/v1"
         )
