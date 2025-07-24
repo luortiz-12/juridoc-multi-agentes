@@ -1,8 +1,7 @@
-# agente_redator.py - Versão adaptada para usar a API da DeepSeek
+# agente_redator.py - Versão adaptada para usar a API da DeepSeek via injeção de dependência
 
 import json
 import logging
-# COMENTÁRIO: Trocamos a importação da biblioteca 'openai' pela 'deepseek'.
 import deepseek
 import os
 from typing import Dict, List, Any
@@ -13,24 +12,25 @@ import traceback
 class AgenteRedator:
     """
     Agente Redator adaptado para usar os modelos da DeepSeek.
-    Mantém a arquitetura modular e granular com tolerância a falhas.
+    Recebe a chave da API durante a inicialização.
     """
     
-    def __init__(self):
+    # COMENTÁRIO: CORREÇÃO APLICADA AQUI.
+    # A definição do construtor foi alterada de `def __init__(self):` para
+    # `def __init__(self, api_key: str):` para que ele possa receber a chave da API do orquestrador.
+    def __init__(self, api_key: str):
         self.logger = logging.getLogger(__name__)
         
-        # COMENTÁRIO: O código agora procura pela variável de ambiente 'DEEPSEEK_API_KEY'.
-        api_key = os.getenv('DEEPSEEK_API_KEY')
+        # A verificação agora é feita sobre o argumento recebido, não mais lendo do ambiente.
         if not api_key:
-            print("❌ ERRO: DEEPSEEK_API_KEY não encontrada nas variáveis de ambiente")
+            print("❌ ERRO: Nenhuma chave de API foi fornecida ao AgenteRedator.")
             raise ValueError("DEEPSEEK_API_KEY não configurada")
         
-        print(f"✅ DEEPSEEK_API_KEY encontrada: {api_key[:5]}...{api_key[-4:]}")
+        self.api_key = api_key
+        print(f"✅ Agente Redator recebeu a chave da API: {self.api_key[:5]}...{self.api_key[-4:]}")
         
-        # COMENTÁRIO: Inicializamos o cliente da DeepSeek. A sintaxe é muito similar à da OpenAI.
-        # A base_url aponta para o endpoint oficial da API da DeepSeek.
         self.client = deepseek.DeepSeek(
-            api_key=api_key,
+            api_key=self.api_key,
             base_url="https://api.deepseek.com/v1"
         )
         print("✅ Cliente DeepSeek inicializado com sucesso.")
@@ -52,10 +52,8 @@ class AgenteRedator:
             print(f"🤖 Chamando API DeepSeek - Modelo: {model}, Tokens: {max_tokens}, Timeout: {timeout_especifico}s")
             print(f"📝 Prompt (início): {prompt[:250].strip().replace(chr(10), ' ')}...")
             
-            # COMENTÁRIO: A chamada para a API é praticamente idêntica à da OpenAI.
-            # A principal mudança é o nome do modelo, que agora é "deepseek-chat".
             response = self.client.chat.completions.create(
-                model=model, # Ex: "deepseek-chat"
+                model=model,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
                 temperature=temperature,
@@ -74,16 +72,12 @@ class AgenteRedator:
             return resultado
         
         except Exception as e:
-            # COMENTÁRIO: A biblioteca da DeepSeek pode ter tipos de erro diferentes (ex: deepseek.RateLimitError).
-            # Por segurança, capturamos a exceção genérica, mas o tratamento específico pode ser refinado.
             print(f"❌ ERRO na chamada à API da DeepSeek: {e}")
             self.logger.error(f"Erro na chamada DeepSeek: {traceback.format_exc()}")
             raise e
 
     def _gerar_secao_html(self, prompt: str, secao_nome: str) -> str:
-        """Função genérica para gerar uma seção da petição."""
         print(f"📝 Gerando seção: {secao_nome}")
-        # COMENTÁRIO: Usando o modelo "deepseek-chat" como padrão.
         return self._chamar_api_com_log(prompt, "deepseek-chat", 4000, 0.4, 240)
 
     def gerar_documento_html_puro(self, dados_formulario: Dict, pesquisas: Dict) -> str:
