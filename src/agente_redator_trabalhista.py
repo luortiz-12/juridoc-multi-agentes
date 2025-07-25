@@ -1,4 +1,4 @@
-# agente_redator.py - Versão Final e Corrigida para DeepSeek usando o SDK da OpenAI
+# agente_redator_trabalhista.py - Agente Especializado em Petições Trabalhistas
 
 import json
 import logging
