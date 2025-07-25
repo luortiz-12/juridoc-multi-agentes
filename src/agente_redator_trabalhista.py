@@ -2,192 +2,93 @@
 
 import json
 import logging
-# COMENTÁRIO: Voltamos a importar a biblioteca da OpenAI, que é a forma correta de aceder à API da DeepSeek.
-import openai
+import asyncio
+import openai  # Usa o SDK da OpenAI para compatibilidade
 import os
-from typing import Dict, List, Any
+from typing import Dict, Any
 import re
 from datetime import datetime
-import traceback
 
-class AgenteRedator:
+class AgenteRedatorTrabalhista:
     """
-    Agente Redator que usa a API da DeepSeek através do SDK oficial da OpenAI.
-    Esta é a abordagem correta e mais estável.
+    Agente Redator Otimizado e Especializado em Direito do Trabalho.
+    Usa a API da DeepSeek através do SDK da OpenAI.
     """
-    
     def __init__(self, api_key: str):
         self.logger = logging.getLogger(__name__)
-        
         if not api_key:
-            print("❌ ERRO: Nenhuma chave de API foi fornecida ao AgenteRedator.")
-            raise ValueError("DEEPSEEK_API_KEY não configurada")
+            raise ValueError("DEEPSEEK_API_KEY não configurada para o AgenteRedatorTrabalhista")
         
-        self.api_key = api_key
-        print(f"✅ Agente Redator recebeu a chave da API da DeepSeek: {self.api_key[:5]}...{self.api_key[-4:]}")
-        
-        # COMENTÁRIO: A inicialização do cliente agora usa a classe OpenAI, mas aponta para o
-        # endpoint da DeepSeek através do argumento 'base_url'. Esta é a correção crucial.
-        self.client = openai.OpenAI(
-            api_key=self.api_key,
-            base_url="https://api.deepseek.com/v1"
-        )
-        print("✅ Cliente configurado para usar a API da DeepSeek com sucesso.")
+        # Configura o cliente OpenAI para usar a API da DeepSeek
+        self.client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+        print("✅ Agente Redator TRABALHISTA inicializado com sucesso.")
 
-    def redigir_peticao_completa(self, dados_estruturados: Dict[str, Any], pesquisa_juridica: Dict[str, Any]) -> Dict[str, Any]:
+    async def _chamar_api_async(self, prompt: str, secao_nome: str) -> str:
+        """Chama a API de forma assíncrona para gerar uma seção."""
+        print(f"📝 Gerando seção trabalhista: {secao_nome}")
         try:
-            print("✍️ Iniciando redação modular com a API DeepSeek...")
-            documento_html = self.gerar_documento_html_puro(dados_estruturados, pesquisa_juridica)
-            print(f"✅ Petição finalizada com DeepSeek: {len(documento_html)} caracteres")
-            return {"documento_html": documento_html}
-        
-        except Exception as e:
-            print(f"❌ ERRO GERAL na redação da petição: {e}")
-            self.logger.error(f"Erro na redação da petição: {traceback.format_exc()}")
-            return {"status": "erro", "erro": str(e), "dados_estruturados": dados_estruturados}
-
-    def _chamar_api_com_log(self, prompt: str, model: str, max_tokens: int, temperature: float, timeout_especifico: int) -> str:
-        try:
-            print(f"🤖 Chamando API DeepSeek - Modelo: {model}, Tokens: {max_tokens}, Timeout: {timeout_especifico}s")
-            print(f"📝 Prompt (início): {prompt[:250].strip().replace(chr(10), ' ')}...")
-            
-            # COMENTÁRIO: A chamada volta a ser 'self.client.chat.completions.create',
-            # que é a sintaxe correta para a biblioteca da OpenAI.
-            response = self.client.chat.completions.create(
-                model=model,
+            # A biblioteca da OpenAI v1+ não é nativamente assíncrona,
+            # então executamos a chamada síncrona em uma thread separada para não bloquear.
+            response = await asyncio.to_thread(
+                self.client.chat.completions.create,
+                model="deepseek-chat",
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=max_tokens,
-                temperature=temperature,
-                timeout=float(timeout_especifico)
+                max_tokens=4096,
+                temperature=0.4
             )
-            
             resultado = response.choices[0].message.content.strip()
-
-            refusal_phrases = ["i'm sorry", "i cannot", "i am unable", "não posso atender"]
-            if any(phrase in resultado.lower() for phrase in refusal_phrases):
-                print(f"❌ ERRO: A API se recusou a processar o prompt.")
-                raise Exception("API Refusal: O modelo se recusou a gerar o conteúdo para esta seção.")
-
-            resultado = re.sub(r'^```html|```$', '', resultado).strip()
-            print(f"✅ DeepSeek respondeu com sucesso ({len(resultado)} chars)")
-            return resultado
-        
+            return re.sub(r'^```html|```$', '', resultado).strip()
         except Exception as e:
-            print(f"❌ ERRO na chamada à API da DeepSeek: {e}")
-            self.logger.error(f"Erro na chamada DeepSeek: {traceback.format_exc()}")
-            raise e
+            print(f"❌ ERRO na API para a seção {secao_nome}: {e}")
+            return f"<h2>Erro ao Gerar Seção: {secao_nome}</h2><p>Ocorreu um erro ao tentar gerar o conteúdo para esta parte do documento. Detalhes: {e}</p>"
 
-    def _gerar_secao_html(self, prompt: str, secao_nome: str) -> str:
-        print(f"📝 Gerando seção: {secao_nome}")
-        # COMENTÁRIO: O nome do modelo da DeepSeek é passado aqui.
-        return self._chamar_api_com_log(prompt, "deepseek-chat", 4000, 0.4, 240)
-
-    def gerar_documento_html_puro(self, dados_formulario: Dict, pesquisas: Dict) -> str:
-        print("📝 Iniciando redação das seções individuais...")
-
-        prompt_fatos = f"""
-        Redija a seção **DOS FATOS** de uma petição inicial.
-        REQUISITOS:
-        - Use um tom formal e jurídico.
-        - Expanda a narrativa fornecida, adicionando detalhes para criar uma história coesa e persuasiva.
-        - Mínimo de 8.000 caracteres.
-        - DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
-        - Retorne APENAS o bloco de HTML para esta seção, começando com `<h2>DOS FATOS</h2>`.
-        """
-        secao_fatos_html = self._gerar_secao_html(prompt_fatos, "DOS FATOS")
-
-        prompt_direito_legislacao = f"""
-        Redija a subseção sobre a **FUNDAMENTAÇÃO LEGAL** para a seção "DO DIREITO".
-        CONTEXTO E FATOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
-        FUNDAMENTOS JURÍDICOS IDENTIFICADOS PARA PESQUISA: {', '.join(dados_formulario.get('fundamentos_necessarios', []))}
-        CONTEÚDO DA PESQUISA DE LEGISLAÇÃO (USE SE FOR RELEVANTE):
-        {pesquisas.get('legislacao_formatada', 'Nenhuma legislação específica foi encontrada na pesquisa.')}
-        INSTRUÇÕES:
-        1. Baseie sua argumentação nos **fatos do caso** e nos **fundamentos identificados**.
-        2. Se o conteúdo da pesquisa de legislação for útil e relevante, utilize-o para explicar os artigos de lei mais importantes e como se aplicam ao caso.
-        3. **Se o conteúdo da pesquisa for irrelevante, genérico ou vazio, ignore-o.** Redija a fundamentação legal com base apenas nos fatos e em seu conhecimento geral sobre a legislação aplicável ao caso.
-        4. Mínimo de 5.000 caracteres.
-        5. Retorne APENAS o bloco de HTML, começando com `<h3>Da Fundamentação Legal</h3>`.
-        """
-        sub_direito_leg_html = self._gerar_secao_html(prompt_direito_legislacao, "DO DIREITO (LEGISLAÇÃO)")
-
-        prompt_direito_jurisprudencia = f"""
-        Redija a subseção sobre a **JURISPRUDÊNCIA APLICÁVEL**.
-        CONTEXTO E FATOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
-        CONTEÚDO DA PESQUISA DE JURISPRUDÊNCIA (USE SE FOR RELEVANTE):
-        {pesquisas.get('jurisprudencia_formatada', 'Nenhuma jurisprudência específica foi encontrada na pesquisa.')}
-        INSTRUÇÕES:
-        1. Se o conteúdo da pesquisa de jurisprudência contiver julgados relevantes, transcreva os trechos mais importantes dentro de `<blockquote>` e, após cada citação, adicione um parágrafo de análise conectando o precedente ao caso concreto.
-        2. **Se o conteúdo da pesquisa for irrelevante ou vazio, ignore-o.** Em vez disso, redija um texto genérico explicando a importância da jurisprudência para o tema e mencione, com base no seu conhecimento geral, quais são os entendimentos consolidados dos tribunais sobre os fundamentos do caso.
-        3. Mínimo de 5.000 caracteres.
-        4. Retorne APENAS o bloco de HTML, começando com `<h3>Da Jurisprudência Aplicável</h3>`.
-        """
-        sub_direito_jur_html = self._gerar_secao_html(prompt_direito_jurisprudencia, "DO DIREITO (JURISPRUDÊNCIA)")
-
-        prompt_direito_doutrina = f"""
-        Redija a subseção sobre a **DOUTRINA** e o **DANO MORAL**.
-        CONTEXTO E FATOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
-        CONTEÚDO DA PESQUISA DE DOUTRINA (USE SE FOR RELEVANTE):
-        {pesquisas.get('doutrina_formatada', 'Nenhuma doutrina específica foi encontrada na pesquisa.')}
-        INSTRUÇÕES:
-        1. Se o conteúdo da pesquisa de doutrina for relevante, resuma os principais argumentos dos autores para construir a tese do caso (ex: dano moral, vínculo empregatício, etc.).
-        2. **Se o conteúdo da pesquisa for irrelevante ou vazio, ignore-o.** Redija a análise doutrinária com base apenas nos fatos e em seu conhecimento jurídico geral sobre os temas.
-        3. Mínimo de 5.000 caracteres.
-        4. Retorne APENAS o bloco de HTML, começando com `<h3>Da Análise Doutrinária</h3>`.
-        """
-        sub_direito_dout_html = self._gerar_secao_html(prompt_direito_doutrina, "DO DIREITO (DOUTRINA)")
+    async def gerar_documento_html_puro_async(self, dados_formulario: Dict, pesquisas: Dict) -> str:
+        """Cria e executa todas as tarefas de redação em paralelo."""
         
-        secao_direito_html = f"<h2>DO DIREITO</h2>{sub_direito_leg_html}{sub_direito_jur_html}{sub_direito_dout_html}"
-
-        prompt_pedidos = f"""
-        Redija a seção **DOS PEDIDOS** de uma petição inicial.
-        REQUISITOS:
-        - Crie uma lista (`<ul>` e `<li>`) detalhada.
-        - Para cada item da lista, adicione um parágrafo (`<p>`) explicativo, detalhando o fundamento do pedido.
-        - Mínimo de 5.000 caracteres.
-        - DADOS DO CASO (use o campo 'pedidos' como base): {json.dumps(dados_formulario, ensure_ascii=False, indent=2)}
-        - Retorne APENAS o bloco de HTML, começando com `<h2>DOS PEDIDOS</h2>`.
-        """
-        secao_pedidos_html = self._gerar_secao_html(prompt_pedidos, "DOS PEDIDOS")
-
-        print("🧩 Montando o documento final...")
+        # Prompts altamente especializados para o contexto trabalhista.
+        prompts = {
+            "fatos": f"""Redija a seção **DOS FATOS** de uma petição inicial trabalhista. REQUISITOS: Use um tom formal e jurídico. Expanda a narrativa fornecida, adicionando detalhes para criar uma história coesa e persuasiva sobre a relação de emprego e os problemas ocorridos. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Retorne APENAS o bloco de HTML para esta seção, começando com <h2>DOS FATOS</h2>.""",
+            "legislacao": f"""Redija a subseção **DA FUNDAMENTAÇÃO LEGAL** para uma petição trabalhista. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA DE LEGISLAÇÃO: {pesquisas.get('legislacao_formatada', 'N/A')}. INSTRUÇÕES: Se a pesquisa for útil, explique os artigos da CLT e outras leis pertinentes. Se a pesquisa falhou, redija com base no seu conhecimento geral sobre os fundamentos do caso. Retorne APENAS o bloco de HTML, começando com <h3>Da Fundamentação Legal</h3>.""",
+            "jurisprudencia": f"""Redija a subseção **DA JURISPRUDÊNCIA APLICÁVEL** para uma petição trabalhista. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA DE JURISPRUDÊNCIA: {pesquisas.get('jurisprudencia_formatada', 'N/A')}. INSTRUÇÕES: Se a pesquisa contiver julgados relevantes, transcreva os trechos em `<blockquote>` e analise a conexão com o caso. Se a pesquisa falhou, explique os entendimentos consolidados dos tribunais sobre o tema. Retorne APENAS o bloco de HTML, começando com <h3>Da Jurisprudência Aplicável</h3>.""",
+            "doutrina": f"""Redija a subseção **DA ANÁLISE DOUTRINÁRIA** para uma petição trabalhista. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA DE DOUTRINA: {pesquisas.get('doutrina_formatada', 'N/A')}. INSTRUÇÕES: Resuma os argumentos de autores sobre os temas do caso (ex: vínculo empregatício, dano moral, etc.). Se a pesquisa falhou, use seu conhecimento geral. Retorne APENAS o bloco de HTML, começando com <h3>Da Análise Doutrinária</h3>.""",
+            "pedidos": f"""Redija a seção **DOS PEDIDOS** de uma petição inicial trabalhista. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. REQUISITOS: Crie uma lista `<ul>` e `<li>` detalhada. Para cada item, adicione um parágrafo `<p>` explicativo com o fundamento do pedido. Retorne APENAS o bloco de HTML, começando com <h2>DOS PEDIDOS</h2>."""
+        }
         
-        documento_final_html = f"""
-<!DOCTYPE html>
+        tasks = [self._chamar_api_async(p, n) for n, p in prompts.items()]
+        secao_fatos, sub_leg, sub_jur, sub_dout, secao_pedidos = await asyncio.gather(*tasks)
+        
+        secao_direito = f"<h2>DO DIREITO</h2>{sub_leg}{sub_jur}{sub_dout}"
+        
+        # Template HTML específico para a Justiça do Trabalho
+        return f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <title>Petição Inicial Trabalhista</title>
-    <style>
-        body {{ font-family: 'Times New Roman', serif; line-height: 1.8; text-align: justify; margin: 3cm; }}
-        h1 {{ text-align: center; font-size: 16pt; }}
-        h2 {{ text-align: left; font-size: 14pt; margin-top: 30px; font-weight: bold; }}
-        h3 {{ text-align: left; font-size: 12pt; margin-top: 20px; font-weight: bold; }}
-        p {{ text-indent: 2em; margin-bottom: 15px; }}
-        blockquote {{ margin-left: 4cm; font-style: italic; border-left: 2px solid #ccc; padding-left: 10px; }}
-        .qualificacao p {{ text-indent: 0; }}
-    </style>
+    <style>body{{font-family:'Times New Roman',serif;line-height:1.8;text-align:justify;margin:3cm}}h1{{text-align:center;font-size:16pt}}h2{{text-align:left;font-size:14pt;margin-top:30px;font-weight:bold}}h3{{text-align:left;font-size:12pt;margin-top:20px;font-weight:bold}}p{{text-indent:2em;margin-bottom:15px}}blockquote{{margin-left:4cm;font-style:italic;border-left:2px solid #ccc;padding-left:10px}}.qualificacao p{{text-indent:0}}</style>
 </head>
 <body>
-    <h1>EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO DE {dados_formulario.get('reu', {}).get('cidade', 'CIDADE COMPETENTE')} - {dados_formulario.get('reu', {}).get('estado', 'UF')}</h1>
-    <div class="qualificacao" style="margin-top: 50px;">
-        <p>
-            <strong>{dados_formulario.get('autor', {}).get('nome', '').upper()}</strong>, {dados_formulario.get('autor', {}).get('qualificacao', '')}, residente e domiciliada em [ENDEREÇO A SER PREENCHIDO], vem, com o devido respeito, por intermédio de seu advogado que esta subscreve (procuração anexa), propor a presente
-        </p>
-        <h1 style="margin-top: 20px;">AÇÃO TRABALHISTA</h1>
-        <p>
-            em face de <strong>{dados_formulario.get('reu', {}).get('nome', '').upper()}</strong>, {dados_formulario.get('reu', {}).get('qualificacao', '')}, pelos fatos e fundamentos a seguir expostos.
-        </p>
+    <h1>EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO DE {dados_formulario.get('reu', {}).get('cidade', 'CIDADE')} - {dados_formulario.get('reu', {}).get('estado', 'UF')}</h1>
+    <div class="qualificacao" style="margin-top:50px;">
+        <p><strong>{dados_formulario.get('autor',{}).get('nome','').upper()}</strong>, {dados_formulario.get('autor',{}).get('qualificacao','')}, residente e domiciliada em [ENDEREÇO A SER PREENCHIDO], vem, com o devido respeito, por intermédio de seu advogado que esta subscreve (procuração anexa), propor a presente</p>
+        <h1 style="margin-top:20px;">AÇÃO TRABALHISTA</h1>
+        <p>em face de <strong>{dados_formulario.get('reu',{}).get('nome','').upper()}</strong>, {dados_formulario.get('reu',{}).get('qualificacao','')}, pelos fatos e fundamentos a seguir expostos.</p>
     </div>
-    {secao_fatos_html}
-    {secao_direito_html}
-    {secao_pedidos_html}
-    <h2 style="font-size: 12pt; text-align:left;">DO VALOR DA CAUSA</h2>
+    {secao_fatos}
+    {secao_direito}
+    {secao_pedidos}
+    <h2 style="font-size:12pt;text-align:left;">DO VALOR DA CAUSA</h2>
     <p>Dá-se à causa o valor de {dados_formulario.get('valor_causa', 'R$ 0,00')}.</p>
-    <p style="margin-top: 50px;">Nestes termos,<br>Pede deferimento.</p>
-    <p style="text-align: center; margin-top: 50px;">[Local], {datetime.now().strftime('%d de %B de %Y')}.</p>
-    <p style="text-align: center; margin-top: 80px;">_________________________________________<br>ADVOGADO<br>OAB/SP Nº XXX.XXX</p>
+    <p style="margin-top:50px;">Nestes termos,<br>Pede deferimento.</p>
+    <p style="text-align:center;margin-top:50px;">[Local], {datetime.now().strftime('%d de %B de %Y')}.</p>
+    <p style="text-align:center;margin-top:80px;">_________________________________________<br>ADVOGADO<br>OAB/SP Nº XXX.XXX</p>
 </body>
-</html>
-        """
-        return documento_final_html.strip()
+</html>"""
+
+    def redigir_peticao_completa(self, dados_estruturados: Dict, pesquisa_juridica: Dict) -> Dict:
+        """Ponto de entrada síncrono que executa a lógica assíncrona."""
+        try:
+            documento_html = asyncio.run(self.gerar_documento_html_puro_async(dados_estruturados, pesquisa_juridica))
+            return {"documento_html": documento_html}
+        except Exception as e:
+            return {"status": "erro", "erro": str(e)}

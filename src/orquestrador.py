@@ -7,7 +7,7 @@ from datetime import datetime
 
 from agente_coletor_dados import AgenteColetorDados
 from pesquisa_juridica import PesquisaJuridica
-# COMENTÁRIO: Importamos as duas novas classes de redatores especializados.
+# COMENTÁRIO: Importa as duas classes de redatores especializados.
 from agente_redator_trabalhista import AgenteRedatorTrabalhista
 from agente_redator_civel import AgenteRedatorCivel
 from agente_validador import AgenteValidador
@@ -16,7 +16,6 @@ class OrquestradorPrincipal:
     def __init__(self):
         print("Inicializando Orquestrador Principal com Agentes Especializados...")
         
-        # O orquestrador centraliza a leitura da chave da API do ambiente.
         deepseek_api_key = os.getenv('DEEPSEEK_API_KEY')
         if not deepseek_api_key:
             raise ValueError("ERRO CRÍTICO: DEEPSEEK_API_KEY não encontrada no ambiente.")
@@ -26,7 +25,7 @@ class OrquestradorPrincipal:
         self.agente_coletor = AgenteColetorDados()
         self.pesquisa_juridica = PesquisaJuridica()
         
-        # COMENTÁRIO: Inicializamos uma instância de CADA agente redator, passando a chave da API.
+        # COMENTÁRIO: Inicializa uma instância de CADA agente redator, passando a chave da API.
         self.agente_redator_trabalhista = AgenteRedatorTrabalhista(api_key=deepseek_api_key)
         self.agente_redator_civel = AgenteRedatorCivel(api_key=deepseek_api_key)
         
@@ -83,7 +82,6 @@ class OrquestradorPrincipal:
             agentes_executados.append("Validador")
             documento_final = resultado_validacao.get('documento_validado', documento_html)
             
-            # RESULTADO FINAL
             print("PROCESSAMENTO COMPLETO FINALIZADO!")
             return {
                 "status": "sucesso",
