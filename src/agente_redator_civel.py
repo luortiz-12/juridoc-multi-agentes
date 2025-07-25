@@ -24,7 +24,8 @@ class AgenteRedatorCivel:
     async def _chamar_api_async(self, prompt: str, secao_nome: str) -> str:
         """Chama a API de forma assíncrona para gerar uma seção."""
         print(f"📝 Gerando seção cível: {secao_nome}")
-        try
+        # COMENTÁRIO: CORREÇÃO APLICADA AQUI. Adicionado o ':' que faltava após o 'try'.
+        try:
             # A biblioteca da OpenAI v1+ não é nativamente assíncrona,
             # então executamos a chamada síncrona em uma thread separada para não bloquear.
             response = await asyncio.to_thread(
