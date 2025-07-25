@@ -16,6 +16,7 @@ class OrquestradorPrincipal:
     def __init__(self):
         print("Inicializando Orquestrador Principal com Agentes Especializados...")
         
+        # O orquestrador centraliza a leitura da chave da API do ambiente.
         deepseek_api_key = os.getenv('DEEPSEEK_API_KEY')
         if not deepseek_api_key:
             raise ValueError("ERRO CRÍTICO: DEEPSEEK_API_KEY não encontrada no ambiente.")
@@ -25,8 +26,7 @@ class OrquestradorPrincipal:
         self.agente_coletor = AgenteColetorDados()
         self.pesquisa_juridica = PesquisaJuridica()
         
-        # COMENTÁRIO: Inicializamos uma instância de CADA agente redator.
-        # Cada um terá a sua própria lógica e prompts especializados.
+        # COMENTÁRIO: Inicializamos uma instância de CADA agente redator, passando a chave da API.
         self.agente_redator_trabalhista = AgenteRedatorTrabalhista(api_key=deepseek_api_key)
         self.agente_redator_civel = AgenteRedatorCivel(api_key=deepseek_api_key)
         
@@ -37,7 +37,6 @@ class OrquestradorPrincipal:
     def processar_solicitacao_completa(self, dados_entrada: Dict[str, Any]) -> Dict[str, Any]:
         try:
             print("Iniciando processamento completo...")
-            inicio_processamento = datetime.now()
             agentes_executados = []
             
             # ETAPA 1: COLETOR DE DADOS
@@ -61,8 +60,7 @@ class OrquestradorPrincipal:
             print("ETAPA 3: Selecionando Agente Redator Especializado...")
             tipo_acao = dados_estruturados.get('tipo_acao', 'Ação Cível')
             
-            # COMENTÁRIO: Esta é a nova lógica de decisão. O orquestrador verifica o tipo de ação
-            # e escolhe o agente redator correto para a tarefa.
+            # COMENTÁRIO: Lógica de decisão para escolher o agente redator correto.
             if "Trabalhista" in tipo_acao:
                 print("... Agente Trabalhista selecionado.")
                 agente_redator_ativo = self.agente_redator_trabalhista
@@ -90,7 +88,6 @@ class OrquestradorPrincipal:
             return {
                 "status": "sucesso",
                 "documento_final": documento_final,
-                # ... outros metadados podem ser adicionados aqui se necessário para logs
             }
             
         except Exception as e:
