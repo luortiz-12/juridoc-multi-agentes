@@ -1,4 +1,4 @@
-# agente_redator_trabalhista.py - Agente Especializado em Petições Trabalhistas
+# agente_redator_trabalhista.py - Agente Especializado em Petições Trabalhistas com Prompts Rígidos
 
 import json
 import logging
@@ -12,7 +12,7 @@ from datetime import datetime
 class AgenteRedatorTrabalhista:
     """
     Agente Redator Otimizado e Especializado em Direito do Trabalho.
-    Usa a API da DeepSeek através do SDK da OpenAI.
+    Utiliza prompts que proíbem Markdown e exigem o uso de tags HTML para formatação.
     """
     def __init__(self, api_key: str):
         self.logger = logging.getLogger(__name__)
@@ -45,13 +45,16 @@ class AgenteRedatorTrabalhista:
     async def gerar_documento_html_puro_async(self, dados_formulario: Dict, pesquisas: Dict) -> str:
         """Cria e executa todas as tarefas de redação em paralelo."""
         
-        # Prompts altamente especializados para o contexto trabalhista.
+        # COMENTÁRIO: Instrução explícita para a IA usar apenas HTML e não Markdown.
+        instrucao_formato = "Sua resposta DEVE ser um bloco de código HTML bem formatado. NÃO use Markdown (como `**` ou `*`). Para ênfase, use apenas tags HTML como `<strong>` para negrito e `<em>` para itálico."
+
+        # Prompts altamente especializados para o contexto trabalhista, agora com a instrução de formato.
         prompts = {
-            "fatos": f"""Redija a seção **DOS FATOS** de uma petição inicial trabalhista. REQUISITOS: Use um tom formal e jurídico. Expanda a narrativa fornecida, adicionando detalhes para criar uma história coesa e persuasiva sobre a relação de emprego e os problemas ocorridos. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Retorne APENAS o bloco de HTML para esta seção, começando com <h2>DOS FATOS</h2>.""",
-            "legislacao": f"""Redija a subseção **DA FUNDAMENTAÇÃO LEGAL** para uma petição trabalhista. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA DE LEGISLAÇÃO: {pesquisas.get('legislacao_formatada', 'N/A')}. INSTRUÇÕES: Se a pesquisa for útil, explique os artigos da CLT e outras leis pertinentes. Se a pesquisa falhou, redija com base no seu conhecimento geral sobre os fundamentos do caso. Retorne APENAS o bloco de HTML, começando com <h3>Da Fundamentação Legal</h3>.""",
-            "jurisprudencia": f"""Redija a subseção **DA JURISPRUDÊNCIA APLICÁVEL** para uma petição trabalhista. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA DE JURISPRUDÊNCIA: {pesquisas.get('jurisprudencia_formatada', 'N/A')}. INSTRUÇÕES: Se a pesquisa contiver julgados relevantes, transcreva os trechos em `<blockquote>` e analise a conexão com o caso. Se a pesquisa falhou, explique os entendimentos consolidados dos tribunais sobre o tema. Retorne APENAS o bloco de HTML, começando com <h3>Da Jurisprudência Aplicável</h3>.""",
-            "doutrina": f"""Redija a subseção **DA ANÁLISE DOUTRINÁRIA** para uma petição trabalhista. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA DE DOUTRINA: {pesquisas.get('doutrina_formatada', 'N/A')}. INSTRUÇÕES: Resuma os argumentos de autores sobre os temas do caso (ex: vínculo empregatício, dano moral, etc.). Se a pesquisa falhou, use seu conhecimento geral. Retorne APENAS o bloco de HTML, começando com <h3>Da Análise Doutrinária</h3>.""",
-            "pedidos": f"""Redija a seção **DOS PEDIDOS** de uma petição inicial trabalhista. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. REQUISITOS: Crie uma lista `<ul>` e `<li>` detalhada. Para cada item, adicione um parágrafo `<p>` explicativo com o fundamento do pedido. Retorne APENAS o bloco de HTML, começando com <h2>DOS PEDIDOS</h2>."""
+            "fatos": f"{instrucao_formato}\n\nRedija a seção 'DOS FATOS' de uma petição inicial trabalhista. Narre o cotidiano do Reclamante e os problemas na relação de emprego. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece sua resposta com <h2>DOS FATOS</h2>.",
+            "legislacao": f"{instrucao_formato}\n\nRedija a subseção 'DA FUNDAMENTAÇÃO LEGAL' para uma petição trabalhista. Foque nos artigos da CLT e leis relevantes. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece sua resposta com <h3>Da Fundamentação Legal</h3>.",
+            "jurisprudencia": f"{instrucao_formato}\n\nRedija a subseção sobre a 'JURISPRUDÊNCIA APLICÁVEL' para uma petição trabalhista. Cite precedentes do TST. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('jurisprudencia_formatada', 'N/A')}. Comece sua resposta com <h3>Da Jurisprudência Aplicável</h3>.",
+            "doutrina": f"{instrucao_formato}\n\nRedija a subseção sobre a 'ANÁLISE DOUTRINÁRIA' para uma petição trabalhista. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('doutrina_formatada', 'N/A')}. Comece sua resposta com <h3>Da Análise Doutrinária</h3>.",
+            "pedidos": f"{instrucao_formato}\n\nRedija a seção 'DOS PEDIDOS' de uma petição inicial trabalhista. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. REQUISITOS: Crie uma lista `<ul>` e `<li>` detalhada. Para cada item, adicione um parágrafo `<p>` explicativo com o fundamento do pedido. Comece sua resposta com <h2>DOS PEDIDOS</h2>."
         }
         
         tasks = [self._chamar_api_async(p, n) for n, p in prompts.items()]
