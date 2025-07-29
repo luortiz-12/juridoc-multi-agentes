@@ -1,28 +1,42 @@
-# agente_coletor_dados.py - Versão 5.0 (Suporte a Contratos)
+# agente_coletor_dados.py - Versão 5.2 (Suporte a Contratos Específicos)
 
+import json
 import re
 import traceback
 from typing import Dict, Any, List
 
 class AgenteColetorDados:
     """
-    Agente Coletor de Dados v5.0 - Suporte a múltiplos tipos de documentos.
+    Agente Coletor de Dados v5.2 - Suporte a múltiplos tipos de documentos.
     - Identifica Petições (Trabalhista, Cível, Criminal) e Contratos.
-    - Extrai fundamentos de forma especializada para cada tipo de documento.
+    - Extrai fundamentos de forma especializada, usando o tipo de contrato quando especificado.
     """
 
     def __init__(self):
-        print("📊 Inicializando Agente Coletor de Dados v5.0 (Multi-Documento)...")
-        # COMENTÁRIO: Adicionados os novos campos do formulário de Contrato.
+        print("📊 Inicializando Agente Coletor de Dados v5.2 (Multi-Documento)...")
+        # COMENTÁRIO: Adicionado o mapeamento para o novo campo 'Tipo-de-contrato'.
         self.mapeamento_flexivel = {
-            'contratante_nome': ['nomedocontratante'], 'contratante_cpf': ['cpfdacontratante'], 'contratante_rg': ['rgdocontratante'],
-            'contratante_cnpj': ['cnpjdacontratante'], 'contratante_endereco': ['endereçodocontratante'],
-            'contratado_nome': ['nomedocontratado'], 'contratado_cpf': ['cpfdacontratado'], 'contratado_rg': ['rgdocontratado'],
-            'contratado_cnpj': ['cnpjdacontratado'], 'contratado_endereco': ['endereçodocontratado'],
-            'objeto_contrato': ['objetodocontrato'], 'valor_contrato': ['valordocontrato'], 'forma_pagamento': ['formadepagamento'],
-            'prazos': ['prazos'], 'responsabilidades': ['responsabilidadesdaspartes'], 'penalidades': ['penalidadespordescumprimento'],
-            'foro': ['forodeeleição'],
-            # ... (mapeamentos de petições mantidos)
+            'tipo_contrato': ['tipodecontrato'],
+            'contratante_nome': ['nomedocontratante', 'contratante'],
+            'contratante_cpf': ['cpfdacontratante', 'cpfcontratante'],
+            'contratante_rg': ['rgdocontratante', 'rgcontratante'],
+            'contratante_cnpj': ['cnpjdacontratante', 'cnpjcontratante'],
+            'contratante_endereco': ['endereçodocontratante', 'endereçocontratante'],
+            'contratado_nome': ['nomedocontratado', 'contratado'],
+            'contratado_cpf': ['cpfdacontratado', 'cpfcontratado'],
+            'contratado_rg': ['rgdocontratado', 'rgcontratado'],
+            'contratado_cnpj': ['cnpjdacontratado', 'cnpjcontratado'],
+            'contratado_endereco': ['endereçodocontratado', 'endereçocontratado'],
+            'objeto_contrato': ['objetodocontrato', 'objeto'],
+            'valor_contrato': ['valordocontrato', 'valor'],
+            'forma_pagamento': ['formadepagamento'],
+            'prazos': ['prazos', 'prazosdepagamento'],
+            'responsabilidades': ['responsabilidadesdaspartes'],
+            'penalidades': ['penalidadespordescumprimento'],
+            'foro': ['forodeeleição', 'foro'],
+            'autor_nome': ['clientenome'], 'qualificacao_cliente': ['qualificacaocliente'],
+            'reu_nome': ['nomedaparte'], 'qualificacao_reu': ['qualificacaoparte'],
+            'fatos': ['fatos'], 'pedido': ['pedido'], 'valor_causa': ['valorcausa'],
         }
         print("✅ Agente Coletor pronto para processar múltiplos tipos de documentos.")
 
@@ -53,29 +67,35 @@ class AgenteColetorDados:
     def _identificar_contexto_e_dados(self, dados_normalizados: Dict[str, Any]) -> (str, Dict[str, Any]):
         dados_relevantes = {k: v for k, v in dados_normalizados.items() if v is not None and str(v).strip() != ""}
         
-        # COMENTÁRIO: Adicionada a lógica para identificar um Contrato.
-        # A presença de campos como 'nomedocontratante' ou 'objetodocontrato' é um forte indicador.
-        if any(k in dados_relevantes for k in ['nomedocontratante', 'objetodocontrato', 'valordocontrato']):
+        if any(k in dados_relevantes for k in ['contratante', 'objetodocontrato', 'objeto', 'valordocontrato', 'valor', 'tipodecontrato']):
             return "Contrato", dados_relevantes
-        # ... (lógicas de identificação de petições mantidas)
-        return "Petição", dados_relevantes # Fallback genérico para petições
+        
+        if any(k in dados_relevantes for k in ['solicitante', 'consulta']):
+            return "Parecer Jurídico", dados_relevantes
+        if any(k in dados_relevantes for k in ['dataadmissaotrabalhista', 'salariotrabalhista']):
+            return "Ação Trabalhista", dados_relevantes
+        
+        return "Petição", dados_relevantes
 
     def _consolidar_fatos(self, dados: Dict[str, Any], contexto: str) -> str:
-        # Para contratos, o campo "fatos" não é usado, pois os dados são estruturados.
         if contexto == "Contrato":
             return self._obter_valor(dados, 'objeto_contrato', '[Objeto do contrato não especificado]')
-        # ... (lógica de consolidação para petições mantida)
         return str(self._obter_valor(dados, 'fatos', ''))
 
     def _extrair_fundamentos_necessarios(self, fatos: str, contexto: str, dados: Dict[str, Any]) -> List[str]:
         fundamentos = set()
         if contexto == "Contrato":
-            # COMENTÁRIO: Para contratos, a pesquisa é focada no objeto do contrato.
+            # COMENTÁRIO: Lógica aprimorada. Ele primeiro tenta usar o tipo específico de contrato.
+            # Se não houver, ele usa o objeto do contrato para a pesquisa.
+            tipo_especifico = self._obter_valor(dados, 'tipo_contrato', '')
             objeto = self._obter_valor(dados, 'objeto_contrato', '')
-            fundamentos.add(f"modelo de contrato de {objeto}")
-            fundamentos.add(f"cláusulas essenciais contrato de {objeto}")
-            fundamentos.add(f"legislação aplicável a contrato de {objeto}")
-        # ... (lógica de extração para petições mantida)
+            
+            termo_principal = tipo_especifico if tipo_especifico else f"de {objeto}"
+            
+            fundamentos.add(f"modelo de {termo_principal}")
+            fundamentos.add(f"cláusulas essenciais {termo_principal}")
+            fundamentos.add(f"legislação aplicável a {termo_principal}")
+        # ... (outras lógicas de extração)
             
         return list(filter(None, fundamentos))
 
@@ -83,7 +103,7 @@ class AgenteColetorDados:
         estrutura_final = {"tipo_documento": contexto, "fundamentos_necessarios": fundamentos}
 
         if contexto == "Contrato":
-            # COMENTÁRIO: Estrutura de dados específica para contratos.
+            estrutura_final['tipo_contrato_especifico'] = self._obter_valor(dados, 'tipo_contrato') # Adiciona o tipo para o redator
             estrutura_final['contratante'] = {
                 "nome": self._obter_valor(dados, 'contratante_nome'), "cpf": self._obter_valor(dados, 'contratante_cpf'),
                 "rg": self._obter_valor(dados, 'contratante_rg'), "cnpj": self._obter_valor(dados, 'contratante_cnpj'),
@@ -100,9 +120,20 @@ class AgenteColetorDados:
                 "responsabilidades": self._obter_valor(dados, 'responsabilidades'), "penalidades": self._obter_valor(dados, 'penalidades'),
                 "foro": self._obter_valor(dados, 'foro')
             })
-        else:
-            # Estrutura para petições
-            estrutura_final['tipo_acao'] = self._obter_valor(dados, 'tipoDocumento', 'Petição') # Adaptação
-            # ... (estrutura de petições mantida)
+        else: # Estrutura para Petições e Pareceres
+            estrutura_final['tipo_acao'] = contexto
+            estrutura_final['fatos'] = fatos_consolidados
+            if "Parecer" in contexto:
+                 estrutura_final.update({
+                    "solicitante": self._obter_valor(dados, 'solicitante'),
+                    "assunto": self._obter_valor(dados, 'assunto'),
+                })
+            else: # Petições
+                estrutura_final.update({
+                    "autor": {"nome": self._obter_valor(dados, 'autor_nome'), "qualificacao": self._obter_valor(dados, 'qualificacao_cliente')},
+                    "reu": {"nome": self._obter_valor(dados, 'reu_nome'), "qualificacao": self._obter_valor(dados, 'qualificacao_reu')},
+                    "pedidos": self._obter_valor(dados, 'pedido'),
+                    "valor_causa": f"R$ {self._obter_valor(dados, 'valor_causa', '0.00')}"
+                })
 
         return estrutura_final
