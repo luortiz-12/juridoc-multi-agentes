@@ -1,39 +1,55 @@
-# agente_redator_habeas_corpus.py - Agente Especializado em Habeas Corpus
+# agente_redator_habeas_corpus.py - Versão 2.0 (Com Ciclo de Feedback e Meta de 30k)
 
 import json
 import logging
 import asyncio
 import openai
 import os
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 import re
 from datetime import datetime
 
 class AgenteRedatorHabeasCorpus:
+    """
+    Agente Redator Especializado em Habeas Corpus.
+    v2.0: Aceita feedback do Agente Validador para melhorar rascunhos e
+    tem uma meta de geração de conteúdo de 30.000 caracteres.
+    """
     def __init__(self, api_key: str):
         if not api_key: raise ValueError("DEEPSEEK_API_KEY não configurada")
         self.client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-        print("✅ Agente Redator de HABEAS CORPUS inicializado.")
+        print("✅ Agente Redator de HABEAS CORPUS (v2.0 com Feedback) inicializado.")
 
     async def _chamar_api_async(self, prompt: str, secao_nome: str) -> str:
-        print(f"📝 Gerando seção de Habeas Corpus: {secao_nome}")
+        """Chama a API de forma assíncrona para gerar uma seção específica."""
+        print(f"📝 Gerando/Melhorando seção de Habeas Corpus: {secao_nome}")
         try:
             response = await asyncio.to_thread(
                 self.client.chat.completions.create,
-                model="deepseek-chat", messages=[{"role": "user", "content": prompt}],
-                max_tokens=4096, temperature=0.3
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=8192,
+                temperature=0.3
             )
             return re.sub(r'^```html|```$', '', response.choices[0].message.content.strip())
         except Exception as e:
+            print(f"❌ ERRO na API para a seção {secao_nome}: {e}")
             return f"<h2>Erro ao Gerar Seção: {secao_nome}</h2><p>{e}</p>"
 
-    async def gerar_documento_html_puro_async(self, dados_formulario: Dict, pesquisas: Dict) -> str:
-        instrucao_formato = "Sua resposta DEVE ser um bloco de texto formatado usando APENAS as seguintes tags HTML: <h2>, <h3>, <p>, <strong>. NÃO use Markdown."
+    async def gerar_documento_html_puro_async(self, dados_formulario: Dict, pesquisas: Dict, documento_anterior: Optional[str] = None, recomendacoes: Optional[List[str]] = None) -> str:
+        """Cria ou melhora as seções do documento em paralelo."""
         
+        instrucao_formato = "Sua resposta DEVE ser um bloco de código HTML bem formatado. NÃO use Markdown (como `**` ou `*`). Para ênfase, use apenas tags HTML como `<strong>` para negrito."
+
+        instrucao_melhoria = ""
+        if recomendacoes:
+            instrucao_melhoria = f"\n\nINSTRUÇÕES PARA MELHORIA: A versão anterior foi considerada insatisfatória. Reescreva e expanda significativamente o conteúdo para atender a seguinte recomendação: '{' '.join(recomendacoes)}'. Use o rascunho anterior como referência do que NÃO fazer.\nRASCUNHO ANTERIOR:\n{documento_anterior}"
+
+        # COMENTÁRIO: Prompts modulares com requisitos de tamanho para atingir a meta de 30k.
         prompts = {
-            "fatos": f"{instrucao_formato}\n\nRedija a seção 'DOS FATOS' de um Habeas Corpus. Descreva a prisão, o constrangimento ilegal, a autoridade coatora e o motivo pelo qual a prisão é ilegal. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS FATOS E DO CONSTRANGIMENTO ILEGAL</h2>.",
-            "direito": f"{instrucao_formato}\n\nRedija a seção 'DO DIREITO' de um Habeas Corpus. Foque no direito à liberdade (Art. 5º, LXVIII, CF) e nos artigos do Código de Processo Penal sobre as hipóteses de soltura. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece com <h2>DO DIREITO E DO PEDIDO LIMINAR</h2>.",
-            "pedidos": f"{instrucao_formato}\n\nRedija a seção 'DOS PEDIDOS' de um Habeas Corpus. Peça a concessão liminar da ordem para expedir o alvará de soltura e, no mérito, a confirmação da ordem. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS PEDIDOS</h2>."
+            "fatos": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a seção 'DOS FATOS E DO CONSTRANGIMENTO ILEGAL' de um Habeas Corpus. Seja extremamente detalhado, com no mínimo 10.000 caracteres. Descreva a prisão, o constrangimento ilegal, a autoridade coatora e o motivo pelo qual a prisão é ilegal. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS FATOS E DO CONSTRANGIMENTO ILEGAL</h2>.",
+            "direito": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a seção 'DO DIREITO E DO PEDIDO LIMINAR' de um Habeas Corpus. Seja detalhado, com no mínimo 15.000 caracteres. Foque no direito à liberdade (Art. 5º, LXVIII, CF) e nos artigos do Código de Processo Penal sobre as hipóteses de soltura e os requisitos da prisão preventiva. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece com <h2>DO DIREITO E DO PEDIDO LIMINAR</h2>.",
+            "pedidos": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a seção 'DOS PEDIDOS' de um Habeas Corpus. Seja detalhado, com no mínimo 5.000 caracteres. Peça a concessão liminar da ordem para expedir o alvará de soltura e, no mérito, a confirmação da ordem. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS PEDIDOS</h2>."
         }
         
         tasks = [self._chamar_api_async(p, n) for n, p in prompts.items()]
@@ -57,8 +73,10 @@ class AgenteRedatorHabeasCorpus:
 </body></html>
         """
 
-    def redigir_peticao_completa(self, dados_estruturados: Dict, pesquisa_juridica: Dict) -> Dict:
+    def redigir_peticao_completa(self, dados_estruturados: Dict, pesquisa_juridica: Dict, documento_anterior: Optional[str] = None, recomendacoes: Optional[List[str]] = None) -> Dict:
+        """Ponto de entrada síncrono que executa a lógica assíncrona, passando o feedback se existir."""
         try:
-            return {"documento_html": asyncio.run(self.gerar_documento_html_puro_async(dados_estruturados, pesquisa_juridica))}
+            documento_html = asyncio.run(self.gerar_documento_html_puro_async(dados_estruturados, pesquisa_juridica, documento_anterior, recomendacoes))
+            return {"documento_html": documento_html}
         except Exception as e:
             return {"status": "erro", "erro": str(e)}
