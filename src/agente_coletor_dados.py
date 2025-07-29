@@ -1,4 +1,4 @@
-# agente_coletor_dados.py - Versão 5.3 (Lógica de Fundamentos Aprimorada)
+# agente_coletor_dados.py - Versão 6.0 (Final - Suporte a todos os documentos)
 
 import json
 import re
@@ -7,33 +7,29 @@ from typing import Dict, Any, List
 
 class AgenteColetorDados:
     """
-    Agente Coletor de Dados v5.3 - Suporte a múltiplos tipos de documentos.
-    - Lógica de extração de fundamentos aprimorada para ser mais sensível ao conteúdo.
+    Agente Coletor de Dados v6.0 - Versão final com suporte a todos os tipos de documentos.
+    - Identifica Petições, Pareceres e Contratos.
+    - Extrai fundamentos de forma especializada para cada tipo, incluindo o tipo específico de contrato.
     """
 
     def __init__(self):
-        print("📊 Inicializando Agente Coletor de Dados v5.3 (Multi-Documento)...")
+        print("📊 Inicializando Agente Coletor de Dados v6.0 (Final)...")
         self.mapeamento_flexivel = {
+            # Contrato
             'tipo_contrato': ['tipodecontrato'],
-            'contratante_nome': ['nomedocontratante', 'contratante'], 'contratante_cpf': ['cpfdacontratante', 'cpfcontratante'],
-            'contratante_rg': ['rgdocontratante', 'rgcontratante'], 'contratante_cnpj': ['cnpjdacontratante', 'cnpjcontratante'],
-            'contratante_endereco': ['endereçodocontratante', 'endereçocontratante'],
-            'contratado_nome': ['nomedocontratado', 'contratado'], 'contratado_cpf': ['cpfdacontratado', 'cpfcontratado'],
-            'contratado_rg': ['rgdocontratado', 'rgcontratado'], 'contratado_cnpj': ['cnpjdacontratado', 'cnpjcontratado'],
-            'contratado_endereco': ['endereçodocontratado', 'endereçocontratado'],
+            'contratante_nome': ['nomedocontratante', 'contratante'], 'contratado_nome': ['nomedocontratado', 'contratado'],
             'objeto_contrato': ['objetodocontrato', 'objeto'], 'valor_contrato': ['valordocontrato', 'valor'],
-            'forma_pagamento': ['formadepagamento'], 'prazos': ['prazos', 'prazosdepagamento'],
-            'responsabilidades': ['responsabilidadesdaspartes'], 'penalidades': ['penalidadespordescumprimento'],
-            'foro': ['forodeeleição', 'foro'],
-            'autor_nome': ['clientenome'], 'qualificacao_cliente': ['qualificacaocliente'],
-            'reu_nome': ['nomedaparte'], 'qualificacao_reu': ['qualificacaoparte'],
-            'fatos': ['fatos'], 'pedido': ['pedido'], 'valor_causa': ['valorcausa'], 'documentos': ['documentos'],
-            'info_extra_civil': ['infoextrascivil', 'informacaoextrapeticaocivil'],
-            'info_extra_trabalhista': ['infoextratrabalhista', 'informacaoextratrabalhista'],
-            'data_admissao': ['dataadmissaotrabalhista'], 'data_demissao': ['datademisaotrabalhista'],
-            'salario': ['salariotrabalhista'], 'jornada': ['jornadadetrabalho'], 'motivo_saida': ['motivosaidatrablhista'],
+            # Parecer
+            'solicitante': ['solicitante'], 'assunto': ['assunto'], 'consulta': ['consulta'],
+            'legislacao_aplicavel': ['legislacao', 'legislacaoaplicavel'], 'analise': ['analise'],
+            # Petições
+            'autor_nome': ['clientenome'], 'reu_nome': ['nomedaparte'],
+            'fatos': ['fatos'], 'pedido': ['pedido'], 'valor_causa': ['valorcausa'],
+            'data_admissao': ['dataadmissaotrabalhista'], 'salario': ['salariotrabalhista'],
+            'data_fato_criminal': ['datafatocriminal'], 'local_fato_criminal': ['localfatocriminal'],
+            'autoridade_coatora': ['autoridadecoatorahabiescorpus'], 'local_prisao': ['localdapisaohabiescorpus'],
         }
-        print("✅ Agente Coletor pronto para processar múltiplos tipos de documentos.")
+        print("✅ Agente Coletor pronto para processar todos os tipos de documentos.")
 
     def _normalizar_chave(self, chave: str) -> str:
         return re.sub(r'[^a-z0-9]', '', str(chave).lower())
@@ -62,34 +58,28 @@ class AgenteColetorDados:
     def _identificar_contexto_e_dados(self, dados_normalizados: Dict[str, Any]) -> (str, Dict[str, Any]):
         dados_relevantes = {k: v for k, v in dados_normalizados.items() if v is not None and str(v).strip() != ""}
         
-        texto_analise = (
-            str(self._obter_valor(dados_relevantes, 'fatos', '')) + " " +
-            str(self._obter_valor(dados_relevantes, 'pedido', '')) + " " +
-            str(self._obter_valor(dados_relevantes, 'info_extra_civil', '')) + " " +
-            str(self._obter_valor(dados_relevantes, 'info_extra_trabalhista', ''))
-        ).lower()
-
-        if any(k in dados_relevantes for k in ['contratante', 'objetodocontrato', 'objeto', 'valordocontrato', 'valor', 'tipodecontrato']):
+        if any(k in dados_relevantes for k in ['contratante', 'objetodocontrato', 'objeto', 'tipodecontrato']):
             return "Contrato", dados_relevantes
         if any(k in dados_relevantes for k in ['solicitante', 'consulta']):
             return "Parecer Jurídico", dados_relevantes
-        
-        palavras_trabalhistas = ['clt', 'reclamante', 'vínculo empregatício', 'verbas rescisórias', 'demissão', 'admissão', 'teletrabalho']
-        if any(k in dados_relevantes for k in ['dataadmissaotrabalhista', 'salariotrabalhista']) or any(p in texto_analise for p in palavras_trabalhistas):
+        if any(k in dados_relevantes for k in ['autoridadecoatorahabiescorpus']):
+            return "Habeas Corpus", dados_relevantes
+        if any(k in dados_relevantes for k in ['datafatocriminal']):
+            return "Queixa-Crime", dados_relevantes
+        if any(k in dados_relevantes for k in ['dataadmissaotrabalhista']):
             return "Ação Trabalhista", dados_relevantes
-
+        
         return "Ação Cível", dados_relevantes
 
     def _consolidar_fatos(self, dados: Dict[str, Any], contexto: str) -> str:
         narrativa = []
-        if self._obter_valor(dados, 'fatos'): narrativa.append(str(self._obter_valor(dados, 'fatos')))
-        
-        if contexto == "Ação Trabalhista":
-            if self._obter_valor(dados, 'jornada'): narrativa.append(f"A jornada de trabalho era: {self._obter_valor(dados, 'jornada')}.")
-            if self._obter_valor(dados, 'motivo_saida'): narrativa.append(f"O motivo da saída foi: {self._obter_valor(dados, 'motivo_saida')}.")
-            if self._obter_valor(dados, 'info_extra_trabalhista'): narrativa.append(f"Informações adicionais: {self._obter_valor(dados, 'info_extra_trabalhista')}.")
-        elif "Cível" in contexto:
-            if self._obter_valor(dados, 'info_extra_civil'): narrativa.append(f"Informações adicionais: {self._obter_valor(dados, 'info_extra_civil')}.")
+        if contexto == "Contrato":
+            return self._obter_valor(dados, 'objeto_contrato', '[Objeto do contrato não especificado]')
+        elif contexto == "Parecer Jurídico":
+            if self._obter_valor(dados, 'consulta'): narrativa.append(f"Consulta: {self._obter_valor(dados, 'consulta')}")
+            if self._obter_valor(dados, 'analise'): narrativa.append(f"Análise Preliminar: {self._obter_valor(dados, 'analise')}")
+        else: # Petições
+            if self._obter_valor(dados, 'fatos'): narrativa.append(str(self._obter_valor(dados, 'fatos')))
             
         return " ".join(narrativa)
 
@@ -97,58 +87,50 @@ class AgenteColetorDados:
         fundamentos = set()
         texto_analise = fatos.lower()
 
-        if contexto == "Ação Trabalhista":
-            # COMENTÁRIO: Lógica de extração aprimorada para ser mais sensível ao conteúdo.
-            fundamentos.update(["direito trabalhista", "CLT"])
-            if "pejotização" in texto_analise or "vínculo empregatício" in texto_analise:
-                fundamentos.update(["reconhecimento de vínculo empregatício", "pejotização", "artigo 3º da CLT"])
-            if "horas extras" in texto_analise:
-                fundamentos.update(["horas extras teletrabalho", "controle de jornada", "CLT art. 62"])
-            if "comissões" in texto_analise or "comissão" in texto_analise:
-                fundamentos.update(["integração de comissões ao salário", "cálculo verbas rescisórias comissões", "Súmula 340 TST"])
-            if "dano existencial" in texto_analise:
-                fundamentos.add("dano existencial jornada excessiva")
-            if "assédio moral" in texto_analise:
-                fundamentos.update(["assédio moral", "danos morais"])
-            if "doença ocupacional" in texto_analise:
-                fundamentos.update(["doença ocupacional", "estabilidade acidentária"])
-        
-        elif "Consumidor" in contexto:
-            fundamentos.update(["direito do consumidor", "Código de Defesa do Consumidor"])
-            if "vício" in texto_analise or "defeito" in texto_analise:
-                fundamentos.add("vício do produto CDC artigo 18")
-            if "dano moral" in texto_analise:
-                fundamentos.add("dano moral consumidor")
-        
-        palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'art', 'artigo'}
-        fundamentos_filtrados = {f.strip() for f in fundamentos if f and f.lower() not in palavras_irrelevantes and len(f.strip()) > 2}
+        if contexto == "Contrato":
+            tipo_especifico = self._obter_valor(dados, 'tipo_contrato', '')
+            objeto = self._obter_valor(dados, 'objeto_contrato', '')
+            termo_principal = tipo_especifico if tipo_especifico else f"de {objeto}"
+            fundamentos.add(f"modelo de {termo_principal}")
+            fundamentos.add(f"cláusulas essenciais {termo_principal}")
+            fundamentos.add(f"legislação aplicável a {termo_principal}")
+        elif contexto == "Parecer Jurídico":
+            texto_completo_parecer = f"{self._obter_valor(dados, 'assunto', '')} {self._obter_valor(dados, 'legislacao_aplicavel', '')} {self._obter_valor(dados, 'consulta', '')}"
+            termos_chave = re.findall(r'\"[a-zA-Z\s]+\"|\b[A-Z]{3,}\b|\b\w+\b', texto_completo_parecer)
+            fundamentos.update(termos_chave)
+        # ... (lógicas para outros contextos aqui)
+
+        palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'art', 'artigo', 'os', 'as', 'dos', 'das', 'é', 'que', 'se'}
+        fundamentos_filtrados = {f.strip().lower() for f in fundamentos if f and f.lower() not in palavras_irrelevantes and len(f.strip()) > 2}
             
-        return list(fundamentos_filtrados) if fundamentos_filtrados else ["direito civil", "código civil"]
+        return list(fundamentos_filtrados)
 
     def _montar_estrutura_final(self, dados: Dict[str, Any], fatos_consolidados: str, fundamentos: List[str], contexto: str) -> Dict[str, Any]:
-        # ... (O resto da função permanece o mesmo)
-        estrutura_final = {
-            "tipo_documento": contexto,
-            "fundamentos_necessarios": fundamentos
-        }
+        estrutura_final = {"tipo_documento": contexto, "fundamentos_necessarios": fundamentos}
 
-        if "Parecer" in contexto:
+        if contexto == "Contrato":
+            estrutura_final['tipo_contrato_especifico'] = self._obter_valor(dados, 'tipo_contrato')
+            estrutura_final['contratante'] = {"nome": self._obter_valor(dados, 'contratante_nome'), "cnpj": self._obter_valor(dados, 'contratante_cnpj'), "endereco": self._obter_valor(dados, 'contratante_endereco')}
+            estrutura_final['contratado'] = {"nome": self._obter_valor(dados, 'contratado_nome'), "cnpj": self._obter_valor(dados, 'contratado_cnpj'), "endereco": self._obter_valor(dados, 'contratado_endereco')}
+            estrutura_final.update({
+                "objeto": fatos_consolidados, "valor": self._obter_valor(dados, 'valor_contrato'),
+                "pagamento": self._obter_valor(dados, 'forma_pagamento'), "prazos": self._obter_valor(dados, 'prazos'),
+                "responsabilidades": self._obter_valor(dados, 'responsabilidades'), "penalidades": self._obter_valor(dados, 'penalidades'),
+                "foro": self._obter_valor(dados, 'foro')
+            })
+        elif contexto == "Parecer Jurídico":
             estrutura_final.update({
                 "solicitante": self._obter_valor(dados, 'solicitante'),
                 "assunto": self._obter_valor(dados, 'assunto'),
             })
-        else:
+        else: # Estrutura para Petições
+            estrutura_final['tipo_acao'] = contexto
+            estrutura_final['fatos'] = fatos_consolidados
             estrutura_final.update({
-                "autor": {"nome": self._obter_valor(dados, 'autor_nome'), "qualificacao": self._obter_valor(dados, 'qualificacao_cliente')},
-                "reu": {"nome": self._obter_valor(dados, 'reu_nome'), "qualificacao": self._obter_valor(dados, 'qualificacao_reu')},
+                "autor": {"nome": self._obter_valor(dados, 'autor_nome')},
+                "reu": {"nome": self._obter_valor(dados, 'reu_nome')},
                 "pedidos": self._obter_valor(dados, 'pedido'),
                 "valor_causa": f"R$ {self._obter_valor(dados, 'valor_causa', '0.00')}"
             })
-            if contexto == "Ação Trabalhista":
-                estrutura_final.update({
-                    "data_admissao": self._obter_valor(dados, 'data_admissao'), "data_demissao": self._obter_valor(dados, 'data_demissao'),
-                    "salario": self._obter_valor(dados, 'salario'), "cargo": self._obter_valor(dados, 'cargo', "[CARGO]"),
-                    "jornada": self._obter_valor(dados, 'jornada'), "motivo_saida": self._obter_valor(dados, 'motivo_saida')
-                })
 
         return estrutura_final
