@@ -14,11 +14,10 @@ class AgenteColetorDados:
 
     def __init__(self):
         print("📊 Inicializando Agente Coletor de Dados v4.0 (Multi-Contexto)...")
-        # COMENTÁRIO: Adicionados os novos campos do formulário de Parecer Jurídico.
         self.mapeamento_flexivel = {
             'solicitante': ['solicitante'], 'assunto': ['assunto'], 'consulta': ['consulta'],
-            'legislacao_aplicavel': ['legislacaoaplicavel'], 'analise': ['analise'], 'conclusao_previa': ['conclusao'],
-            # ... (mapeamentos anteriores mantidos)
+            'legislacao_aplicavel': ['legislacao', 'legislacaoaplicavel'], # Adicionado 'legislacao'
+            'analise': ['analise'], 'conclusao_previa': ['conclusao'],
             'autor_nome': ['clientenome'], 'autor_qualificacao': ['qualificacaocliente'],
             'reu_nome': ['nomedaparte', 'nomecontrariopeticao'], 'reu_qualificacao': ['qualificacao', 'qualificacaoparte', 'qualificacaocontrariopeticao'],
             'fatos': ['fatos'], 'pedido': ['pedido'], 'valor_causa': ['valorcausa'], 'documentos': ['documentos'],
@@ -56,61 +55,57 @@ class AgenteColetorDados:
             return {"status": "erro", "erro": f"Falha no processamento dos dados de entrada: {e}"}
 
     def _identificar_contexto_e_dados(self, dados_normalizados: Dict[str, Any]) -> (str, Dict[str, Any]):
-        """Analisa os campos preenchidos para determinar o tipo de documento."""
         dados_relevantes = {k: v for k, v in dados_normalizados.items() if v is not None and str(v).strip() != ""}
         
-        # COMENTÁRIO: Adicionada a lógica para identificar um Parecer Jurídico.
-        # A presença dos campos 'solicitante' ou 'consulta' é um forte indicador.
         if any(k in dados_relevantes for k in ['solicitante', 'consulta']):
             return "Parecer Jurídico", dados_relevantes
         if any(k in dados_relevantes for k in ['dataadmissaotrabalhista', 'salariotrabalhista']):
             return "Ação Trabalhista", dados_relevantes
-        # ... (outras lógicas de identificação)
         
         return "Ação Cível", dados_relevantes
 
     def _consolidar_fatos(self, dados: Dict[str, Any], contexto: str) -> str:
-        """Junta informações de múltiplos campos para criar a narrativa principal."""
         narrativa = []
-        
-        # COMENTÁRIO: Lógica de consolidação específica para o Parecer.
         if contexto == "Parecer Jurídico":
             if self._obter_valor(dados, 'consulta'): narrativa.append(f"Consulta: {self._obter_valor(dados, 'consulta')}")
             if self._obter_valor(dados, 'analise'): narrativa.append(f"Análise Preliminar Fornecida: {self._obter_valor(dados, 'analise')}")
         else:
             if self._obter_valor(dados, 'fatos'): narrativa.append(str(self._obter_valor(dados, 'fatos')))
-            # ... (outras lógicas de consolidação)
             
         return " ".join(narrativa)
 
     def _extrair_fundamentos_necessarios(self, fatos: str, contexto: str, dados: Dict[str, Any]) -> List[str]:
-        """Extrai os termos jurídicos chave para guiar a pesquisa."""
         fundamentos = set()
         texto_analise = fatos.lower()
 
-        # COMENTÁRIO: Lógica de extração de fundamentos para o Parecer.
-        # Usa os campos 'assunto' e 'legislacao_aplicavel' como fontes primárias.
+        # COMENTÁRIO: Lógica de extração de fundamentos para Parecer Jurídico foi corrigida e aprimorada.
         if contexto == "Parecer Jurídico":
             assunto = self._obter_valor(dados, 'assunto', '')
             legislacao = self._obter_valor(dados, 'legislacao_aplicavel', '')
-            fundamentos.update(re.split(r'[,\s]+', assunto))
-            fundamentos.update(re.split(r'[,\s]+', legislacao))
-        elif contexto == "Ação Trabalhista":
-            fundamentos.update(["direito trabalhista", "CLT"])
-            # ... (lógica trabalhista)
+            consulta = self._obter_valor(dados, 'consulta', '')
+            
+            # Extrai termos do assunto, da legislação e da consulta para uma pesquisa rica.
+            fundamentos.update(re.split(r'[,\s()]+', assunto))
+            fundamentos.update(re.split(r'[,\s()]+', legislacao))
+            fundamentos.update(re.split(r'[,\s()]+', consulta))
+        
         elif "Consumidor" in contexto:
             fundamentos.update(["direito do consumidor", "Código de Defesa do Consumidor"])
-            if "vício" in texto_analise or "defeito" in texto_analise: fundamentos.add("vício do produto CDC artigo 18")
-            if "dano moral" in texto_analise: fundamentos.add("dano moral consumidor")
+            if "vício" in texto_analise or "defeito" in texto_analise:
+                fundamentos.add("vício do produto CDC artigo 18")
+            if "dano moral" in texto_analise:
+                fundamentos.add("dano moral consumidor")
+        
+        # Remove palavras comuns e vazias para limpar a lista de pesquisa
+        palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'art', 'artigo'}
+        fundamentos_filtrados = {f for f in fundamentos if f and f.lower() not in palavras_irrelevantes}
             
-        return list(filter(None, fundamentos)) # Remove strings vazias
+        return list(fundamentos_filtrados)
 
     def _montar_estrutura_final(self, dados: Dict[str, Any], fatos_consolidados: str, fundamentos: List[str], contexto: str) -> Dict[str, Any]:
-        """Monta o dicionário final com os dados limpos e estruturados."""
-        
         estrutura_final = {
             "tipo_acao": contexto,
-            "fatos": fatos_consolidados, # No parecer, 'fatos' conterá a consulta.
+            "fatos": fatos_consolidados,
             "fundamentos_necessarios": fundamentos
         }
 
@@ -121,7 +116,6 @@ class AgenteColetorDados:
                 "conclusao_previa": self._obter_valor(dados, 'conclusao_previa')
             })
         else:
-            # Estrutura para petições (autor vs réu)
             estrutura_final.update({
                 "autor": {"nome": self._obter_valor(dados, 'autor_nome'), "qualificacao": self._obter_valor(dados, 'autor_qualificacao')},
                 "reu": {"nome": self._obter_valor(dados, 'reu_nome'), "qualificacao": self._obter_valor(dados, 'reu_qualificacao')},

@@ -12,6 +12,8 @@ from agente_redator_trabalhista import AgenteRedatorTrabalhista
 from agente_redator_civel import AgenteRedatorCivel
 from agente_redator_queixa_crime import AgenteRedatorQueixaCrime
 from agente_redator_habeas_corpus import AgenteRedatorHabeasCorpus
+# COMENTÁRIO: Adicionada a importação do novo agente de parecer.
+from agente_redator_parecer import AgenteRedatorParecer
 from agente_validador import AgenteValidador
 
 class OrquestradorPrincipal:
@@ -32,6 +34,7 @@ class OrquestradorPrincipal:
         self.agente_redator_civel = AgenteRedatorCivel(api_key=deepseek_api_key)
         self.agente_redator_queixa_crime = AgenteRedatorQueixaCrime(api_key=deepseek_api_key)
         self.agente_redator_habeas_corpus = AgenteRedatorHabeasCorpus(api_key=deepseek_api_key)
+        self.agente_redator_parecer = AgenteRedatorParecer(api_key=deepseek_api_key)
         
         self.agente_validador = AgenteValidador()
         
@@ -63,7 +66,7 @@ class OrquestradorPrincipal:
             print("ETAPA 3: Selecionando Agente Redator Especializado...")
             tipo_acao = dados_estruturados.get('tipo_acao', 'Ação Cível')
             
-            # COMENTÁRIO: Lógica de decisão expandida para incluir os novos agentes.
+            # COMENTÁRIO: Lógica de decisão expandida para incluir o novo agente de parecer.
             if "Trabalhista" in tipo_acao:
                 print("... Agente Trabalhista selecionado.")
                 agente_redator_ativo = self.agente_redator_trabalhista
@@ -73,6 +76,9 @@ class OrquestradorPrincipal:
             elif "Habeas Corpus" in tipo_acao:
                 print("... Agente de Habeas Corpus selecionado.")
                 agente_redator_ativo = self.agente_redator_habeas_corpus
+            elif "Parecer Jurídico" in tipo_acao:
+                print("... Agente de Parecer Jurídico selecionado.")
+                agente_redator_ativo = self.agente_redator_parecer
             else: # Cível é o padrão
                 print("... Agente Cível selecionado.")
                 agente_redator_ativo = self.agente_redator_civel
