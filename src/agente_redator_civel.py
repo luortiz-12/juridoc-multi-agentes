@@ -1,4 +1,4 @@
-# agente_redator_civel.py - Agente Especializado em Petições Cíveis com Prompts Rígidos
+# agente_redator_civel.py - Agente Especializado em Petições Cíveis com Prompts Simplificados
 
 import json
 import logging
@@ -12,7 +12,7 @@ from datetime import datetime
 class AgenteRedatorCivel:
     """
     Agente Redator Especializado em Direito Cível.
-    Utiliza prompts que proíbem Markdown e exigem o uso de tags HTML para formatação.
+    Utiliza prompts que forçam a geração de um HTML simples e consistente.
     """
     def __init__(self, api_key: str):
         self.logger = logging.getLogger(__name__)
@@ -38,25 +38,21 @@ class AgenteRedatorCivel:
             return f"<h2>Erro ao Gerar Seção: {secao_nome}</h2><p>{e}</p>"
 
     async def gerar_documento_html_puro_async(self, dados_formulario: Dict, pesquisas: Dict) -> str:
-        # COMENTÁRIO: Os prompts foram reescritos para serem extremamente explícitos sobre o formato de saída.
-        instrucao_formato = "Sua resposta DEVE ser um bloco de código HTML bem formatado. NÃO use Markdown (como `**` ou `*`). Para ênfase, use apenas tags HTML como `<strong>` para negrito e `<em>` para itálico."
+        # COMENTÁRIO: Nova instrução de formato, muito mais rigorosa.
+        instrucao_formato = "Sua resposta DEVE ser um bloco de texto formatado usando APENAS as seguintes tags HTML: <h2> para títulos de seção, <h3> para subtítulos, <p> para parágrafos, e <strong> para negrito. NÃO use <div>, <blockquote>, <em>, <ul>, <li> ou qualquer outra tag. NÃO use Markdown (`**`)."
 
         prompts = {
-            "fatos": f"{instrucao_formato}\n\nRedija a seção 'DOS FATOS' de uma petição inicial cível. Descreva a relação de consumo, o vício do produto e as tentativas de resolução. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece sua resposta com <h2>DOS FATOS</h2>.",
-            "legislacao": f"{instrucao_formato}\n\nRedija a subseção 'DO DIREITO' para uma petição cível. Foque no Código de Defesa do Consumidor (Art. 18) e no Código Civil. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece sua resposta com <h3>Da Fundamentação Legal</h3>.",
-            "jurisprudencia": f"{instrucao_formato}\n\nRedija a subseção sobre a 'JURISPRUDÊNCIA' para uma petição cível. Cite precedentes sobre vício do produto e dano moral ao consumidor. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('jurisprudencia_formatada', 'N/A')}. Comece sua resposta com <h3>Da Jurisprudência Aplicável</h3>.",
-            "doutrina": f"{instrucao_formato}\n\nRedija a subseção sobre a 'DOUTRINA' para uma petição cível. Discorra sobre a responsabilidade do fornecedor. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('doutrina_formatada', 'N/A')}. Comece sua resposta com <h3>Da Análise Doutrinária</h3>.",
-            "pedidos": f"{instrucao_formato}\n\nRedija a seção 'DOS PEDIDOS' de uma petição inicial cível. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece sua resposta com <h2>DOS PEDIDOS</h2>."
+            "fatos": f"{instrucao_formato}\n\nRedija a seção 'DOS FATOS' de uma petição cível. Descreva a relação de consumo e o vício do produto. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS FATOS</h2>.",
+            "direito": f"{instrucao_formato}\n\nRedija a seção 'DO DIREITO' de uma petição cível. Fundamente com base no Código de Defesa do Consumidor e no Código Civil, citando os artigos principais. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece com <h2>DO DIREITO</h2>.",
+            "pedidos": f"{instrucao_formato}\n\nRedija a seção 'DOS PEDIDOS' de uma petição cível. Liste os pedidos de forma clara e direta em parágrafos separados. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS PEDIDOS</h2>."
         }
         
         tasks = [self._chamar_api_async(p, n) for n, p in prompts.items()]
-        secao_fatos, sub_leg, sub_jur, sub_dout, secao_pedidos = await asyncio.gather(*tasks)
-        
-        secao_direito = f"<h2>DO DIREITO</h2>{sub_leg}{sub_jur}{sub_dout}"
+        secao_fatos, secao_direito, secao_pedidos = await asyncio.gather(*tasks)
         
         # Template HTML final
         return f"""
-<!DOCTYPE html><html lang="pt-BR"><head><title>Petição Inicial Cível</title><style>body{{font-family:'Times New Roman',serif;line-height:1.8;text-align:justify;margin:3cm}}h1{{text-align:center;font-size:16pt}}h2{{text-align:left;font-size:14pt;margin-top:30px;font-weight:bold}}h3{{text-align:left;font-size:12pt;margin-top:20px;font-weight:bold}}p{{text-indent:2em;margin-bottom:15px}}blockquote{{margin-left:4cm;font-style:italic;border-left:2px solid #ccc;padding-left:10px}}.qualificacao p{{text-indent:0}}</style></head>
+<!DOCTYPE html><html lang="pt-BR"><head><title>Petição Inicial Cível</title><style>body{{font-family:'Times New Roman',serif;line-height:1.8;text-align:justify;margin:3cm}}h1{{text-align:center;font-size:16pt}}h2{{text-align:left;font-size:14pt;margin-top:30px;font-weight:bold}}h3{{text-align:left;font-size:12pt;margin-top:20px;font-weight:bold}}p{{text-indent:2em;margin-bottom:15px}}.qualificacao p{{text-indent:0}}</style></head>
 <body>
     <h1>EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DE DIREITO DA ___ VARA CÍVEL DA COMARCA DE {dados_formulario.get('reu', {}).get('cidade', 'CIDADE')} - {dados_formulario.get('reu', {}).get('estado', 'UF')}</h1>
     <div class="qualificacao" style="margin-top:50px;"><p><strong>{dados_formulario.get('autor',{}).get('nome','').upper()}</strong>, {dados_formulario.get('autor',{}).get('qualificacao','')}, residente e domiciliada em [ENDEREÇO A SER PREENCHIDO], vem, com o devido respeito, por intermédio de seu advogado que esta subscreve (procuração anexa), propor a presente</p><h1 style="margin-top:20px;">AÇÃO CÍVEL</h1><p>em face de <strong>{dados_formulario.get('reu',{}).get('nome','').upper()}</strong>, {dados_formulario.get('reu',{}).get('qualificacao','')}, pelos fatos e fundamentos a seguir expostos.</p></div>
