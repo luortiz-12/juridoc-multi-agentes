@@ -1,4 +1,4 @@
-# agente_pesquisa_contratos.py - Agente de Pesquisa Especializado em Contratos
+# agente_pesquisa_contratos.py - Agente de Pesquisa Especializado em Contratos com Logs Aprimorados
 
 import asyncio
 import aiohttp
@@ -11,15 +11,19 @@ from bs4 import BeautifulSoup
 class AgentePesquisaContratos:
     """
     Agente de Pesquisa Otimizado e Especializado em encontrar modelos e cláusulas de contratos.
+    v2.0: Logs detalhados para cada etapa da extração de conteúdo.
     """
     def __init__(self):
-        print("🔍 Inicializando Agente de Pesquisa de CONTRATOS...")
+        print("🔍 Inicializando Agente de Pesquisa de CONTRATOS (Logs Aprimorados)...")
         self.headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        # COMENTÁRIO: Sites prioritários focados em modelos de documentos e legislação.
         self.sites_prioritarios = ['jusbrasil.com.br', 'conjur.com.br', 'migalhas.com.br', 'planalto.gov.br']
+        self.config = {'tamanho_minimo_conteudo': 500, 'tamanho_maximo_conteudo': 20000, 'max_sites_por_query': 3}
         print("✅ Sistema de pesquisa de CONTRATOS inicializado.")
 
     async def _extrair_conteudo_url_async(self, session, url: str) -> Dict[str, Any]:
+        """Extrai conteúdo de uma URL de forma assíncrona com logs detalhados."""
+        # COMENTÁRIO: Adicionado log para cada tentativa de acesso.
+        print(f"🌐 Acessando URL: {url}")
         try:
             async with session.get(url, headers=self.headers, timeout=15, ssl=False) as response:
                 if response.status == 200:
@@ -30,12 +34,20 @@ class AgentePesquisaContratos:
                         tag.decompose()
                     texto = soup.body.get_text(separator='\n', strip=True) if soup.body else ""
                     texto_limpo = re.sub(r'\n\s*\n', '\n', texto).strip()
-                    if len(texto_limpo) > 500:
-                        print(f"📄 Conteúdo de contrato extraído de: {url} ({len(texto_limpo)} caracteres)")
-                        return {"url": url, "texto": texto_limpo[:20000]}
-                return None
+                    
+                    # COMENTÁRIO: Adicionado log específico para conteúdo descartado por ser muito curto.
+                    if len(texto_limpo) < self.config['tamanho_minimo_conteudo']:
+                        print(f"⚠️ Conteúdo descartado de {url}: muito curto ({len(texto_limpo)} caracteres)")
+                        return None
+                    
+                    print(f"📄 Conteúdo de contrato extraído de: {url} ({len(texto_limpo)} caracteres)")
+                    return {"url": url, "texto": texto_limpo[:self.config['tamanho_maximo_conteudo']]}
+                else:
+                    # COMENTÁRIO: Log de erro mais específico para falhas de acesso HTTP.
+                    print(f"❌ Erro ao acessar {url}: Status {response.status}")
+                    return None
         except Exception as e:
-            print(f"❌ Erro ao extrair conteúdo de contrato de {url}: {e}")
+            print(f"❌ Erro ao extrair conteúdo de contrato de {url}: {type(e).__name__} - {e}")
             return None
 
     async def _pesquisar_e_extrair_async(self, termo: str) -> List[Dict[str, Any]]:
@@ -44,7 +56,7 @@ class AgentePesquisaContratos:
         query = f'"{termo}" {site_query}'
         try:
             loop = asyncio.get_event_loop()
-            urls = await loop.run_in_executor(None, lambda: list(search(query, num_results=3, lang="pt")))
+            urls = await loop.run_in_executor(None, lambda: list(search(query, num_results=self.config['max_sites_por_query'], lang="pt")))
         except Exception as e:
             print(f"⚠️ Falha na busca do Google para '{termo}': {e}")
             return []
@@ -60,7 +72,6 @@ class AgentePesquisaContratos:
         
         todos_conteudos = [item for sublist in resultados_brutos for item in sublist]
         
-        # Formata a pesquisa para o Agente Redator
         pesquisa_formatada = "## Modelos e Cláusulas de Referência Encontrados:\n\n"
         for item in todos_conteudos:
             pesquisa_formatada += f"### Fonte: {item['url']}\n\n"
@@ -76,6 +87,19 @@ class AgentePesquisaContratos:
         except Exception as e:
             print(f"❌ Erro crítico durante a pesquisa de contratos: {e}")
             return {"pesquisa_formatada": "A pesquisa de modelos de contrato falhou.", "conteudos_extraidos": []}
+        
         tempo_total = (datetime.now() - inicio_pesquisa).total_seconds()
-        print(f"✅ PESQUISA DE CONTRATOS CONCLUÍDA em {tempo_total:.1f} segundos")
+        
+        # COMENTÁRIO: Log de resumo final mais detalhado.
+        print("\n--- RESUMO DA PESQUISA DE CONTRATOS ---")
+        print(f"Fundamentos pesquisados: {fundamentos}")
+        conteudos_encontrados = resultado.get("conteudos_extraidos", [])
+        if conteudos_encontrados:
+            print(f"✅ {len(conteudos_encontrados)} modelos/conteúdos relevantes encontrados.")
+            for i, item in enumerate(conteudos_encontrados, 1):
+                print(f"  {i}. {item['url']} ({len(item['texto'])} chars)")
+        else:
+            print("⚠️ Nenhum modelo ou conteúdo relevante foi extraído com sucesso.")
+        print(f"✅ PESQUISA DE CONTRATOS CONCLUÍDA em {tempo_total:.1f} segundos\n")
+        
         return resultado
