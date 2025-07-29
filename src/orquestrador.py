@@ -1,4 +1,4 @@
-# orquestrador.py - Versão Final com Seleção Dinâmica de Agentes Redatores
+# orquestrador.py - Versão Final com Seleção Dinâmica de Todos os Agentes Redatores
 
 import os
 import traceback
@@ -7,9 +7,11 @@ from datetime import datetime
 
 from agente_coletor_dados import AgenteColetorDados
 from pesquisa_juridica import PesquisaJuridica
-# COMENTÁRIO: Importa as duas classes de redatores especializados.
+# COMENTÁRIO: Importamos TODAS as classes de redatores especializados.
 from agente_redator_trabalhista import AgenteRedatorTrabalhista
 from agente_redator_civel import AgenteRedatorCivel
+from agente_redator_queixa_crime import AgenteRedatorQueixaCrime
+from agente_redator_habeas_corpus import AgenteRedatorHabeasCorpus
 from agente_validador import AgenteValidador
 
 class OrquestradorPrincipal:
@@ -25,9 +27,11 @@ class OrquestradorPrincipal:
         self.agente_coletor = AgenteColetorDados()
         self.pesquisa_juridica = PesquisaJuridica()
         
-        # COMENTÁRIO: Inicializa uma instância de CADA agente redator, passando a chave da API.
+        # COMENTÁRIO: Inicializamos uma instância de CADA agente redator, passando a chave da API.
         self.agente_redator_trabalhista = AgenteRedatorTrabalhista(api_key=deepseek_api_key)
         self.agente_redator_civel = AgenteRedatorCivel(api_key=deepseek_api_key)
+        self.agente_redator_queixa_crime = AgenteRedatorQueixaCrime(api_key=deepseek_api_key)
+        self.agente_redator_habeas_corpus = AgenteRedatorHabeasCorpus(api_key=deepseek_api_key)
         
         self.agente_validador = AgenteValidador()
         
@@ -59,11 +63,17 @@ class OrquestradorPrincipal:
             print("ETAPA 3: Selecionando Agente Redator Especializado...")
             tipo_acao = dados_estruturados.get('tipo_acao', 'Ação Cível')
             
-            # COMENTÁRIO: Lógica de decisão para escolher o agente redator correto.
+            # COMENTÁRIO: Lógica de decisão expandida para incluir os novos agentes.
             if "Trabalhista" in tipo_acao:
                 print("... Agente Trabalhista selecionado.")
                 agente_redator_ativo = self.agente_redator_trabalhista
-            else:
+            elif "Queixa-Crime" in tipo_acao:
+                print("... Agente de Queixa-Crime selecionado.")
+                agente_redator_ativo = self.agente_redator_queixa_crime
+            elif "Habeas Corpus" in tipo_acao:
+                print("... Agente de Habeas Corpus selecionado.")
+                agente_redator_ativo = self.agente_redator_habeas_corpus
+            else: # Cível é o padrão
                 print("... Agente Cível selecionado.")
                 agente_redator_ativo = self.agente_redator_civel
 
