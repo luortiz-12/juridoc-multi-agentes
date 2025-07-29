@@ -1,4 +1,4 @@
-# agente_coletor_dados.py - Versão 4.0 (Suporte a Múltiplos Tipos de Documentos)
+# agente_coletor_dados.py - Versão 4.1 (Extração de Fundamentos para Parecer Corrigida)
 
 import json
 import re
@@ -7,16 +7,16 @@ from typing import Dict, Any, List
 
 class AgenteColetorDados:
     """
-    Agente Coletor de Dados v4.0 - Suporte a múltiplos contextos jurídicos.
+    Agente Coletor de Dados v4.1 - Suporte a múltiplos contextos jurídicos.
     - Identifica Ações Trabalhistas, Cíveis, Queixas-Crime, Habeas Corpus e Pareceres Jurídicos.
     - Consolida fatos e extrai fundamentos de forma especializada para cada área.
     """
 
     def __init__(self):
-        print("📊 Inicializando Agente Coletor de Dados v4.0 (Multi-Contexto)...")
+        print("📊 Inicializando Agente Coletor de Dados v4.1 (Multi-Contexto)...")
         self.mapeamento_flexivel = {
             'solicitante': ['solicitante'], 'assunto': ['assunto'], 'consulta': ['consulta'],
-            'legislacao_aplicavel': ['legislacao', 'legislacaoaplicavel'], # Adicionado 'legislacao'
+            'legislacao_aplicavel': ['legislacao', 'legislacaoaplicavel'],
             'analise': ['analise'], 'conclusao_previa': ['conclusao'],
             'autor_nome': ['clientenome'], 'autor_qualificacao': ['qualificacaocliente'],
             'reu_nome': ['nomedaparte', 'nomecontrariopeticao'], 'reu_qualificacao': ['qualificacao', 'qualificacaoparte', 'qualificacaocontrariopeticao'],
@@ -85,9 +85,10 @@ class AgenteColetorDados:
             consulta = self._obter_valor(dados, 'consulta', '')
             
             # Extrai termos do assunto, da legislação e da consulta para uma pesquisa rica.
-            fundamentos.update(re.split(r'[,\s()]+', assunto))
-            fundamentos.update(re.split(r'[,\s()]+', legislacao))
-            fundamentos.update(re.split(r'[,\s()]+', consulta))
+            texto_completo_parecer = f"{assunto} {legislacao} {consulta}"
+            # Usa regex para encontrar palavras ou grupos de palavras entre aspas ou maiúsculas, além de palavras normais.
+            termos_chave = re.findall(r'\"[a-zA-Z\s]+\"|\b[A-Z]{3,}\b|\b\w+\b', texto_completo_parecer)
+            fundamentos.update(termos_chave)
         
         elif "Consumidor" in contexto:
             fundamentos.update(["direito do consumidor", "Código de Defesa do Consumidor"])
@@ -97,8 +98,8 @@ class AgenteColetorDados:
                 fundamentos.add("dano moral consumidor")
         
         # Remove palavras comuns e vazias para limpar a lista de pesquisa
-        palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'art', 'artigo'}
-        fundamentos_filtrados = {f for f in fundamentos if f and f.lower() not in palavras_irrelevantes}
+        palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'art', 'artigo', 'os', 'as', 'dos', 'das', 'é', 'que', 'se', 'seu', 'sua', 'mas', 'qual', 'quais', 'como', 'ser'}
+        fundamentos_filtrados = {f.strip().lower() for f in fundamentos if f and f.lower() not in palavras_irrelevantes and len(f.strip()) > 2}
             
         return list(fundamentos_filtrados)
 
