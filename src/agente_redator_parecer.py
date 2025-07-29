@@ -22,27 +22,26 @@ class AgenteRedatorParecer:
         """Gera o parecer completo com uma única chamada à API para garantir coesão."""
         print("📝 Gerando Parecer Jurídico completo...")
         
-        # COMENTÁRIO: Um único prompt, mais complexo, para gerar o documento inteiro de uma vez.
-        # Isto é mais adequado para a estrutura de um parecer.
+        # COMENTÁRIO: O prompt foi atualizado com a nova regra de tamanho mínimo.
         prompt_completo = f"""
-        Você é um advogado especialista e parecerista. Sua tarefa é redigir um Parecer Jurídico técnico, objetivo e bem fundamentado com base nos dados fornecidos.
+        Você é um advogado especialista e parecerista. Sua tarefa é redigir um Parecer Jurídico técnico, objetivo e extremamente bem fundamentado com base nos dados fornecidos.
 
         ESTRUTURA OBRIGATÓRIA DO DOCUMENTO:
         1.  **EMENTA:** Um resumo conciso do parecer em 3 a 5 tópicos.
-        2.  **I - RELATÓRIO:** Descreva a consulta feita pelo solicitante.
-        3.  **II - FUNDAMENTAÇÃO:** Analise a questão com base na legislação e jurisprudência pesquisadas. Desenvolva o raciocínio jurídico.
+        2.  **I - RELATÓRIO:** Descreva detalhadamente a consulta feita pelo solicitante.
+        3.  **II - FUNDAMENTAÇÃO:** Analise a questão de forma aprofundada, com base na legislação e jurisprudência pesquisadas. Desenvolva o raciocínio jurídico de forma exaustiva.
         4.  **III - CONCLUSÃO:** Responda objetivamente à consulta com base na fundamentação.
 
         DADOS PARA O PARECER:
         - **Solicitante:** {dados_formulario.get('solicitante')}
         - **Assunto Principal:** {dados_formulario.get('assunto')}
         - **Consulta Detalhada:** {dados_formulario.get('fatos')}
-        - **Conclusão Sugerida (se houver):** {dados_formulario.get('conclusao_previa')}
-        - **Pesquisa Jurídica Realizada (Legislação):** {pesquisas.get('legislacao_formatada', 'Nenhuma pesquisa específica encontrada.')}
-        - **Pesquisa Jurídica Realizada (Jurisprudência):** {pesquisas.get('jurisprudencia_formatada', 'Nenhuma pesquisa específica encontrada.')}
+        - **Pesquisa Jurídica (Legislação):** {pesquisas.get('legislacao_formatada', 'Nenhuma pesquisa específica encontrada.')}
+        - **Pesquisa Jurídica (Jurisprudência):** {pesquisas.get('jurisprudencia_formatada', 'Nenhuma pesquisa específica encontrada.')}
 
-        REGRAS DE FORMATAÇÃO:
+        REGRAS DE FORMATAÇÃO E CONTEÚDO:
         - A resposta DEVE ser um bloco de código HTML completo e bem formatado.
+        - O texto final deve ter no mínimo 30.000 caracteres. Seja extremamente detalhado e aprofundado na análise.
         - Use `<h2>` para os títulos principais (RELATÓRIO, FUNDAMENTAÇÃO, CONCLUSÃO).
         - Use `<h3>` para a EMENTA.
         - Use `<p>` para parágrafos e `<strong>` para negrito.
@@ -55,13 +54,12 @@ class AgenteRedatorParecer:
                 model="deepseek-chat", messages=[{"role": "user", "content": prompt_completo}],
                 max_tokens=8192, temperature=0.3
             )
-            resultado = response.choices[0].message.content.strip()
-            documento_html = re.sub(r'^```html|```$', '', resultado).strip()
+            documento_html = re.sub(r'^```html|```$', '', response.choices[0].message.content.strip())
         except Exception as e:
             print(f"❌ ERRO na API ao gerar o parecer: {e}")
             return f"<h1>Erro na Geração do Parecer</h1><p>{e}</p>"
 
-        # Template HTML final para o Parecer
+        # COMENTÁRIO: O template HTML final foi revisado para garantir que não há secções extras.
         return f"""
 <!DOCTYPE html><html lang="pt-BR"><head><title>Parecer Jurídico</title><style>body{{font-family:'Times New Roman',serif;line-height:1.6;text-align:justify;margin:3cm}}h1,h2,h3{{text-align:center;font-weight:bold}}h1{{font-size:16pt}}h2{{font-size:14pt;margin-top:30px;text-align:left;}}h3{{font-size:12pt;margin-top:20px;text-align:left;font-style:italic;}}p{{text-indent:2em;margin-bottom:15px}}</style></head>
 <body>
