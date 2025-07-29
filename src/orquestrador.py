@@ -48,6 +48,7 @@ class OrquestradorPrincipal:
             if resultado_coletor.get("status") == "erro": return resultado_coletor
             dados_estruturados = resultado_coletor.get('dados_estruturados', {})
             
+            # COMENTÁRIO: Esta é agora a ÚNICA variável que define o tipo de documento.
             tipo_documento = dados_estruturados.get('tipo_documento', 'Petição')
             
             # ETAPA 2: SELEÇÃO E EXECUÇÃO DA PESQUISA ESPECIALIZADA
@@ -60,38 +61,36 @@ class OrquestradorPrincipal:
 
             resultado_pesquisa = agente_pesquisa_ativo.pesquisar_fundamentacao_completa(
                 fundamentos=dados_estruturados.get('fundamentos_necessarios', []),
-                tipo_acao=dados_estruturados.get('tipo_acao', '')
+                # Passa o tipo de documento para a pesquisa, para consistência.
+                tipo_acao=tipo_documento 
             )
             
             # ETAPA 3: SELEÇÃO E EXECUÇÃO DO REDATOR ESPECIALIZADO
             print("ETAPA 3: Selecionando Agente Redator Especializado...")
             
-            # COMENTÁRIO: Esta é a lógica de decisão corrigida e reforçada.
-            # Ela usa o 'tipo_documento' e o 'tipo_acao' para escolher o agente correto.
+            # COMENTÁRIO: A lógica de decisão agora usa APENAS a variável 'tipo_documento'.
             agente_redator_ativo = None
-            if tipo_documento == "Contrato":
+            if "Contrato" in tipo_documento:
                 print("... Agente de Contratos selecionado.")
                 agente_redator_ativo = self.agente_redator_contratos
-            else:
-                tipo_acao = dados_estruturados.get('tipo_acao', 'Ação Cível')
-                if "Trabalhista" in tipo_acao:
-                    print("... Agente Trabalhista selecionado.")
-                    agente_redator_ativo = self.agente_redator_trabalhista
-                elif "Queixa-Crime" in tipo_acao:
-                    print("... Agente de Queixa-Crime selecionado.")
-                    agente_redator_ativo = self.agente_redator_queixa_crime
-                elif "Habeas Corpus" in tipo_acao:
-                    print("... Agente de Habeas Corpus selecionado.")
-                    agente_redator_ativo = self.agente_redator_habeas_corpus
-                elif "Parecer Jurídico" in tipo_acao:
-                    print("... Agente de Parecer Jurídico selecionado.")
-                    agente_redator_ativo = self.agente_redator_parecer
-                else: # Cível é o padrão para petições
-                    print("... Agente Cível selecionado.")
-                    agente_redator_ativo = self.agente_redator_civel
+            elif "Trabalhista" in tipo_documento:
+                print("... Agente Trabalhista selecionado.")
+                agente_redator_ativo = self.agente_redator_trabalhista
+            elif "Queixa-Crime" in tipo_documento:
+                print("... Agente de Queixa-Crime selecionado.")
+                agente_redator_ativo = self.agente_redator_queixa_crime
+            elif "Habeas Corpus" in tipo_documento:
+                print("... Agente de Habeas Corpus selecionado.")
+                agente_redator_ativo = self.agente_redator_habeas_corpus
+            elif "Parecer Jurídico" in tipo_documento:
+                print("... Agente de Parecer Jurídico selecionado.")
+                agente_redator_ativo = self.agente_redator_parecer
+            else: # Cível é o padrão para petições
+                print("... Agente Cível selecionado.")
+                agente_redator_ativo = self.agente_redator_civel
 
             if not agente_redator_ativo:
-                raise ValueError("Não foi possível selecionar um agente redator para o tipo de documento.")
+                raise ValueError(f"Não foi possível selecionar um agente redator para o tipo: {tipo_documento}")
 
             resultado_redacao = agente_redator_ativo.redigir_peticao_completa(
                 dados_estruturados=dados_estruturados,
