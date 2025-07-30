@@ -1,4 +1,4 @@
-# agente_coletor_dados.py - Versão 6.3 (Final - Extração de Fundamentos Aprimorada)
+# agente_coletor_dados.py - Versão 6.3 (Final - Extração de Fundamentos Aprimorad)
 
 import json
 import re
