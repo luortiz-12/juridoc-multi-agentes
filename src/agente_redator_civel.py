@@ -1,4 +1,4 @@
-# agente_redator_civel.py - Versão 2.0 (Com Ciclo de Feedback e Meta de 30k)
+# agente_redator_civel.py - Versão 2.1 (Com Prompts Rígidos Anti-Alucinação)
 
 import json
 import logging
@@ -12,19 +12,21 @@ from datetime import datetime
 class AgenteRedatorCivel:
     """
     Agente Redator Especializado em Direito Cível.
-    v2.0: Aceita feedback do Agente Validador para melhorar rascunhos e
-    tem uma meta de geração de conteúdo de 30.000 caracteres.
+    v2.1: Utiliza prompts rígidos para garantir a fidelidade aos dados do formulário
+    e evitar a invenção de fatos ("alucinação").
     """
     def __init__(self, api_key: str):
         self.logger = logging.getLogger(__name__)
         if not api_key: raise ValueError("DEEPSEEK_API_KEY não configurada")
         
         self.client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-        print("✅ Agente Redator CÍVEL (v2.0 com Feedback) inicializado com sucesso.")
+        print("✅ Agente Redator CÍVEL (v2.1 com Prompts Rígidos) inicializado com sucesso.")
 
     async def _chamar_api_async(self, prompt: str, secao_nome: str) -> str:
         """Chama a API de forma assíncrona para gerar uma seção específica."""
+        # COMENTÁRIO: Log do prompt aumentado para facilitar a depuração.
         print(f"📝 Gerando/Melhorando seção cível: {secao_nome}")
+        print(f"   Prompt (início): {prompt[:300].replace(chr(10), ' ')}...")
         try:
             response = await asyncio.to_thread(
                 self.client.chat.completions.create,
@@ -43,18 +45,20 @@ class AgenteRedatorCivel:
         """Cria ou melhora as seções do documento em paralelo."""
         
         instrucao_formato = "Sua resposta DEVE ser um bloco de código HTML bem formatado. NÃO use Markdown (como `**` ou `*`). Para ênfase, use apenas tags HTML como `<strong>` para negrito."
+        
+        # COMENTÁRIO: Esta é a nova instrução crucial para evitar que a IA invente dados.
+        instrucao_fidelidade = "ATENÇÃO: Você DEVE se basear ESTRITAMENTE nos dados fornecidos no JSON 'DADOS DO CASO' abaixo. NÃO invente nomes, valores, datas, produtos ou qualquer outro fato que não esteja presente nos dados. Sua tarefa é expandir e detalhar a história fornecida, não criar uma nova."
 
         instrucao_melhoria = ""
         if recomendacoes:
             instrucao_melhoria = f"\n\nINSTRUÇÕES PARA MELHORIA: A versão anterior foi considerada insatisfatória. Reescreva e expanda significativamente o conteúdo para atender a seguinte recomendação: '{' '.join(recomendacoes)}'. Use o rascunho anterior como referência do que NÃO fazer.\nRASCUNHO ANTERIOR:\n{documento_anterior}"
 
-        # COMENTÁRIO: Prompts modulares com requisitos de tamanho para atingir a meta de 30k.
         prompts = {
-            "fatos": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a seção 'DOS FATOS' de uma petição cível. Seja extremamente detalhado, com no mínimo 10.000 caracteres. Descreva a relação de consumo, o vício do produto e as tentativas de resolução. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS FATOS</h2>.",
-            "legislacao": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a subseção 'DA FUNDAMENTAÇÃO LEGAL' para uma petição cível. Seja detalhado, com no mínimo 7.000 caracteres. Foque no Código de Defesa do Consumidor e no Código Civil. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece com <h3>Da Fundamentação Legal</h3>.",
-            "jurisprudencia": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a subseção sobre a 'JURISPRUDÊNCIA APLICÁVEL' para uma petição cível. Seja detalhado, com no mínimo 7.000 caracteres. Cite precedentes sobre o tema. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('jurisprudencia_formatada', 'N/A')}. Comece com <h3>Da Jurisprudência Aplicável</h3>.",
-            "doutrina": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a subseção sobre a 'ANÁLISE DOUTRINÁRIA' para uma petição cível. Seja detalhado, com no mínimo 7.000 caracteres. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('doutrina_formatada', 'N/A')}. Comece com <h3>Da Análise Doutrinária</h3>.",
-            "pedidos": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a seção 'DOS PEDIDOS' de uma petição cível. Seja detalhado, com no mínimo 5.000 caracteres. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS PEDIDOS</h2>."
+            "fatos": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a seção 'DOS FATOS' de uma petição cível. Seja extremamente detalhado, com no mínimo 10.000 caracteres. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS FATOS</h2>.",
+            "legislacao": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção 'DA FUNDAMENTAÇÃO LEGAL' para uma petição cível. Seja detalhado, com no mínimo 7.000 caracteres. Use os dados da pesquisa para fundamentar. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece com <h3>Da Fundamentação Legal</h3>.",
+            "jurisprudencia": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção sobre a 'JURISPRUDÊNCIA APLICÁVEL' para uma petição cível. Seja detalhado, com no mínimo 7.000 caracteres. Use os dados da pesquisa para citar precedentes. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('jurisprudencia_formatada', 'N/A')}. Comece com <h3>Da Jurisprudência Aplicável</h3>.",
+            "doutrina": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção sobre a 'ANÁLISE DOUTRINÁRIA' para uma petição cível. Seja detalhado, com no mínimo 7.000 caracteres. Use os dados da pesquisa. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('doutrina_formatada', 'N/A')}. Comece com <h3>Da Análise Doutrinária</h3>.",
+            "pedidos": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a seção 'DOS PEDIDOS' de uma petição cível. Seja detalhado, com no mínimo 5.000 caracteres. Baseie-se estritamente no campo 'pedidos' dos dados. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS PEDIDOS</h2>."
         }
         
         tasks = [self._chamar_api_async(p, n) for n, p in prompts.items()]
