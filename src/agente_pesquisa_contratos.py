@@ -1,4 +1,4 @@
-# agente_pesquisa_contratos.py - Versão 2.0 (Pesquisa Persistente e Aprofundada)
+# agente_pesquisa_contratos.py - Versão 3.0 (Pesquisa Ampla e Aprofundada)
 
 import asyncio
 import aiohttp
@@ -11,23 +11,22 @@ from bs4 import BeautifulSoup
 class AgentePesquisaContratos:
     """
     Agente de Pesquisa Otimizado e Especializado em encontrar modelos e cláusulas de contratos.
-    v2.0: Realiza uma pesquisa persistente, garantindo um número mínimo de extrações bem-sucedidas.
+    v3.0: Realiza uma pesquisa ampla no Google, sem se restringir a sites pré-definidos,
+    garantindo uma maior diversidade de fontes e resiliência a bloqueios.
     """
     def __init__(self):
-        print("🔍 Inicializando Agente de Pesquisa de CONTRATOS (Persistente v2.0)...")
+        print("🔍 Inicializando Agente de Pesquisa de CONTRATOS (Pesquisa Ampla v3.0)...")
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
             'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
         }
-        # COMENTÁRIO: Novas configurações para a pesquisa persistente.
         self.config = {
             'tamanho_minimo_conteudo': 500,
             'tamanho_maximo_conteudo': 20000,
-            'min_sucessos_por_termo': 4, # META: Garantir pelo menos 4 conteúdos por termo.
-            'google_search_results': 10, # Busca mais links para ter mais opções.
+            'min_sucessos_por_termo': 4,
+            'google_search_results': 10,
         }
-        self.sites_prioritarios = ['jusbrasil.com.br', 'conjur.com.br', 'migalhas.com.br', 'planalto.gov.br']
         print("✅ Sistema de pesquisa de CONTRATOS inicializado.")
 
     async def _extrair_conteudo_url_async(self, session, url: str) -> Dict[str, Any]:
@@ -63,8 +62,10 @@ class AgentePesquisaContratos:
         até atingir a meta de sucessos, ignorando as falhas.
         """
         print(f"\n📚 Buscando modelos e cláusulas para: '{termo}'...")
-        site_query = " OR ".join([f"site:{site}" for site in self.sites_prioritarios])
-        query = f'"{termo}" {site_query}'
+        
+        # COMENTÁRIO: A restrição "site:" foi removida para permitir uma pesquisa ampla no Google.
+        # A query foi aprimorada para buscar por termos mais eficazes.
+        query = f'"{termo}" completo para preencher'
         
         resultados_sucesso = []
         urls_tentadas = set()
@@ -80,10 +81,8 @@ class AgentePesquisaContratos:
                         urls_tentadas.add(url)
                         tasks.append(self._extrair_conteudo_url_async(session, url))
                 
-                # Executa todas as extrações em paralelo
                 resultados_tasks = await asyncio.gather(*tasks)
                 
-                # Filtra apenas os resultados bem-sucedidos
                 resultados_sucesso = [res for res in resultados_tasks if res]
 
                 # Limita ao número mínimo de sucessos desejado
