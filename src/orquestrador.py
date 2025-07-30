@@ -1,4 +1,4 @@
-# orquestrador.py - Versão Final com Seleção Dinâmica de Todos os Agentes
+# orquestrador.py - Versão Final com Seleção Dinâmica de Todos os Agente
 
 import os
 import traceback

@@ -1,4 +1,4 @@
-# agente_coletor_dados.py - Versão 6.2 (Final - Suporte a todos os documentos)
+# agente_coletor_dados.py - Versão 6.2 (Final - Suporte a todos os documento)
 
 import json
 import re
