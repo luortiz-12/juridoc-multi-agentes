@@ -102,15 +102,27 @@ class AgenteColetorDados:
             contexto_juridico = self._obter_valor(dados, 'contexto_juridico', '')
             pontos_relevantes = self._obter_valor(dados, 'pontos_relevantes', '')
             
-            # Cria 2 ou 3 pesquisas de alta qualidade em vez de muitas palavras soltas.
-            if titulo_caso and contexto_juridico:
-                fundamentos.add(f"{titulo_caso} {contexto_juridico}")
+            # Extrai termos do contexto jurídico, que são de alta qualidade.
+            termos_contexto = [termo.strip() for termo in re.split(r',|\(', contexto_juridico) if termo.strip() and len(termo.split()) <= 3]
+            fundamentos.update(termos_contexto)
+
+            # Extrai o tema principal do título do caso.
+            palavras_titulo = re.findall(r'\b\w+\b', titulo_caso)
+            palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'ser', 'uma', 'por', 'são', 'qual', 'quais', 'os', 'as', 'dos', 'das', 'é', 'que', 'se', 'análise'}
+            tema_principal = " ".join([p for p in palavras_titulo if p.lower() not in palavras_irrelevantes])
+            if tema_principal:
+                fundamentos.add(tema_principal)
+
+            # Adiciona termos chave da primeira pergunta relevante, quebrados em pedaços de 3 palavras.
             if pontos_relevantes:
-                # Extrai a primeira pergunta como um termo de pesquisa completo.
-                primeira_pergunta = pontos_relevantes.split('?')[0]
-                fundamentos.add(primeira_pergunta.strip())
-            if titulo_caso:
-                fundamentos.add(f"jurisprudência sobre {titulo_caso}")
+                primeira_pergunta = pontos_relevantes.split('?')[0].lower()
+                palavras_pergunta = re.findall(r'\b\w+\b', primeira_pergunta)
+                palavras_chave_pergunta = [p for p in palavras_pergunta if p not in palavras_irrelevantes and len(p) > 3]
+                if len(palavras_chave_pergunta) >= 3:
+                    fundamentos.add(" ".join(palavras_chave_pergunta[:3]))
+                    if len(palavras_chave_pergunta) > 3:
+                        fundamentos.add(" ".join(palavras_chave_pergunta[-3:]))
+
         elif contexto == "Contrato":
             tipo_especifico = self._obter_valor(dados, 'tipo_contrato', '')
             objeto = self._obter_valor(dados, 'objeto_contrato', '')
@@ -123,10 +135,7 @@ class AgenteColetorDados:
             if "vício" in texto_analise or "defeito" in texto_analise: fundamentos.add("vício do produto CDC artigo 18")
         # ... (outras lógicas para outros contextos)
 
-        palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'ser', 'uma', 'por', 'são', 'qual', 'quais'}
-        fundamentos_filtrados = {f.strip(" .,'\"") for f in fundamentos if f and f.lower() not in palavras_irrelevantes and len(f.strip()) > 2}
-            
-        return list(fundamentos_filtrados) if fundamentos_filtrados else ["direito civil"]
+        return list(fundamentos) if fundamentos else ["direito civil"]
 
     def _montar_estrutura_final(self, dados: Dict[str, Any], fatos_consolidados: str, fundamentos: List[str], contexto: str) -> Dict[str, Any]:
         estrutura_final = {"tipo_documento": contexto, "fundamentos_necessarios": fundamentos}
