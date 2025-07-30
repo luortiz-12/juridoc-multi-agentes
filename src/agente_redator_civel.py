@@ -1,4 +1,4 @@
-# agente_redator_civel.py - Versão 2.1 (Com Prompts Rígidos Anti-Alucinação)
+# agente_redator_civel.py - Versão 2.2 (Com Prompts Rígidos Anti-Alucinação)
 
 import json
 import logging
@@ -12,7 +12,7 @@ from datetime import datetime
 class AgenteRedatorCivel:
     """
     Agente Redator Especializado em Direito Cível.
-    v2.1: Utiliza prompts rígidos para garantir a fidelidade aos dados do formulário
+    v2.2: Utiliza prompts rígidos para garantir a fidelidade aos dados do formulário
     e evitar a invenção de fatos ("alucinação").
     """
     def __init__(self, api_key: str):
@@ -20,11 +20,10 @@ class AgenteRedatorCivel:
         if not api_key: raise ValueError("DEEPSEEK_API_KEY não configurada")
         
         self.client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-        print("✅ Agente Redator CÍVEL (v2.1 com Prompts Rígidos) inicializado com sucesso.")
+        print("✅ Agente Redator CÍVEL (v2.2 com Prompts Rígidos) inicializado com sucesso.")
 
     async def _chamar_api_async(self, prompt: str, secao_nome: str) -> str:
         """Chama a API de forma assíncrona para gerar uma seção específica."""
-        # COMENTÁRIO: Log do prompt aumentado para facilitar a depuração.
         print(f"📝 Gerando/Melhorando seção cível: {secao_nome}")
         print(f"   Prompt (início): {prompt[:300].replace(chr(10), ' ')}...")
         try:
@@ -46,8 +45,8 @@ class AgenteRedatorCivel:
         
         instrucao_formato = "Sua resposta DEVE ser um bloco de código HTML bem formatado. NÃO use Markdown (como `**` ou `*`). Para ênfase, use apenas tags HTML como `<strong>` para negrito."
         
-        # COMENTÁRIO: Esta é a nova instrução crucial para evitar que a IA invente dados.
-        instrucao_fidelidade = "ATENÇÃO: Você DEVE se basear ESTRITAMENTE nos dados fornecidos no JSON 'DADOS DO CASO' abaixo. NÃO invente nomes, valores, datas, produtos ou qualquer outro fato que não esteja presente nos dados. Sua tarefa é expandir e detalhar a história fornecida, não criar uma nova."
+        # COMENTÁRIO: A instrução de fidelidade foi aprimorada para ser mais clara sobre como usar a criatividade.
+        instrucao_fidelidade = "ATENÇÃO: Sua tarefa é redigir um texto jurídico. Você DEVE se basear ESTRITAMENTE nos dados fornecidos no JSON 'DADOS DO CASO' e na 'PESQUISA' jurídica. Use seu conhecimento e criatividade para expandir e detalhar a história, conectando os fatos com os fundamentos legais encontrados na pesquisa. NÃO invente nomes, valores, datas ou qualquer fato que contradiga os dados fornecidos."
 
         instrucao_melhoria = ""
         if recomendacoes:
