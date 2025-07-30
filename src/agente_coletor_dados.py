@@ -102,22 +102,27 @@ class AgenteColetorDados:
             print(f"   -> Termos-chave trabalhistas identificados: {list(fundamentos)}")
 
         elif "Cível" in contexto:
-            fundamentos.update(["direito civil", "código civil"])
-            if "consumidor" in texto_analise or "produto" in texto_analise:
-                fundamentos.add("direito do consumidor")
-                if "vício" in texto_analise or "defeito" in texto_analise:
-                    fundamentos.add("vício do produto CDC")
-            if "acidente de trânsito" in texto_analise or "colisão" in texto_analise:
-                fundamentos.update(["responsabilidade civil acidente", "danos materiais trânsito"])
-            if "incumprimento de contrato" in texto_analise:
-                fundamentos.update(["incumprimento contratual", "rescisão contrato civil"])
-            if "dano moral" in texto_analise:
-                fundamentos.add("indenização dano moral")
+            # COMENTÁRIO: A lógica para Ação Cível foi substituída por um método mais inteligente.
+            # Ele agora extrai frases de 2 e 3 palavras do próprio texto, em vez de usar temas fixos.
+            palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'que', 'foi', 'mas', 'sem', 'ser', 'uma', 'por', 'são', 'qual', 'quais', 'os', 'as', 'dos', 'das', 'é', 'se', 'seu', 'sua', 'pelo', 'pela'}
             
-            if len(fundamentos) > 2:
-                fundamentos.discard("direito civil")
-                fundamentos.discard("código civil")
-            print(f"   -> Termos-chave cíveis identificados: {list(fundamentos)}")
+            # Limpa o texto, mantendo apenas palavras relevantes
+            palavras = re.findall(r'\b\w+\b', texto_analise)
+            palavras_filtradas = [p for p in palavras if p not in palavras_irrelevantes and len(p) > 3]
+
+            # Cria frases de 2 e 3 palavras (bigramas e trigramas)
+            if len(palavras_filtradas) >= 2:
+                for i in range(len(palavras_filtradas) - 1):
+                    fundamentos.add(" ".join(palavras_filtradas[i:i+2]))
+            if len(palavras_filtradas) >= 3:
+                for i in range(len(palavras_filtradas) - 2):
+                    fundamentos.add(" ".join(palavras_filtradas[i:i+3]))
+            
+            # Garante que os termos mais genéricos sejam usados como fallback se nada for encontrado
+            if not fundamentos:
+                fundamentos.update(["direito civil", "código civil", "danos materiais", "danos morais"])
+            
+            print(f"   -> Termos-chave cíveis extraídos do contexto: {list(fundamentos)[:5]}...") # Mostra apenas os 5 primeiros para não poluir o log
 
         elif contexto == "Contrato":
             tipo_especifico = self._obter_valor(dados, 'tipo_contrato', '')
@@ -145,7 +150,20 @@ class AgenteColetorDados:
             # ... (bloco de estudo de caso)
             pass
         else: 
-            # ... (bloco de petições)
-            pass
+            # COMENTÁRIO: Este bloco agora trata de TODAS as petições (Cível, Trabalhista, etc.)
+            # A estrutura é a mesma, garantindo que o redator sempre receba 'autor' e 'reu'.
+            estrutura_final['tipo_acao'] = contexto
+            estrutura_final['fatos'] = fatos_consolidados
+            estrutura_final.update({
+                "autor": {"nome": self._obter_valor(dados, 'autor_nome'), "qualificacao": self._obter_valor(dados, 'qualificacao_cliente')},
+                "reu": {"nome": self._obter_valor(dados, 'reu_nome'), "qualificacao": self._obter_valor(dados, 'qualificacao_reu')},
+                "pedidos": self._obter_valor(dados, 'pedido'),
+                "valor_causa": f"R$ {self._obter_valor(dados, 'valor_causa', '0.00')}"
+            })
+            if contexto == "Ação Trabalhista":
+                 estrutura_final.update({
+                    "data_admissao": self._obter_valor(dados, 'data_admissao'), "data_demissao": self._obter_valor(dados, 'data_demissao'),
+                    "salario": self._obter_valor(dados, 'salario')
+                })
 
         return estrutura_final
