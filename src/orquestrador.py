@@ -1,4 +1,4 @@
-# orquestrador.py - Versão Final com Ciclo de Feedback e Seleção Correta de Agentes
+# orquestrador.py - Versão Final com Seleção Dinâmica de Todos os Agentes
 
 import os
 import traceback
@@ -14,6 +14,8 @@ from agente_redator_queixa_crime import AgenteRedatorQueixaCrime
 from agente_redator_habeas_corpus import AgenteRedatorHabeasCorpus
 from agente_redator_parecer import AgenteRedatorParecer
 from agente_redator_contratos import AgenteRedatorContratos
+# COMENTÁRIO: Importamos o novo agente de Estudo de Caso.
+from agente_redator_estudo_de_caso import AgenteRedatorEstudoDeCaso
 from agente_validador import AgenteValidador
 
 class OrquestradorPrincipal:
@@ -30,12 +32,15 @@ class OrquestradorPrincipal:
         self.pesquisa_juridica_peticoes = PesquisaJuridica()
         self.pesquisa_juridica_contratos = AgentePesquisaContratos()
         
+        # Inicializa todos os agentes redatores
         self.agente_redator_trabalhista = AgenteRedatorTrabalhista(api_key=deepseek_api_key)
         self.agente_redator_civel = AgenteRedatorCivel(api_key=deepseek_api_key)
         self.agente_redator_queixa_crime = AgenteRedatorQueixaCrime(api_key=deepseek_api_key)
         self.agente_redator_habeas_corpus = AgenteRedatorHabeasCorpus(api_key=deepseek_api_key)
         self.agente_redator_parecer = AgenteRedatorParecer(api_key=deepseek_api_key)
         self.agente_redator_contratos = AgenteRedatorContratos(api_key=deepseek_api_key)
+        # COMENTÁRIO: Inicializamos uma instância do novo agente de Estudo de Caso.
+        self.agente_redator_estudo_de_caso = AgenteRedatorEstudoDeCaso(api_key=deepseek_api_key)
         
         self.agente_validador = AgenteValidador()
         
@@ -52,10 +57,8 @@ class OrquestradorPrincipal:
             
             # ETAPA 2: SELEÇÃO E EXECUÇÃO DA PESQUISA ESPECIALIZADA
             if tipo_documento == "Contrato":
-                print("... Agente de Pesquisa de Contratos selecionado.")
                 agente_pesquisa_ativo = self.pesquisa_juridica_contratos
             else:
-                print("... Agente de Pesquisa Jurídica (Petições) selecionado.")
                 agente_pesquisa_ativo = self.pesquisa_juridica_peticoes
 
             resultado_pesquisa = agente_pesquisa_ativo.pesquisar_fundamentacao_completa(
@@ -67,27 +70,26 @@ class OrquestradorPrincipal:
             print("ETAPA 3: Selecionando Agente Redator Especializado...")
             
             agente_redator_ativo = None
+            # COMENTÁRIO: A lógica de decisão foi expandida para incluir o novo agente de Estudo de Caso.
             if "Contrato" in tipo_documento:
-                print("... Agente de Contratos selecionado.")
                 agente_redator_ativo = self.agente_redator_contratos
+            elif "Estudo de Caso" in tipo_documento:
+                agente_redator_ativo = self.agente_redator_estudo_de_caso
             elif "Trabalhista" in tipo_documento:
-                print("... Agente Trabalhista selecionado.")
                 agente_redator_ativo = self.agente_redator_trabalhista
             elif "Queixa-Crime" in tipo_documento:
-                print("... Agente de Queixa-Crime selecionado.")
                 agente_redator_ativo = self.agente_redator_queixa_crime
             elif "Habeas Corpus" in tipo_documento:
-                print("... Agente de Habeas Corpus selecionado.")
                 agente_redator_ativo = self.agente_redator_habeas_corpus
             elif "Parecer Jurídico" in tipo_documento:
-                print("... Agente de Parecer Jurídico selecionado.")
                 agente_redator_ativo = self.agente_redator_parecer
             else: # Cível é o padrão para petições
-                print("... Agente Cível selecionado.")
                 agente_redator_ativo = self.agente_redator_civel
 
             if not agente_redator_ativo:
                 raise ValueError(f"Não foi possível selecionar um agente redator para o tipo: {tipo_documento}")
+            
+            print(f"... Agente '{agente_redator_ativo.__class__.__name__}' selecionado.")
 
             # ETAPA 4: CICLO DE REDAÇÃO E VALIDAÇÃO
             print("ETAPA 4: Iniciando Ciclo de Redação e Validação...")
