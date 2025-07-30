@@ -93,7 +93,7 @@ class AgenteColetorDados:
         fundamentos = set()
         texto_analise = fatos.lower() + " " + self._obter_valor(dados, 'pedido', '').lower()
 
-        # COMENTÁRIO: Lógica de extração de fundamentos aprimorada para todos os contextos.
+        # COMENTÁRIO: Lógica de extração aprimorada para todos os contextos.
         if contexto == "Ação Trabalhista":
             fundamentos.update(["direito trabalhista", "CLT"])
             if "horas extras" in texto_analise: fundamentos.update(["horas extras teletrabalho", "controle de jornada"])
@@ -102,27 +102,36 @@ class AgenteColetorDados:
             print(f"   -> Termos-chave trabalhistas identificados: {list(fundamentos)}")
 
         elif "Cível" in contexto:
-            # COMENTÁRIO: A lógica para Ação Cível foi substituída por um método mais inteligente.
-            # Ele agora extrai frases de 2 e 3 palavras do próprio texto, em vez de usar temas fixos.
-            palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'que', 'foi', 'mas', 'sem', 'ser', 'uma', 'por', 'são', 'qual', 'quais', 'os', 'as', 'dos', 'das', 'é', 'se', 'seu', 'sua', 'pelo', 'pela'}
+            # COMENTÁRIO: A lógica para Ação Cível foi substituída por um método mais inteligente,
+            # baseado em temas e palavras-chave, gerando frases curtas para pesquisa.
+            temas_identificados = False
             
-            # Limpa o texto, mantendo apenas palavras relevantes
-            palavras = re.findall(r'\b\w+\b', texto_analise)
-            palavras_filtradas = [p for p in palavras if p not in palavras_irrelevantes and len(p) > 3]
+            # Tema: Direito do Consumidor
+            if any(k in texto_analise for k in ["consumidor", "produto", "loja", "compra", "serviço"]):
+                fundamentos.add("direito do consumidor")
+                if "vício" in texto_analise or "defeito" in texto_analise:
+                    fundamentos.add("vício do produto CDC")
+                temas_identificados = True
 
-            # Cria frases de 2 e 3 palavras (bigramas e trigramas)
-            if len(palavras_filtradas) >= 2:
-                for i in range(len(palavras_filtradas) - 1):
-                    fundamentos.add(" ".join(palavras_filtradas[i:i+2]))
-            if len(palavras_filtradas) >= 3:
-                for i in range(len(palavras_filtradas) - 2):
-                    fundamentos.add(" ".join(palavras_filtradas[i:i+3]))
+            # Tema: Acidente de Trânsito
+            if any(k in texto_analise for k in ["acidente de trânsito", "colisão", "veículo", "abalroada", "batida"]):
+                fundamentos.update(["responsabilidade civil acidente", "danos materiais trânsito", "artigo 186 código civil"])
+                temas_identificados = True
+
+            # Tema: Incumprimento de Contrato
+            if any(k in texto_analise for k in ["incumprimento de contrato", "rescisão do contrato", "abandonou a obra", "não cumpriu"]):
+                fundamentos.update(["incumprimento contratual", "rescisão contrato civil", "artigo 475 código civil"])
+                temas_identificados = True
+
+            # Tema: Dano Moral (pode ser cumulativo)
+            if "dano moral" in texto_analise or "transtorno" in texto_analise or "stress" in texto_analise:
+                fundamentos.add("indenização dano moral")
             
-            # Garante que os termos mais genéricos sejam usados como fallback se nada for encontrado
-            if not fundamentos:
-                fundamentos.update(["direito civil", "código civil", "danos materiais", "danos morais"])
-            
-            print(f"   -> Termos-chave cíveis extraídos do contexto: {list(fundamentos)[:5]}...") # Mostra apenas os 5 primeiros para não poluir o log
+            # Se nenhum tema específico foi encontrado, usa o fallback.
+            if not temas_identificados:
+                fundamentos.update(["direito civil", "código civil"])
+
+            print(f"   -> Termos-chave cíveis identificados: {list(fundamentos)}")
 
         elif contexto == "Contrato":
             tipo_especifico = self._obter_valor(dados, 'tipo_contrato', '')
@@ -134,7 +143,8 @@ class AgenteColetorDados:
         
         # ... (outras lógicas para Criminal, Parecer, Estudo de Caso)
 
-        return list(fundamentos) if fundamentos else ["direito civil"]
+        # Limita o número de fundamentos para não sobrecarregar a pesquisa
+        return list(fundamentos)[:5]
 
     def _montar_estrutura_final(self, dados: Dict[str, Any], fatos_consolidados: str, fundamentos: List[str], contexto: str) -> Dict[str, Any]:
         # A lógica de montagem permanece a mesma, pois já é robusta e separada por contexto.
