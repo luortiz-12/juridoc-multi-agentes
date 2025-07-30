@@ -1,4 +1,4 @@
-# agente_pesquisa_contratos.py - Agente de Pesquisa Especializado em Contratos com Logs Aprimorados
+# agente_pesquisa_contratos.py - Versão 2.0 (Pesquisa Persistente e Aprofundada)
 
 import asyncio
 import aiohttp
@@ -11,19 +11,28 @@ from bs4 import BeautifulSoup
 class AgentePesquisaContratos:
     """
     Agente de Pesquisa Otimizado e Especializado em encontrar modelos e cláusulas de contratos.
-    v2.0: Logs detalhados para cada etapa da extração de conteúdo.
+    v2.0: Realiza uma pesquisa persistente, garantindo um número mínimo de extrações bem-sucedidas.
     """
     def __init__(self):
-        print("🔍 Inicializando Agente de Pesquisa de CONTRATOS (Logs Aprimorados)...")
-        self.headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+        print("🔍 Inicializando Agente de Pesquisa de CONTRATOS (Persistente v2.0)...")
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+        }
+        # COMENTÁRIO: Novas configurações para a pesquisa persistente.
+        self.config = {
+            'tamanho_minimo_conteudo': 500,
+            'tamanho_maximo_conteudo': 20000,
+            'min_sucessos_por_termo': 4, # META: Garantir pelo menos 4 conteúdos por termo.
+            'google_search_results': 10, # Busca mais links para ter mais opções.
+        }
         self.sites_prioritarios = ['jusbrasil.com.br', 'conjur.com.br', 'migalhas.com.br', 'planalto.gov.br']
-        self.config = {'tamanho_minimo_conteudo': 500, 'tamanho_maximo_conteudo': 20000, 'max_sites_por_query': 3}
         print("✅ Sistema de pesquisa de CONTRATOS inicializado.")
 
     async def _extrair_conteudo_url_async(self, session, url: str) -> Dict[str, Any]:
         """Extrai conteúdo de uma URL de forma assíncrona com logs detalhados."""
-        # COMENTÁRIO: Adicionado log para cada tentativa de acesso.
-        print(f"🌐 Acessando URL: {url}")
+        print(f"→ Tentando extrair de: {url}")
         try:
             async with session.get(url, headers=self.headers, timeout=15, ssl=False) as response:
                 if response.status == 200:
@@ -35,36 +44,57 @@ class AgentePesquisaContratos:
                     texto = soup.body.get_text(separator='\n', strip=True) if soup.body else ""
                     texto_limpo = re.sub(r'\n\s*\n', '\n', texto).strip()
                     
-                    # COMENTÁRIO: Adicionado log específico para conteúdo descartado por ser muito curto.
                     if len(texto_limpo) < self.config['tamanho_minimo_conteudo']:
-                        print(f"⚠️ Conteúdo descartado de {url}: muito curto ({len(texto_limpo)} caracteres)")
+                        print(f"⚠️ Descartado (curto): {url}")
                         return None
-                    
-                    print(f"📄 Conteúdo de contrato extraído de: {url} ({len(texto_limpo)} caracteres)")
+
+                    print(f"✔ SUCESSO: Conteúdo extraído de {url} ({len(texto_limpo)} caracteres)")
                     return {"url": url, "texto": texto_limpo[:self.config['tamanho_maximo_conteudo']]}
                 else:
-                    # COMENTÁRIO: Log de erro mais específico para falhas de acesso HTTP.
-                    print(f"❌ Erro ao acessar {url}: Status {response.status}")
+                    print(f"❌ Falha (Status {response.status}): {url}")
                     return None
         except Exception as e:
-            print(f"❌ Erro ao extrair conteúdo de contrato de {url}: {type(e).__name__} - {e}")
+            print(f"❌ Falha (Erro: {type(e).__name__}): {url}")
             return None
 
     async def _pesquisar_e_extrair_async(self, termo: str) -> List[Dict[str, Any]]:
-        print(f"📚 Buscando modelos e cláusulas para: '{termo}'...")
+        """
+        COMENTÁRIO: Lógica principal aprimorada. Agora ele busca mais links e tenta extrair
+        até atingir a meta de sucessos, ignorando as falhas.
+        """
+        print(f"\n📚 Buscando modelos e cláusulas para: '{termo}'...")
         site_query = " OR ".join([f"site:{site}" for site in self.sites_prioritarios])
         query = f'"{termo}" {site_query}'
+        
+        resultados_sucesso = []
+        urls_tentadas = set()
+        
         try:
             loop = asyncio.get_event_loop()
-            urls = await loop.run_in_executor(None, lambda: list(search(query, num_results=self.config['max_sites_por_query'], lang="pt")))
-        except Exception as e:
-            print(f"⚠️ Falha na busca do Google para '{termo}': {e}")
-            return []
+            urls_google = await loop.run_in_executor(None, lambda: list(search(query, num_results=self.config['google_search_results'], lang="pt")))
+            
+            async with aiohttp.ClientSession() as session:
+                tasks = []
+                for url in urls_google:
+                    if url not in urls_tentadas:
+                        urls_tentadas.add(url)
+                        tasks.append(self._extrair_conteudo_url_async(session, url))
+                
+                # Executa todas as extrações em paralelo
+                resultados_tasks = await asyncio.gather(*tasks)
+                
+                # Filtra apenas os resultados bem-sucedidos
+                resultados_sucesso = [res for res in resultados_tasks if res]
 
-        async with aiohttp.ClientSession() as session:
-            tasks = [self._extrair_conteudo_url_async(session, url) for url in urls]
-            resultados = await asyncio.gather(*tasks)
-            return [res for res in resultados if res]
+                # Limita ao número mínimo de sucessos desejado
+                resultados_sucesso = resultados_sucesso[:self.config['min_sucessos_por_termo']]
+
+            print(f"🎯 Pesquisa para '{termo}' concluída com {len(resultados_sucesso)} extrações bem-sucedidas.")
+            return resultados_sucesso
+
+        except Exception as e:
+            print(f"⚠️ Falha crítica na busca do Google para '{termo}': {e}")
+            return resultados_sucesso
 
     async def pesquisar_modelos_async(self, fundamentos: List[str]) -> Dict[str, Any]:
         tasks = [self._pesquisar_e_extrair_async(fundamento) for fundamento in fundamentos]
@@ -90,7 +120,6 @@ class AgentePesquisaContratos:
         
         tempo_total = (datetime.now() - inicio_pesquisa).total_seconds()
         
-        # COMENTÁRIO: Log de resumo final mais detalhado.
         print("\n--- RESUMO DA PESQUISA DE CONTRATOS ---")
         print(f"Fundamentos pesquisados: {fundamentos}")
         conteudos_encontrados = resultado.get("conteudos_extraidos", [])
