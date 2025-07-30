@@ -73,9 +73,13 @@ class OrquestradorPrincipal:
             )
             
             print("\n[RESUMO PESQUISA]")
-            print(f"  -> Conteúdos de Legislação encontrados: {len(resultado_pesquisa.get('legislacao', []))}")
-            print(f"  -> Conteúdos de Jurisprudência encontrados: {len(resultado_pesquisa.get('jurisprudencia', []))}")
-            print(f"  -> Conteúdos de Doutrina encontrados: {len(resultado_pesquisa.get('doutrina', []))}")
+            # Adapta o resumo para os diferentes tipos de pesquisa
+            if tipo_documento == "Contrato":
+                print(f"  -> Conteúdos de Contratos encontrados: {len(resultado_pesquisa.get('conteudos_extraidos', []))}")
+            else:
+                print(f"  -> Conteúdos de Legislação encontrados: {len(resultado_pesquisa.get('legislacao', []))}")
+                print(f"  -> Conteúdos de Jurisprudência encontrados: {len(resultado_pesquisa.get('jurisprudencia', []))}")
+                print(f"  -> Conteúdos de Doutrina encontrados: {len(resultado_pesquisa.get('doutrina', []))}")
 
             print("\n" + "="*50)
             print("--- ETAPA 3: AGENTE REDATOR (Ciclo de Redação e Validação) ---")
