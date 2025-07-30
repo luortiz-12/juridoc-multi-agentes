@@ -15,20 +15,21 @@ class AgenteColetorDados:
     def __init__(self):
         print("📊 Inicializando Agente Coletor de Dados v6.2 (Final)...")
         self.mapeamento_flexivel = {
-            # COMENTÁRIO: Adicionados os novos campos do formulário de Estudo de Caso.
+            # Estudo de Caso
             'titulo_caso': ['titulodecaso', 'titulodocaso'],
             'descricao_caso': ['descricaodocaso'],
             'contexto_juridico': ['contextojuridico'],
             'pontos_relevantes': ['pontosrelevantes'],
             'analise_caso': ['analisedocaso'],
             'conclusao_caso': ['conclusaodocaso', 'conclusao'],
-            
-            # Mapeamentos existentes (Contrato, Parecer, Petições)
+            # Contrato
             'tipo_contrato': ['tipodecontrato'],
             'contratante_nome': ['nomedocontratante', 'contratante'], 'contratado_nome': ['nomedocontratado', 'contratado'],
             'objeto_contrato': ['objetodocontrato', 'objeto'], 'valor_contrato': ['valordocontrato', 'valor'],
+            # Parecer
             'solicitante': ['solicitante'], 'assunto': ['assunto'], 'consulta': ['consulta'],
             'legislacao_aplicavel': ['legislacao', 'legislacaoaplicavel'], 'analise': ['analise'],
+            # Petições
             'autor_nome': ['clientenome'], 'qualificacao_cliente': ['qualificacaocliente'],
             'reu_nome': ['nomedaparte'], 'qualificacao_reu': ['qualificacaoparte'],
             'fatos': ['fatos'], 'pedido': ['pedido'], 'valor_causa': ['valorcausa'],
@@ -65,8 +66,6 @@ class AgenteColetorDados:
     def _identificar_contexto_e_dados(self, dados_normalizados: Dict[str, Any]) -> (str, Dict[str, Any]):
         dados_relevantes = {k: v for k, v in dados_normalizados.items() if v is not None and str(v).strip() != ""}
         
-        # COMENTÁRIO: Adicionada a lógica para identificar um Estudo de Caso.
-        # A presença de campos únicos como 'titulodocaso' ou 'descricaodocaso' define o contexto.
         if any(k in dados_relevantes for k in ['titulodocaso', 'descricaodocaso', 'contextojuridico']):
             return "Estudo de Caso", dados_relevantes
         if any(k in dados_relevantes for k in ['contratante', 'objetodocontrato', 'objeto', 'tipodecontrato']):
@@ -80,7 +79,6 @@ class AgenteColetorDados:
 
     def _consolidar_fatos(self, dados: Dict[str, Any], contexto: str) -> str:
         narrativa = []
-        # COMENTÁRIO: Lógica de consolidação específica para Estudo de Caso.
         if contexto == "Estudo de Caso":
             if self._obter_valor(dados, 'descricao_caso'): narrativa.append(f"Descrição do Caso: {self._obter_valor(dados, 'descricao_caso')}")
             if self._obter_valor(dados, 'pontos_relevantes'): narrativa.append(f"Pontos Relevantes para Análise: {self._obter_valor(dados, 'pontos_relevantes')}")
@@ -98,7 +96,7 @@ class AgenteColetorDados:
         fundamentos = set()
         texto_analise = fatos.lower()
         
-        # COMENTÁRIO: Lógica de extração de fundamentos específica para Estudo de Caso.
+        # COMENTÁRIO: Lógica de extração de fundamentos específica para cada contexto.
         if contexto == "Estudo de Caso":
             contexto_juridico = self._obter_valor(dados, 'contexto_juridico', '')
             pontos_relevantes = self._obter_valor(dados, 'pontos_relevantes', '')
@@ -123,15 +121,9 @@ class AgenteColetorDados:
         return list(fundamentos_filtrados) if fundamentos_filtrados else ["direito civil"]
 
     def _montar_estrutura_final(self, dados: Dict[str, Any], fatos_consolidados: str, fundamentos: List[str], contexto: str) -> Dict[str, Any]:
-        """
-        COMENTÁRIO: Esta função foi reestruturada com uma lógica if/elif/else clara.
-        Cada tipo de documento tem seu próprio bloco de código para montar a estrutura de dados,
-        garantindo que um não interfira com o outro.
-        """
         estrutura_final = {"tipo_documento": contexto, "fundamentos_necessarios": fundamentos}
 
         if contexto == "Estudo de Caso":
-            # COMENTÁRIO: Estrutura de dados final específica para Estudo de Caso.
             estrutura_final.update({
                 "titulo_caso": self._obter_valor(dados, 'titulo_caso'),
                 "descricao_caso": self._obter_valor(dados, 'descricao_caso'),
