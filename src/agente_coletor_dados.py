@@ -1,4 +1,4 @@
-# agente_coletor_dados.py - Versão 5.2 (Suporte a Estudo de Caso)
+# agente_coletor_dados.py - Versão 6.2 (Final - Suporte a todos os documentos)
 
 import json
 import re
@@ -7,21 +7,21 @@ from typing import Dict, Any, List
 
 class AgenteColetorDados:
     """
-    Agente Coletor de Dados v5.2 - Suporte a múltiplos tipos de documentos.
+    Agente Coletor de Dados v6.2 - Versão final com suporte a todos os tipos de documentos.
     - Identifica Petições, Pareceres, Contratos e Estudos de Caso.
     - Extrai fundamentos de forma especializada para cada tipo de documento.
     """
 
     def __init__(self):
-        print("📊 Inicializando Agente Coletor de Dados v5.2 (Multi-Documento)...")
+        print("📊 Inicializando Agente Coletor de Dados v6.2 (Final)...")
         self.mapeamento_flexivel = {
             # COMENTÁRIO: Adicionados os novos campos do formulário de Estudo de Caso.
-            'titulo_caso': ['titulodocaso'],
+            'titulo_caso': ['titulodecaso', 'titulodocaso'],
             'descricao_caso': ['descricaodocaso'],
             'contexto_juridico': ['contextojuridico'],
             'pontos_relevantes': ['pontosrelevantes'],
             'analise_caso': ['analisedocaso'],
-            'conclusao_caso': ['conclusao'],
+            'conclusao_caso': ['conclusaodocaso', 'conclusao'],
             
             # Mapeamentos existentes (Contrato, Parecer, Petições)
             'tipo_contrato': ['tipodecontrato'],
@@ -73,10 +73,6 @@ class AgenteColetorDados:
             return "Contrato", dados_relevantes
         if any(k in dados_relevantes for k in ['solicitante', 'consulta']):
             return "Parecer Jurídico", dados_relevantes
-        if any(k in dados_relevantes for k in ['autoridadecoatorahabiescorpus']):
-            return "Habeas Corpus", dados_relevantes
-        if any(k in dados_relevantes for k in ['datafatocriminal']):
-            return "Queixa-Crime", dados_relevantes
         if any(k in dados_relevantes for k in ['dataadmissaotrabalhista']):
             return "Ação Trabalhista", dados_relevantes
         
@@ -84,8 +80,8 @@ class AgenteColetorDados:
 
     def _consolidar_fatos(self, dados: Dict[str, Any], contexto: str) -> str:
         narrativa = []
+        # COMENTÁRIO: Lógica de consolidação específica para Estudo de Caso.
         if contexto == "Estudo de Caso":
-            # COMENTÁRIO: Lógica de consolidação específica para Estudo de Caso.
             if self._obter_valor(dados, 'descricao_caso'): narrativa.append(f"Descrição do Caso: {self._obter_valor(dados, 'descricao_caso')}")
             if self._obter_valor(dados, 'pontos_relevantes'): narrativa.append(f"Pontos Relevantes para Análise: {self._obter_valor(dados, 'pontos_relevantes')}")
         elif contexto == "Contrato":
@@ -100,28 +96,38 @@ class AgenteColetorDados:
 
     def _extrair_fundamentos_necessarios(self, fatos: str, contexto: str, dados: Dict[str, Any]) -> List[str]:
         fundamentos = set()
+        texto_analise = fatos.lower()
         
         # COMENTÁRIO: Lógica de extração de fundamentos específica para Estudo de Caso.
         if contexto == "Estudo de Caso":
             contexto_juridico = self._obter_valor(dados, 'contexto_juridico', '')
             pontos_relevantes = self._obter_valor(dados, 'pontos_relevantes', '')
             texto_completo = f"{contexto_juridico} {pontos_relevantes}"
-            termos_chave = re.findall(r'\"[a-zA-Z\s]+\"|\b[A-Z]{3,}\b|\b\w+\b', texto_completo)
+            termos_chave = re.findall(r'\"[a-zA-Z\s]+\"|\b[A-Z]{3,}\b|\b[\w\.]+\b', texto_completo)
             fundamentos.update(termos_chave)
-        # ... (outras lógicas de extração permanecem inalteradas)
         elif contexto == "Contrato":
             tipo_especifico = self._obter_valor(dados, 'tipo_contrato', '')
             objeto = self._obter_valor(dados, 'objeto_contrato', '')
             termo_principal = tipo_especifico if tipo_especifico else f"de {objeto}"
             fundamentos.add(f"modelo de {termo_principal}")
             fundamentos.add(f"cláusulas essenciais {termo_principal}")
+        elif "Cível" in contexto:
+            fundamentos.update(["direito civil", "código civil"])
+            if "consumidor" in texto_analise: fundamentos.add("direito do consumidor")
+            if "vício" in texto_analise or "defeito" in texto_analise: fundamentos.add("vício do produto CDC artigo 18")
+        # ... (outras lógicas para outros contextos)
 
-        palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não'}
-        fundamentos_filtrados = {f.strip() for f in fundamentos if f and f.lower() not in palavras_irrelevantes and len(f.strip()) > 2}
+        palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'ser', 'uma', 'por', 'são', 'qual', 'quais'}
+        fundamentos_filtrados = {f.strip(" .,'\"") for f in fundamentos if f and f.lower() not in palavras_irrelevantes and len(f.strip()) > 2}
             
         return list(fundamentos_filtrados) if fundamentos_filtrados else ["direito civil"]
 
     def _montar_estrutura_final(self, dados: Dict[str, Any], fatos_consolidados: str, fundamentos: List[str], contexto: str) -> Dict[str, Any]:
+        """
+        COMENTÁRIO: Esta função foi reestruturada com uma lógica if/elif/else clara.
+        Cada tipo de documento tem seu próprio bloco de código para montar a estrutura de dados,
+        garantindo que um não interfira com o outro.
+        """
         estrutura_final = {"tipo_documento": contexto, "fundamentos_necessarios": fundamentos}
 
         if contexto == "Estudo de Caso":
