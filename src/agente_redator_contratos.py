@@ -1,4 +1,4 @@
-# agente_redator_contratos.py - Versão 4.0 (Com Ciclo de Feedback e Meta de 30k)
+# agente_redator_contratos.py - Versão 4.2 (Com Prompts Aprimorados para Fidelidade e Qualidade)
 
 import json
 import logging
@@ -12,13 +12,13 @@ from datetime import datetime
 class AgenteRedatorContratos:
     """
     Agente Redator Otimizado e Especializado na redação de Contratos.
-    v4.0: Utiliza prompts dinâmicos e modulares, aceita feedback para melhoria
-    e tem uma meta de geração de conteúdo de 30.000 caracteres.
+    v4.2: Utiliza prompts aprimorados que forçam a fidelidade aos dados do formulário
+    e o uso inteligente da pesquisa, permitindo criatividade guiada.
     """
     def __init__(self, api_key: str):
         if not api_key: raise ValueError("DEEPSEEK_API_KEY não configurada")
         self.client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-        print("✅ Agente Redator de CONTRATOS (Dinâmico v4.0) inicializado.")
+        print("✅ Agente Redator de CONTRATOS (Dinâmico v4.2) inicializado.")
 
     async def _chamar_api_async(self, prompt: str, secao_nome: str) -> str:
         """Chama a API de forma assíncrona para gerar uma seção específica do contrato."""
@@ -28,7 +28,7 @@ class AgenteRedatorContratos:
                 self.client.chat.completions.create,
                 model="deepseek-chat",
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=8192, # Aumentado para permitir respostas mais longas
+                max_tokens=8192,
                 temperature=0.2
             )
             return re.sub(r'^```html|```$', '', response.choices[0].message.content.strip())
@@ -40,24 +40,28 @@ class AgenteRedatorContratos:
         """Cria ou melhora as cláusulas do documento em paralelo."""
         
         instrucao_formato = "Sua resposta DEVE ser um bloco de código HTML. Use <h3> para o título da cláusula (ex: '<h3>CLÁUSULA PRIMEIRA - DO OBJETO</h3>'), <p> para o texto, e <strong> para negrito. NÃO use Markdown (`**`). Seja extremamente detalhado e formal."
+        
+        # COMENTÁRIO: Nova instrução crucial que guia a IA sobre como usar os dados e a criatividade.
+        instrucao_fidelidade = "ATENÇÃO: Sua tarefa é redigir uma cláusula de contrato. Você DEVE se basear ESTRITAMENTE nos dados fornecidos no JSON 'DADOS DO CASO' e na 'PESQUISA' jurídica. Use seu conhecimento e criatividade para expandir e detalhar a história, conectando os fatos com os modelos e cláusulas encontrados na pesquisa. NÃO invente nomes, valores, datas ou qualquer fato que contradiga os dados fornecidos."
 
         instrucao_melhoria = ""
         if recomendacoes:
-            instrucao_melhoria = f"\n\nINSTRUÇÕES PARA MELHORIA: A versão anterior foi considerada insatisfatória. Reescreva e expanda significativamente o conteúdo para atender a seguinte recomendação: '{' '.join(recomendacoes)}'. Use o rascunho anterior como referência do que NÃO fazer.\nRASCUNHO ANTERIOR:\n{documento_anterior}"
+            instrucao_melhoria = f"\n\nINSTRUÇÕES PARA MELHORIA: A versão anterior foi considerada insatisfatória. Reescreva e expanda significativamente o conteúdo para atender a seguinte recomendação: '{' '.join(recomendacoes)}'."
 
         tipo_contrato = dados_formulario.get('tipo_contrato_especifico', 'DE PRESTAÇÃO DE SERVIÇOS')
+        pesquisa_formatada = pesquisas.get('pesquisa_formatada', 'Nenhuma pesquisa de referência foi encontrada.')
 
-        # COMENTÁRIO: Prompts modulares com requisitos de tamanho para atingir a meta de 30k.
+        # COMENTÁRIO: Os prompts agora incluem a instrução de fidelidade e passam os dados da pesquisa.
         prompts = {
-            "objeto": f"{instrucao_formato}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA PRIMEIRA - DO OBJETO'. Seja extremamente detalhado, com no mínimo 4.000 caracteres. Detalhe o seguinte: {dados_formulario.get('objeto', '')}",
-            "valor": f"{instrucao_formato}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA SEGUNDA - DO VALOR E DA FORMA DE PAGAMENTO'. Seja detalhado, com no mínimo 3.000 caracteres. Detalhe o valor de {dados_formulario.get('valor', '')} e a forma de pagamento: {dados_formulario.get('pagamento', '')}",
-            "prazos": f"{instrucao_formato}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA TERCEIRA - DOS PRAZOS'. Seja detalhado, com no mínimo 3.000 caracteres. Detalhe os seguintes prazos: {dados_formulario.get('prazos', '')}",
-            "obrigacoes": f"{instrucao_formato}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA QUARTA - DAS OBRIGAÇÕES DAS PARTES'. Seja detalhado, com no mínimo 5.000 caracteres. Crie subtítulos com '<strong>Obrigações do CONTRATANTE:</strong>' e '<strong>Obrigações do CONTRATADO:</strong>'. Detalhe as seguintes responsabilidades: {dados_formulario.get('responsabilidades', '')}",
-            "penalidades": f"{instrucao_formato}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA QUINTA - DAS PENALIDADES'. Seja detalhado, com no mínimo 3.000 caracteres. Detalhe as seguintes penalidades por descumprimento: {dados_formulario.get('penalidades', '')}",
-            "propriedade": f"{instrucao_formato}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA SEXTA - DA PROPRIEDADE INTELECTUAL'. Crie uma cláusula padrão detalhada, com no mínimo 3.000 caracteres, definindo a quem pertence a propriedade intelectual do trabalho desenvolvido.",
-            "confidencialidade": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a 'CLÁUSULA SÉTIMA - DA CONFIDENCIALIDADE'. Crie uma cláusula padrão detalhada, com no mínimo 3.000 caracteres, obrigando ambas as partes a manter sigilo sobre as informações trocadas.",
-            "rescisao": f"{instrucao_formato}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA OITAVA - DA RESCISÃO'. Seja detalhado, com no mínimo 3.000 caracteres. Detalhe as condições e consequências da rescisão do contrato.",
-            "foro": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a 'CLÁUSULA NONA - DO FORO'. Especifique o foro de eleição como: {dados_formulario.get('foro', '')}",
+            "objeto": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA PRIMEIRA - DO OBJETO'.\nDADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}\nPESQUISA:{pesquisa_formatada}",
+            "valor": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA SEGUNDA - DO VALOR E DA FORMA DE PAGAMENTO'.\nDADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}\nPESQUISA:{pesquisa_formatada}",
+            "prazos": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA TERCEIRA - DOS PRAZOS'.\nDADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}\nPESQUISA:{pesquisa_formatada}",
+            "obrigacoes": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA QUARTA - DAS OBRIGAÇÕES DAS PARTES'. Crie subtítulos com '<strong>Obrigações do CONTRATANTE:</strong>' e '<strong>Obrigações do CONTRATADO:</strong>'.\nDADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}\nPESQUISA:{pesquisa_formatada}",
+            "penalidades": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA QUINTA - DAS PENALIDADES'.\nDADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}\nPESQUISA:{pesquisa_formatada}",
+            "propriedade": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA SEXTA - DA PROPRIEDADE INTELECTUAL'. Crie uma cláusula padrão definindo a quem pertence a propriedade intelectual do trabalho desenvolvido.\nDADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}\nPESQUISA:{pesquisa_formatada}",
+            "confidencialidade": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a 'CLÁUSULA SÉTIMA - DA CONFIDENCIALIDADE'. Crie uma cláusula padrão obrigando as partes a manter sigilo.\nDADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}\nPESQUISA:{pesquisa_formatada}",
+            "rescisao": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA OITAVA - DA RESCISÃO'.\nDADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}\nPESQUISA:{pesquisa_formatada}",
+            "foro": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a 'CLÁUSULA NONA - DO FORO'.\nDADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}\nPESQUISA:{pesquisa_formatada}",
         }
         
         tasks = [self._chamar_api_async(p, n) for n, p in prompts.items()]
