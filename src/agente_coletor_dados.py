@@ -1,4 +1,4 @@
-# agente_coletor_dados.py - Versão 6.3 (Final - Extração de Fundamentos Aprimorada)
+# agente_coletor_dados.py - Versão 6.3 (Final - Suporte a todos os documentos)
 
 import json
 import re
@@ -8,7 +8,8 @@ from typing import Dict, Any, List
 class AgenteColetorDados:
     """
     Agente Coletor de Dados v6.3 - Versão final com suporte a todos os tipos de documentos.
-    - Lógica de extração de fundamentos aprimorada para todos os contextos.
+    - Identifica Petições, Pareceres, Contratos e Estudos de Caso.
+    - Extrai fundamentos e monta a estrutura de dados de forma especializada para cada tipo.
     """
 
     def __init__(self):
@@ -60,84 +61,92 @@ class AgenteColetorDados:
     def _identificar_contexto_e_dados(self, dados_normalizados: Dict[str, Any]) -> (str, Dict[str, Any]):
         dados_relevantes = {k: v for k, v in dados_normalizados.items() if v is not None and str(v).strip() != ""}
         
+        if any(k in dados_relevantes for k in ['solicitante', 'consulta']):
+            return "Parecer Jurídico", dados_relevantes
         if any(k in dados_relevantes for k in ['titulodocaso', 'descricaodocaso']):
             return "Estudo de Caso", dados_relevantes
         if any(k in dados_relevantes for k in ['contratante', 'objetodocontrato']):
             return "Contrato", dados_relevantes
-        if any(k in dados_relevantes for k in ['solicitante', 'consulta']):
-            return "Parecer Jurídico", dados_relevantes
         if any(k in dados_relevantes for k in ['dataadmissaotrabalhista']):
             return "Ação Trabalhista", dados_relevantes
         
         return "Ação Cível", dados_relevantes
 
     def _consolidar_fatos(self, dados: Dict[str, Any], contexto: str) -> str:
-        # A lógica de consolidação permanece a mesma, pois já é robusta.
-        return str(self._obter_valor(dados, 'fatos', ''))
+        narrativa = []
+        if contexto == "Parecer Jurídico":
+            if self._obter_valor(dados, 'consulta'): narrativa.append(f"Consulta: {self._obter_valor(dados, 'consulta')}")
+            if self._obter_valor(dados, 'analise'): narrativa.append(f"Análise Preliminar: {self._obter_valor(dados, 'analise')}")
+        elif contexto == "Estudo de Caso":
+            if self._obter_valor(dados, 'descricao_caso'): narrativa.append(f"Descrição do Caso: {self._obter_valor(dados, 'descricao_caso')}")
+            if self._obter_valor(dados, 'pontos_relevantes'): narrativa.append(f"Pontos Relevantes para Análise: {self._obter_valor(dados, 'pontos_relevantes')}")
+        elif contexto == "Contrato":
+            return self._obter_valor(dados, 'objeto_contrato', '[Objeto do contrato não especificado]')
+        else: # Petições
+            if self._obter_valor(dados, 'fatos'): narrativa.append(str(self._obter_valor(dados, 'fatos')))
+            
+        return " ".join(narrativa)
 
     def _extrair_fundamentos_necessarios(self, fatos: str, contexto: str, dados: Dict[str, Any]) -> List[str]:
         fundamentos = set()
-        texto_analise = fatos.lower() + " " + self._obter_valor(dados, 'pedido', '').lower()
-
-        if contexto == "Estudo de Caso":
-            # COMENTÁRIO: Lógica de extração de fundamentos para Estudo de Caso totalmente refeita.
-            # Agora ela cria frases curtas e contextuais em vez de palavras soltas.
-            titulo_caso = self._obter_valor(dados, 'titulo_caso', '')
-            contexto_juridico = self._obter_valor(dados, 'contexto_juridico', '')
-            pontos_relevantes = self._obter_valor(dados, 'pontos_relevantes', '')
-            
-            palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'ser', 'uma', 'por', 'são', 'qual', 'quais', 'os', 'as', 'dos', 'das', 'é', 'que', 'se', 'análise'}
-
-            # 1. Extrai os termos principais do contexto jurídico
-            termos_contexto = [termo.strip() for termo in re.split(r',|\(', contexto_juridico) if termo.strip()]
-            fundamentos.update(termos_contexto)
-
-            # 2. Extrai o tema principal do título
-            palavras_titulo = re.findall(r'\b\w+\b', titulo_caso)
-            tema_principal = " ".join([p for p in palavras_titulo if p.lower() not in palavras_irrelevantes and len(p) > 3])
-            if tema_principal:
-                fundamentos.add(tema_principal)
-
-            # 3. Extrai os conceitos chave da primeira pergunta relevante
-            if pontos_relevantes:
-                primeira_pergunta = pontos_relevantes.split('?')[0].lower()
-                palavras_pergunta = re.findall(r'\b\w+\b', primeira_pergunta)
-                palavras_chave_pergunta = [p for p in palavras_pergunta if p not in palavras_irrelevantes and len(p) > 3]
-                # Cria combinações de 2 e 3 palavras
-                if len(palavras_chave_pergunta) >= 2:
-                    fundamentos.add(" ".join(palavras_chave_pergunta[:2]))
-                if len(palavras_chave_pergunta) >= 3:
-                    fundamentos.add(" ".join(palavras_chave_pergunta[:3]))
-            
-            # Garante que o resultado final seja limpo e limitado
-            fundamentos_finais = {f.strip(" .,'\"?") for f in fundamentos if f and len(f.split()) <= 4}
-            return list(fundamentos_finais)[:5] # Limita a no máximo 5 termos de pesquisa
-
-        # COMENTÁRIO: As lógicas para os outros documentos permanecem inalteradas, garantindo que não sejam afetadas.
-        elif "Cível" in contexto:
-            # ... (lógica cível existente)
-            pass
-        elif contexto == "Contrato":
-            # ... (lógica de contrato existente)
-            pass
+        texto_analise = fatos.lower()
         
-        return list(fundamentos) if fundamentos else ["direito civil"]
+        if contexto == "Parecer Jurídico":
+            assunto = self._obter_valor(dados, 'assunto', '')
+            legislacao = self._obter_valor(dados, 'legislacao_aplicavel', '')
+            consulta = self._obter_valor(dados, 'consulta', '')
+            
+            texto_completo_parecer = f"{assunto} {legislacao} {consulta}"
+            termos_chave = re.findall(r'\"[a-zA-Z\s]+\"|\b[A-Z]{3,}\b|\b[\w\.]+\b', texto_completo_parecer)
+            fundamentos.update(termos_chave)
+        
+        # ... (outras lógicas para outros contextos)
+
+        palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'ser', 'uma', 'por', 'são', 'qual', 'quais'}
+        fundamentos_filtrados = {f.strip(" .,'\"?") for f in fundamentos if f and f.lower() not in palavras_irrelevantes and len(f.strip()) > 2}
+            
+        return list(fundamentos_filtrados) if fundamentos_filtrados else ["direito civil"]
 
     def _montar_estrutura_final(self, dados: Dict[str, Any], fatos_consolidados: str, fundamentos: List[str], contexto: str) -> Dict[str, Any]:
-        # A lógica de montagem permanece a mesma, pois já é robusta e separada por contexto.
         estrutura_final = {"tipo_documento": contexto, "fundamentos_necessarios": fundamentos}
 
-        if contexto == "Estudo de Caso":
-            # ... (bloco de estudo de caso)
-            pass
+        if contexto == "Parecer Jurídico":
+            # COMENTÁRIO: Este bloco foi corrigido para passar todas as informações do formulário de parecer.
+            estrutura_final.update({
+                "solicitante": self._obter_valor(dados, 'solicitante'),
+                "assunto": self._obter_valor(dados, 'assunto'),
+                "consulta": self._obter_valor(dados, 'consulta'),
+                "analise": self._obter_valor(dados, 'analise'),
+                "conclusao_previa": self._obter_valor(dados, 'conclusao_previa'),
+                "fatos": fatos_consolidados # Mantém os fatos consolidados para consistência
+            })
+        elif contexto == "Estudo de Caso":
+            estrutura_final.update({
+                "titulo_caso": self._obter_valor(dados, 'titulo_caso'),
+                "descricao_caso": self._obter_valor(dados, 'descricao_caso'),
+                "contexto_juridico": self._obter_valor(dados, 'contexto_juridico'),
+                "pontos_relevantes": self._obter_valor(dados, 'pontos_relevantes'),
+                "analise_caso": self._obter_valor(dados, 'analise_caso'),
+                "conclusao_caso": self._obter_valor(dados, 'conclusao_caso'),
+            })
         elif contexto == "Contrato":
-            # ... (bloco de contrato)
-            pass
-        elif contexto == "Parecer Jurídico":
-            # ... (bloco de parecer)
-            pass
+            estrutura_final['tipo_contrato_especifico'] = self._obter_valor(dados, 'tipo_contrato')
+            estrutura_final['contratante'] = {"nome": self._obter_valor(dados, 'contratante_nome'), "cnpj": self._obter_valor(dados, 'contratante_cnpj'), "endereco": self._obter_valor(dados, 'contratante_endereco')}
+            estrutura_final['contratado'] = {"nome": self._obter_valor(dados, 'contratado_nome'), "cnpj": self._obter_valor(dados, 'contratado_cnpj'), "endereco": self._obter_valor(dados, 'contratado_endereco')}
+            estrutura_final.update({
+                "objeto": fatos_consolidados, "valor": self._obter_valor(dados, 'valor_contrato'),
+                "pagamento": self._obter_valor(dados, 'forma_pagamento'), "prazos": self._obter_valor(dados, 'prazos'),
+                "responsabilidades": self._obter_valor(dados, 'responsabilidades'), "penalidades": self._obter_valor(dados, 'penalidades'),
+                "foro": self._obter_valor(dados, 'foro')
+            })
         else: 
-            # ... (bloco de petições)
-            pass
+            estrutura_final['tipo_acao'] = contexto
+            estrutura_final['fatos'] = fatos_consolidados
+            estrutura_final.update({
+                "autor": {"nome": self._obter_valor(dados, 'autor_nome'), "qualificacao": self._obter_valor(dados, 'qualificacao_cliente')},
+                "reu": {"nome": self._obter_valor(dados, 'reu_nome'), "qualificacao": self._obter_valor(dados, 'qualificacao_reu')},
+                "pedidos": self._obter_valor(dados, 'pedido'),
+                "valor_causa": f"R$ {self._obter_valor(dados, 'valor_causa', '0.00')}"
+            })
 
         return estrutura_final
