@@ -1,4 +1,4 @@
-# agente_redator_civel.py - Versão 2.2 (Com Prompts Rígidos Anti-Alucinação)
+# agente_redator_civel.py - Versão 2.5 (Com Prompts de Formatação Rígidos)
 
 import json
 import logging
@@ -12,20 +12,19 @@ from datetime import datetime
 class AgenteRedatorCivel:
     """
     Agente Redator Especializado em Direito Cível.
-    v2.2: Utiliza prompts rígidos para garantir a fidelidade aos dados do formulário
-    e evitar a invenção de fatos ("alucinação").
+    v2.5: Utiliza prompts modulares e detalhados com regras de formatação rígidas
+    para garantir um HTML consistente e limpo.
     """
     def __init__(self, api_key: str):
         self.logger = logging.getLogger(__name__)
         if not api_key: raise ValueError("DEEPSEEK_API_KEY não configurada")
         
         self.client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-        print("✅ Agente Redator CÍVEL (v2.2 com Prompts Rígidos) inicializado com sucesso.")
+        print("✅ Agente Redator CÍVEL (v2.5 com Prompts Rígidos) inicializado com sucesso.")
 
     async def _chamar_api_async(self, prompt: str, secao_nome: str) -> str:
         """Chama a API de forma assíncrona para gerar uma seção específica."""
         print(f"📝 Gerando/Melhorando seção cível: {secao_nome}")
-        print(f"   Prompt (início): {prompt[:300].replace(chr(10), ' ')}...")
         try:
             response = await asyncio.to_thread(
                 self.client.chat.completions.create,
@@ -43,21 +42,20 @@ class AgenteRedatorCivel:
     async def gerar_documento_html_puro_async(self, dados_formulario: Dict, pesquisas: Dict, documento_anterior: Optional[str] = None, recomendacoes: Optional[List[str]] = None) -> str:
         """Cria ou melhora as seções do documento em paralelo."""
         
-        instrucao_formato = "Sua resposta DEVE ser um bloco de código HTML bem formatado. NÃO use Markdown (como `**` ou `*`). Para ênfase, use apenas tags HTML como `<strong>` para negrito."
-        
-        # COMENTÁRIO: A instrução de fidelidade foi aprimorada para ser mais clara sobre como usar a criatividade.
-        instrucao_fidelidade = "ATENÇÃO: Sua tarefa é redigir um texto jurídico. Você DEVE se basear ESTRITAMENTE nos dados fornecidos no JSON 'DADOS DO CASO' e na 'PESQUISA' jurídica. Use seu conhecimento e criatividade para expandir e detalhar a história, conectando os fatos com os fundamentos legais encontrados na pesquisa. NÃO invente nomes, valores, datas ou qualquer fato que contradiga os dados fornecidos."
+        # COMENTÁRIO: A instrução de formato foi aprimorada para ser ainda mais rigorosa e explícita.
+        instrucao_formato = "REGRAS DE FORMATAÇÃO ESTRITAS: Sua resposta deve ser APENAS o conteúdo HTML para a seção solicitada. Use exclusivamente as seguintes tags: <h2> para o título principal da seção (ex: <h2>DOS FATOS</h2>), <h3> para subtítulos internos, <p> para parágrafos, e <strong> para texto em negrito. É PROIBIDO o uso de qualquer outra tag, como <div>, <blockquote>, <ul>, <li>, <em>, ou formatação Markdown (`**`)."
+        instrucao_fidelidade = "ATENÇÃO: Você DEVE se basear ESTRITAMENTE nos dados fornecidos no JSON 'DADOS DO CASO'. NÃO invente fatos. Sua tarefa é expandir e detalhar a história fornecida."
 
         instrucao_melhoria = ""
         if recomendacoes:
-            instrucao_melhoria = f"\n\nINSTRUÇÕES PARA MELHORIA: A versão anterior foi considerada insatisfatória. Reescreva e expanda significativamente o conteúdo para atender a seguinte recomendação: '{' '.join(recomendacoes)}'. Use o rascunho anterior como referência do que NÃO fazer.\nRASCUNHO ANTERIOR:\n{documento_anterior}"
+            instrucao_melhoria = f"\n\nINSTRUÇÕES PARA MELHORIA: A versão anterior foi considerada insatisfatória. Reescreva e expanda o conteúdo para atender a seguinte recomendação: '{' '.join(recomendacoes)}'."
 
         prompts = {
-            "fatos": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a seção 'DOS FATOS' de uma petição cível. Seja extremamente detalhado, com no mínimo 10.000 caracteres. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS FATOS</h2>.",
-            "legislacao": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção 'DA FUNDAMENTAÇÃO LEGAL' para uma petição cível. Seja detalhado, com no mínimo 7.000 caracteres. Use os dados da pesquisa para fundamentar. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece com <h3>Da Fundamentação Legal</h3>.",
-            "jurisprudencia": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção sobre a 'JURISPRUDÊNCIA APLICÁVEL' para uma petição cível. Seja detalhado, com no mínimo 7.000 caracteres. Use os dados da pesquisa para citar precedentes. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('jurisprudencia_formatada', 'N/A')}. Comece com <h3>Da Jurisprudência Aplicável</h3>.",
-            "doutrina": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção sobre a 'ANÁLISE DOUTRINÁRIA' para uma petição cível. Seja detalhado, com no mínimo 7.000 caracteres. Use os dados da pesquisa. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('doutrina_formatada', 'N/A')}. Comece com <h3>Da Análise Doutrinária</h3>.",
-            "pedidos": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a seção 'DOS PEDIDOS' de uma petição cível. Seja detalhado, com no mínimo 5.000 caracteres. Baseie-se estritamente no campo 'pedidos' dos dados. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS PEDIDOS</h2>."
+            "fatos": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a seção 'DOS FATOS' de uma petição cível. Seja extremamente detalhado. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS FATOS</h2>.",
+            "legislacao": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção 'DA FUNDAMENTAÇÃO LEGAL' para uma petição cível. Fundamente com base na legislação pesquisada. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece com <h3>Da Fundamentação Legal</h3>.",
+            "jurisprudencia": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção sobre a 'JURISPRUDÊNCIA APLICÁVEL' para uma petição cível. Cite precedentes da pesquisa. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('jurisprudencia_formatada', 'N/A')}. Comece com <h3>Da Jurisprudência Aplicável</h3>.",
+            "doutrina": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção sobre a 'ANÁLISE DOUTRINÁRIA' para uma petição cível. Use a pesquisa. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('doutrina_formatada', 'N/A')}. Comece com <h3>Da Análise Doutrinária</h3>.",
+            "pedidos": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a seção 'DOS PEDIDOS' de uma petição cível. Baseie-se estritamente no campo 'pedidos' dos dados. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS PEDIDOS</h2>."
         }
         
         tasks = [self._chamar_api_async(p, n) for n, p in prompts.items()]
