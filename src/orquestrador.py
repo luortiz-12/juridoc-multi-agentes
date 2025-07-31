@@ -1,11 +1,20 @@
-# orquestrador.py - Versão Final com Seleção Dinâmica e Logs Aprimorados
+# orquestrador.py - Versão Final com a Nova Arquitetura de Agentes Especializados
 
 import os
 import traceback
 from typing import Dict, Any, List
 from datetime import datetime
 
-from agente_coletor_dados import AgenteColetorDados
+# COMENTÁRIO: Importamos o novo agente identificador e todos os coletores especializados.
+from agente_identificador import AgenteIdentificador
+from agente_coletor_civel import AgenteColetorCivel
+from agente_coletor_trabalhista import AgenteColetorTrabalhista
+from agente_coletor_contratos import AgenteColetorContratos
+from agente_coletor_parecer import AgenteColetorParecer
+from agente_coletor_queixa_crime import AgenteColetorQueixaCrime
+from agente_coletor_habeas_corpus import AgenteColetorHabeasCorpus
+from agente_coletor_estudo_de_caso import AgenteColetorEstudoDeCaso
+
 from pesquisa_juridica import PesquisaJuridica
 from agente_pesquisa_contratos import AgentePesquisaContratos
 from agente_redator_trabalhista import AgenteRedatorTrabalhista
@@ -14,6 +23,7 @@ from agente_redator_queixa_crime import AgenteRedatorQueixaCrime
 from agente_redator_habeas_corpus import AgenteRedatorHabeasCorpus
 from agente_redator_parecer import AgenteRedatorParecer
 from agente_redator_contratos import AgenteRedatorContratos
+from agente_redator_estudo_de_caso import AgenteRedatorEstudoDeCaso
 from agente_validador import AgenteValidador
 
 class OrquestradorPrincipal:
@@ -26,17 +36,31 @@ class OrquestradorPrincipal:
         
         print("✅ Chave da API encontrada pelo Orquestrador.")
 
-        self.agente_coletor = AgenteColetorDados()
+        # COMENTÁRIO: Inicializamos o novo agente identificador e um dicionário com todos os coletores.
+        self.agente_identificador = AgenteIdentificador()
+        self.coletores = {
+            "Ação Cível": AgenteColetorCivel(),
+            "Ação Trabalhista": AgenteColetorTrabalhista(),
+            "Contrato": AgenteColetorContratos(),
+            "Parecer Jurídico": AgenteColetorParecer(),
+            "Queixa-Crime": AgenteColetorQueixaCrime(),
+            "Habeas Corpus": AgenteColetorHabeasCorpus(),
+            "Estudo de Caso": AgenteColetorEstudoDeCaso(),
+        }
+        
         self.pesquisa_juridica_peticoes = PesquisaJuridica()
         self.pesquisa_juridica_contratos = AgentePesquisaContratos()
         
-        # Inicializa todos os agentes redatores
-        self.agente_redator_trabalhista = AgenteRedatorTrabalhista(api_key=deepseek_api_key)
-        self.agente_redator_civel = AgenteRedatorCivel(api_key=deepseek_api_key)
-        self.agente_redator_queixa_crime = AgenteRedatorQueixaCrime(api_key=deepseek_api_key)
-        self.agente_redator_habeas_corpus = AgenteRedatorHabeasCorpus(api_key=deepseek_api_key)
-        self.agente_redator_parecer = AgenteRedatorParecer(api_key=deepseek_api_key)
-        self.agente_redator_contratos = AgenteRedatorContratos(api_key=deepseek_api_key)
+        # Inicializa todos os agentes redatores num dicionário para fácil acesso.
+        self.redatores = {
+            "Ação Cível": AgenteRedatorCivel(api_key=deepseek_api_key),
+            "Ação Trabalhista": AgenteRedatorTrabalhista(api_key=deepseek_api_key),
+            "Contrato": AgenteRedatorContratos(api_key=deepseek_api_key),
+            "Parecer Jurídico": AgenteRedatorParecer(api_key=deepseek_api_key),
+            "Queixa-Crime": AgenteRedatorQueixaCrime(api_key=deepseek_api_key),
+            "Habeas Corpus": AgenteRedatorHabeasCorpus(api_key=deepseek_api_key),
+            "Estudo de Caso": AgenteRedatorEstudoDeCaso(api_key=deepseek_api_key),
+        }
         
         self.agente_validador = AgenteValidador()
         
@@ -44,89 +68,80 @@ class OrquestradorPrincipal:
     
     def processar_solicitacao_completa(self, dados_entrada: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            # COMENTÁRIO: Adicionados separadores e logs de resumo para cada etapa.
-            print("\n" + "="*50)
-            print("--- ETAPA 1: AGENTE COLETOR DE DADOS ---")
-            resultado_coletor = self.agente_coletor.coletar_e_processar(dados_entrada)
+            print("\n" + "="*60)
+            print("🚀 INICIANDO NOVO FLUXO DE GERAÇÃO DE DOCUMENTO 🚀")
+            print("="*60)
+
+            # ETAPA 1: AGENTE IDENTIFICADOR
+            print("\n--- ETAPA 1: Identificação do Tipo de Documento ---")
+            resultado_identificador = self.agente_identificador.identificar_documento(dados_entrada)
+            if resultado_identificador.get("status") == "erro": return resultado_identificador
+            tipo_documento = resultado_identificador.get("tipo_documento", "Ação Cível")
+            print(f"  -> Documento identificado como: {tipo_documento}")
+
+            # ETAPA 2: AGENTE COLETOR DE DADOS ESPECIALIZADO
+            print("\n--- ETAPA 2: Coleta de Dados Especializada ---")
+            agente_coletor_ativo = self.coletores.get(tipo_documento)
+            if not agente_coletor_ativo:
+                raise ValueError(f"Nenhum agente coletor encontrado para o tipo: {tipo_documento}")
+            print(f"  -> Acionando Agente: {agente_coletor_ativo.__class__.__name__}")
+            resultado_coletor = agente_coletor_ativo.coletar_e_processar(dados_entrada)
             if resultado_coletor.get("status") == "erro": return resultado_coletor
             dados_estruturados = resultado_coletor.get('dados_estruturados', {})
-            
-            tipo_documento = dados_estruturados.get('tipo_documento', 'Petição')
-            fundamentos_pesquisa = dados_estruturados.get('fundamentos_necessarios', [])
-            
-            print(f"\n[RESUMO COLETOR]")
-            print(f"  -> Tipo de Documento Identificado: {tipo_documento}")
-            print(f"  -> Termos para Pesquisa: {fundamentos_pesquisa}")
-            
-            print("\n" + "="*50)
-            print("--- ETAPA 2: AGENTE DE PESQUISA ---")
+            print("[RESUMO COLETOR]")
+            print(f"  -> Fundamentos para Pesquisa: {dados_estruturados.get('fundamentos_necessarios', [])}")
+
+            # ETAPA 3: AGENTE DE PESQUISA ESPECIALIZADO
+            print("\n--- ETAPA 3: Pesquisa Jurídica ---")
             if tipo_documento == "Contrato":
-                print("  -> Selecionando Agente de Pesquisa de Contratos...")
                 agente_pesquisa_ativo = self.pesquisa_juridica_contratos
             else:
-                print("  -> Selecionando Agente de Pesquisa Jurídica (Petições/Outros)...")
                 agente_pesquisa_ativo = self.pesquisa_juridica_peticoes
-
+            print(f"  -> Acionando Agente: {agente_pesquisa_ativo.__class__.__name__}")
             resultado_pesquisa = agente_pesquisa_ativo.pesquisar_fundamentacao_completa(
-                fundamentos=fundamentos_pesquisa,
+                fundamentos=dados_estruturados.get('fundamentos_necessarios', []),
                 tipo_acao=tipo_documento
             )
-            
-            print("\n[RESUMO PESQUISA]")
-            # Adapta o resumo para os diferentes tipos de pesquisa
-            if tipo_documento == "Contrato":
-                print(f"  -> Conteúdos de Contratos encontrados: {len(resultado_pesquisa.get('conteudos_extraidos', []))}")
-            else:
-                print(f"  -> Conteúdos de Legislação encontrados: {len(resultado_pesquisa.get('legislacao', []))}")
-                print(f"  -> Conteúdos de Jurisprudência encontrados: {len(resultado_pesquisa.get('jurisprudencia', []))}")
-                print(f"  -> Conteúdos de Doutrina encontrados: {len(resultado_pesquisa.get('doutrina', []))}")
 
-            print("\n" + "="*50)
-            print("--- ETAPA 3: AGENTE REDATOR (Ciclo de Redação e Validação) ---")
-            
-            agente_redator_ativo = self._selecionar_redator(tipo_documento)
-            print(f"  -> Agente '{agente_redator_ativo.__class__.__name__}' selecionado para a redação.")
+            # ETAPA 4: AGENTE REDATOR ESPECIALIZADO (COM CICLO DE FEEDBACK)
+            print("\n--- ETAPA 4: Redação e Validação Iterativa ---")
+            agente_redator_ativo = self.redatores.get(tipo_documento)
+            if not agente_redator_ativo:
+                raise ValueError(f"Nenhum agente redator encontrado para o tipo: {tipo_documento}")
+            print(f"  -> Acionando Agente: {agente_redator_ativo.__class__.__name__}")
 
             max_tentativas = 3
-            tentativa_atual = 0
             documento_atual = ""
             recomendacoes = []
             
-            while tentativa_atual < max_tentativas:
-                tentativa_atual += 1
+            for tentativa_atual in range(1, max_tentativas + 1):
                 print(f"\n--- TENTATIVA DE REDAÇÃO Nº {tentativa_atual} ---")
-                
                 resultado_redacao = agente_redator_ativo.redigir_peticao_completa(
                     dados_estruturados=dados_estruturados,
                     pesquisa_juridica=resultado_pesquisa,
                     documento_anterior=documento_atual,
                     recomendacoes=recomendacoes
                 )
-                
                 if resultado_redacao.get("status") == "erro": return resultado_redacao
                 documento_atual = resultado_redacao.get('documento_html', '')
                 
-                print("\n--- VALIDAÇÃO DA TENTATIVA Nº " + str(tentativa_atual) + " ---")
+                print(f"\n--- VALIDAÇÃO DA TENTATIVA Nº {tentativa_atual} ---")
                 resultado_validacao = self.agente_validador.validar_e_formatar(documento_atual, dados_estruturados)
                 
-                print(f"[RESUMO VALIDAÇÃO TENTATIVA {tentativa_atual}]")
-                print(f"  -> Status: {resultado_validacao.get('status', 'erro').upper()}")
-                print(f"  -> Score de Qualidade: {resultado_validacao.get('score_qualidade', 0):.2f}%")
-
                 if resultado_validacao.get("status") == "aprovado":
-                    print("  -> Decisão: Documento APROVADO.")
+                    print("✅ Documento APROVADO pelo Agente Validador.")
                     break
                 
                 recomendacoes = resultado_validacao.get("recomendacoes", [])
-                print(f"  -> Decisão: Documento REPROVADO. Recomendações para a próxima tentativa: {recomendacoes}")
-                if tentativa_atual >= max_tentativas:
+                print(f"❌ Documento REPROVADO. Recomendações para a próxima tentativa: {recomendacoes}")
+                if tentativa_atual == max_tentativas:
                     print("⚠️ Número máximo de tentativas atingido. Usando a melhor versão disponível.")
 
             documento_final = resultado_validacao.get('documento_validado', documento_atual)
             
-            print("\n" + "="*50)
-            print("--- ETAPA 4: FINALIZAÇÃO ---")
+            print("\n" + "="*60)
             print("✅ PROCESSAMENTO COMPLETO FINALIZADO!")
+            print("="*60)
             return {
                 "status": "sucesso",
                 "documento_final": documento_final,
@@ -135,12 +150,3 @@ class OrquestradorPrincipal:
         except Exception as e:
             traceback.print_exc()
             return {"status": "erro", "erro": str(e)}
-
-    def _selecionar_redator(self, tipo_documento: str):
-        """Seleciona o agente redator apropriado com base no tipo de documento."""
-        if "Contrato" in tipo_documento: return self.agente_redator_contratos
-        if "Trabalhista" in tipo_documento: return self.agente_redator_trabalhista
-        if "Queixa-Crime" in tipo_documento: return self.agente_redator_queixa_crime
-        if "Habeas Corpus" in tipo_documento: return self.agente_redator_habeas_corpus
-        if "Parecer Jurídico" in tipo_documento: return self.agente_redator_parecer
-        return self.agente_redator_civel # Padrão
