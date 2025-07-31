@@ -39,6 +39,7 @@ class AgenteRedatorContratos:
     async def gerar_documento_html_puro_async(self, dados_formulario: Dict, pesquisas: Dict, documento_anterior: Optional[str] = None, recomendacoes: Optional[List[str]] = None) -> str:
         """Cria ou melhora as cláusulas do documento em paralelo."""
         
+        # COMENTÁRIO: Adicionado um log para verificar os dados que o redator está a receber.
         print("--- DADOS RECEBIDOS PELO AGENTE REDATOR DE CONTRATOS ---")
         print(json.dumps(dados_formulario, indent=2, ensure_ascii=False))
         print("----------------------------------------------------")
@@ -53,6 +54,8 @@ class AgenteRedatorContratos:
         tipo_contrato = dados_formulario.get('tipo_contrato_especifico', 'DE PRESTAÇÃO DE SERVIÇOS')
         pesquisa_formatada = pesquisas.get('pesquisa_formatada', 'Nenhuma pesquisa de referência foi encontrada.')
 
+        # COMENTÁRIO: Os prompts foram reescritos para injetar os dados diretamente na instrução,
+        # em vez de passar um grande JSON. Isso força a IA a usar os dados corretos.
         prompts = {
             "objeto": f"{instrucao_formato}\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA PRIMEIRA - DO OBJETO', detalhando o seguinte: {dados_formulario.get('objeto', '')}\n\nUse a seguinte pesquisa como referência:\n{pesquisa_formatada}",
             "valor": f"{instrucao_formato}\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA SEGUNDA - DO VALOR E DA FORMA DE PAGAMENTO', detalhando o valor de '{dados_formulario.get('valor', '')}' e a forma de pagamento: '{dados_formulario.get('pagamento', '')}'",
