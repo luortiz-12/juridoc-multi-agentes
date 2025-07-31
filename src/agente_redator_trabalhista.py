@@ -1,4 +1,4 @@
-# agente_redator_trabalhista.py - Versão 4.0 (Com Ciclo de Feedback e Meta de 30k)
+# agente_redator_trabalhista.py - Versão 4.1 (Com Prompts Rígidos Anti-Alucinação)
 
 import json
 import logging
@@ -12,15 +12,15 @@ from datetime import datetime
 class AgenteRedatorTrabalhista:
     """
     Agente Redator Especializado em Direito do Trabalho.
-    v4.0: Aceita feedback do Agente Validador para melhorar rascunhos e
-    tem uma meta de geração de conteúdo de 30.000 caracteres.
+    v4.1: Utiliza prompts rígidos para garantir a fidelidade aos dados do formulário
+    e evitar a invenção de fatos ("alucinação").
     """
     def __init__(self, api_key: str):
         self.logger = logging.getLogger(__name__)
         if not api_key: raise ValueError("DEEPSEEK_API_KEY não configurada")
         
         self.client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-        print("✅ Agente Redator TRABALHISTA (v4.0 com Feedback) inicializado com sucesso.")
+        print("✅ Agente Redator TRABALHISTA (v4.1 com Prompts Rígidos) inicializado com sucesso.")
 
     async def _chamar_api_async(self, prompt: str, secao_nome: str) -> str:
         """Chama a API de forma assíncrona para gerar uma seção específica."""
@@ -30,7 +30,7 @@ class AgenteRedatorTrabalhista:
                 self.client.chat.completions.create,
                 model="deepseek-chat",
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=8192, # Aumentado para permitir respostas mais longas
+                max_tokens=8192,
                 temperature=0.4
             )
             resultado = response.choices[0].message.content.strip()
@@ -44,18 +44,19 @@ class AgenteRedatorTrabalhista:
         
         instrucao_formato = "Sua resposta DEVE ser um bloco de código HTML bem formatado. NÃO use Markdown (como `**` ou `*`). Para ênfase, use apenas tags HTML como `<strong>` para negrito."
 
-        # COMENTÁRIO: Se houver recomendações do validador, uma instrução de melhoria é adicionada a todos os prompts.
+        # COMENTÁRIO: Esta é a nova instrução crucial para evitar que a IA invente dados.
+        instrucao_fidelidade = "ATENÇÃO: Sua tarefa é redigir um texto jurídico. Você DEVE se basear ESTRITAMENTE nos dados fornecidos no JSON 'DADOS DO CASO' e na 'PESQUISA' jurídica. Use seu conhecimento e criatividade para expandir e detalhar a história, conectando os fatos com os fundamentos legais encontrados na pesquisa. NÃO invente nomes, valores, datas ou qualquer fato que contradiga os dados fornecidos."
+
         instrucao_melhoria = ""
         if recomendacoes:
             instrucao_melhoria = f"\n\nINSTRUÇÕES PARA MELHORIA: A versão anterior foi considerada insatisfatória. Reescreva e expanda significativamente o conteúdo para atender a seguinte recomendação: '{' '.join(recomendacoes)}'. Use o rascunho anterior como referência do que NÃO fazer.\nRASCUNHO ANTERIOR:\n{documento_anterior}"
 
-        # COMENTÁRIO: Requisitos de tamanho aumentados para atingir a meta de 30k.
         prompts = {
-            "fatos": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a seção 'DOS FATOS' de uma petição inicial trabalhista. Seja extremamente detalhado e expanda a narrativa, com no mínimo 10.000 caracteres. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece sua resposta com <h2>DOS FATOS</h2>.",
-            "legislacao": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a subseção 'DA FUNDAMENTAÇÃO LEGAL' para uma petição trabalhista. Seja detalhado, com no mínimo 7.000 caracteres. Foque nos artigos da CLT e leis relevantes. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece sua resposta com <h3>Da Fundamentação Legal</h3>.",
-            "jurisprudencia": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a subseção sobre a 'JURISPRUDÊNCIA APLICÁVEL' para uma petição trabalhista. Seja detalhado, com no mínimo 7.000 caracteres. Cite precedentes do TST. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('jurisprudencia_formatada', 'N/A')}. Comece sua resposta com <h3>Da Jurisprudência Aplicável</h3>.",
-            "doutrina": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a subseção sobre a 'ANÁLISE DOUTRINÁRIA' para uma petição trabalhista. Seja detalhado, com no mínimo 7.000 caracteres. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('doutrina_formatada', 'N/A')}. Comece sua resposta com <h3>Da Análise Doutrinária</h3>.",
-            "pedidos": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a seção 'DOS PEDIDOS' de uma petição inicial trabalhista. Seja detalhado, com no mínimo 5.000 caracteres. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. REQUISITOS: Crie uma lista `<ul>` e `<li>` detalhada. Para cada item, adicione um parágrafo `<p>` explicativo com o fundamento do pedido. Comece sua resposta com <h2>DOS PEDIDOS</h2>."
+            "fatos": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a seção 'DOS FATOS' de uma petição inicial trabalhista. Seja extremamente detalhado, com no mínimo 10.000 caracteres. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece sua resposta com <h2>DOS FATOS</h2>.",
+            "legislacao": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção 'DA FUNDAMENTAÇÃO LEGAL' para uma petição trabalhista. Seja detalhado, com no mínimo 7.000 caracteres. Use os dados da pesquisa para fundamentar. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece sua resposta com <h3>Da Fundamentação Legal</h3>.",
+            "jurisprudencia": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção sobre a 'JURISPRUDÊNCIA APLICÁVEL' para uma petição trabalhista. Seja detalhado, com no mínimo 7.000 caracteres. Use os dados da pesquisa para citar precedentes. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('jurisprudencia_formatada', 'N/A')}. Comece sua resposta com <h3>Da Jurisprudência Aplicável</h3>.",
+            "doutrina": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção sobre a 'ANÁLISE DOUTRINÁRIA' para uma petição trabalhista. Seja detalhado, com no mínimo 7.000 caracteres. Use os dados da pesquisa. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('doutrina_formatada', 'N/A')}. Comece sua resposta com <h3>Da Análise Doutrinária</h3>.",
+            "pedidos": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a seção 'DOS PEDIDOS' de uma petição inicial trabalhista. Seja detalhado, com no mínimo 5.000 caracteres. Baseie-se estritamente no campo 'pedidos' dos dados. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece sua resposta com <h2>DOS PEDIDOS</h2>."
         }
         
         tasks = [self._chamar_api_async(p, n) for n, p in prompts.items()]
@@ -63,7 +64,6 @@ class AgenteRedatorTrabalhista:
         
         secao_direito = f"<h2>DO DIREITO</h2>{sub_leg}{sub_jur}{sub_dout}"
         
-        # COMENTÁRIO: O CSS foi corrigido para usar line-height: 1.5, resolvendo o problema do espaçamento duplo.
         return f"""
 <!DOCTYPE html><html lang="pt-BR"><head><title>Petição Inicial Trabalhista</title><style>body{{font-family:'Times New Roman',serif;line-height:1.5;text-align:justify;margin:3cm}}h1{{text-align:center;font-size:16pt}}h2{{text-align:left;font-size:14pt;margin-top:30px;font-weight:bold}}h3{{text-align:left;font-size:12pt;margin-top:20px;font-weight:bold}}p{{text-indent:2em;margin-bottom:15px}}.qualificacao p{{text-indent:0}}</style></head>
 <body>
@@ -76,7 +76,6 @@ class AgenteRedatorTrabalhista:
 </body></html>
         """
 
-    # COMENTÁRIO: A assinatura do método principal foi atualizada para aceitar os novos argumentos opcionais.
     def redigir_peticao_completa(self, dados_estruturados: Dict, pesquisa_juridica: Dict, documento_anterior: Optional[str] = None, recomendacoes: Optional[List[str]] = None) -> Dict:
         """Ponto de entrada síncrono que executa a lógica assíncrona, passando o feedback se existir."""
         try:
