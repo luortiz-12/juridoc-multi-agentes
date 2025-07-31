@@ -1,4 +1,4 @@
-# agente_validador.py - Versão 2.2 com Lógica de Aprovação de 80%
+# agente_validador.py - Versão 2.3 com Recomendação de Formatação Aprimorada
 
 import re
 from typing import Dict, Any, List
@@ -6,17 +6,15 @@ from datetime import datetime
 
 class AgenteValidador:
     """
-    Agente Validador v2.2 que:
+    Agente Validador v2.3 que:
     - Analisa a qualidade do documento.
-    - Aprova documentos que atingem 80% da meta de tamanho.
-    - Gera recomendações claras para o Agente Redator em caso de reprovação.
-    - Fornece logs detalhados sobre o tamanho do documento.
+    - Gera recomendações claras, incluindo instruções de formatação para evitar HTML aninhado.
     """
     
     def __init__(self):
-        print("✅ Inicializando Agente Validador v2.2 (com Feedback)...")
+        print("✅ Inicializando Agente Validador v2.3 (com Feedback Aprimorado)...")
         self.criterios_validacao = {
-            'tamanho_minimo': 30000, # Meta de 30k
+            'tamanho_minimo': 30000,
         }
         print("✅ Agente Validador inicializado")
     
@@ -30,13 +28,10 @@ class AgenteValidador:
             
             analise = self._analisar_documento(documento_html)
             
-            # COMENTÁRIO: Adicionado log para informar o tamanho do documento.
             print(f"   -> Tamanho do Documento: {analise['tamanho']} caracteres (Meta: {self.criterios_validacao['tamanho_minimo']})")
             
             problemas, recomendacoes = self._identificar_problemas_e_recomendar(analise)
             
-            # COMENTÁRIO: A lógica de aprovação foi ajustada para 80%.
-            # Se não houver problemas (ou seja, se o tamanho for >= 80% da meta), o status é 'aprovado'.
             status = "reprovado" if problemas else "aprovado"
             
             print(f"📊 Status da Validação: {status.upper()}")
@@ -64,7 +59,6 @@ class AgenteValidador:
         problemas = []
         recomendacoes = []
         
-        # COMENTÁRIO: A margem de aprovação foi alterada para 80% da meta.
         tamanho_aceitavel = self.criterios_validacao['tamanho_minimo'] * 0.80
         if analise['tamanho'] < tamanho_aceitavel:
             problema = {
@@ -72,10 +66,11 @@ class AgenteValidador:
                 'descricao': f"Documento com {analise['tamanho']} caracteres (meta de 80%: {int(tamanho_aceitavel)})"
             }
             problemas.append(problema)
-            recomendacoes.append("O documento está muito curto. Por favor, expanda todas as seções, adicionando mais detalhes, aprofundamento jurídico e exemplos práticos para enriquecer o conteúdo.")
             
-        # Outras validações podem ser adicionadas aqui.
-        
+            # COMENTÁRIO: A recomendação agora inclui uma instrução de formatação explícita para a IA.
+            # Isto deve resolver o problema do HTML aninhado na segunda tentativa.
+            recomendacoes.append("O documento está muito curto. Expanda todas as seções com mais detalhes. IMPORTANTE: Ao reescrever, gere APENAS o conteúdo HTML da seção solicitada, sem incluir `<!DOCTYPE>`, `<html>`, `<head>`, ou `<body>` tags.")
+            
         return problemas, recomendacoes
 
     def _calcular_score_qualidade(self, documento: str) -> float:
@@ -84,9 +79,8 @@ class AgenteValidador:
         tamanho = len(documento)
         meta = self.criterios_validacao['tamanho_minimo']
         
-        if meta == 0: return 100.0 # Evita divisão por zero
+        if meta == 0: return 100.0
         
-        # O score é proporcional ao tamanho, até atingir 100% na meta.
         score = (tamanho / meta) * 100.0
             
         return min(100.0, round(score, 2))
