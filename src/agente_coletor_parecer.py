@@ -1,4 +1,4 @@
-# agente_coletor_parecer.py - Novo Agente Especializado em Coletar Dados para Pareceres Jurídicos
+# agente_coletor_parecer.py - v2.0 (Extração de Fundamentos Aprimorada)
 
 import re
 import traceback
@@ -8,15 +8,12 @@ class AgenteColetorParecer:
     """
     Agente Especializado com uma única responsabilidade:
     - Receber os dados brutos de um formulário já identificado como "Parecer Jurídico".
-    - Mapear os campos específicos de um parecer.
-    - Consolidar a consulta para o redator.
-    - Extrair os fundamentos jurídicos relevantes para a pesquisa.
+    - Extrair os fundamentos jurídicos relevantes para a pesquisa, criando frases curtas e contextuais.
     - Montar a estrutura de dados limpa para os próximos agentes.
     """
 
     def __init__(self):
-        print("📊 Inicializando Agente Coletor de Dados de PARECER JURÍDICO...")
-        # COMENTÁRIO: Este mapeamento contém apenas os campos relevantes para um parecer.
+        print("📊 Inicializando Agente Coletor de Dados de PARECER JURÍDICO (v2.0)...")
         self.mapeamento_flexivel = {
             'solicitante': ['solicitante'],
             'assunto': ['assunto'],
@@ -66,22 +63,40 @@ class AgenteColetorParecer:
         return " ".join(narrativa)
 
     def _extrair_fundamentos_necessarios(self, dados: Dict[str, Any]) -> List[str]:
-        """Extrai os termos jurídicos chave para guiar a pesquisa."""
+        """
+        COMENTÁRIO: Lógica de extração de fundamentos totalmente refeita.
+        Agora, ele cria frases curtas e contextuais em vez de palavras soltas.
+        """
         fundamentos = set()
         
         assunto = self._obter_valor(dados, 'assunto', '')
         legislacao = self._obter_valor(dados, 'legislacao_aplicavel', '')
-        consulta = self._obter_valor(dados, 'consulta', '')
         
-        texto_completo_parecer = f"{assunto} {legislacao} {consulta}"
+        texto_para_extrair = f"{assunto} {legislacao}"
         
-        termos_chave = re.findall(r'\"[a-zA-Z\s]+\"|\b[A-Z]{3,}\b|\b[\w\.]+\b', texto_completo_parecer)
-        fundamentos.update(termos_chave)
+        # Remove pontuação e texto dentro de parênteses para limpar o texto
+        texto_limpo = re.sub(r'\(.*?\)', '', texto_para_extrair).replace(',', '').replace('.', '')
         
         palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'ser', 'uma', 'por', 'são', 'qual', 'quais'}
-        fundamentos_filtrados = {f.strip(" .,'\"?") for f in fundamentos if f and f.lower() not in palavras_irrelevantes and len(f.strip()) > 2}
-            
-        return list(fundamentos_filtrados)[:5] # Limita a no máximo 5 termos
+        palavras = [p for p in texto_limpo.split() if p.lower() not in palavras_irrelevantes and len(p) > 2]
+
+        # Adiciona siglas importantes (ex: LGPD, CLT)
+        siglas = re.findall(r'\b[A-Z]{3,}\b', f"{assunto} {legislacao}")
+        fundamentos.update(siglas)
+
+        # Cria frases de 2 e 3 palavras
+        if len(palavras) >= 2:
+            for i in range(len(palavras) - 1):
+                fundamentos.add(" ".join(palavras[i:i+2]))
+        if len(palavras) >= 3:
+            for i in range(len(palavras) - 2):
+                fundamentos.add(" ".join(palavras[i:i+3]))
+        
+        # Se nenhuma frase foi criada, adiciona palavras-chave do assunto
+        if not fundamentos and assunto:
+            fundamentos.update([p for p in assunto.split() if p.lower() not in palavras_irrelevantes])
+
+        return list(fundamentos)[:5] # Limita a no máximo 5 termos
 
     def _montar_estrutura_final(self, dados: Dict[str, Any], fatos_consolidados: str, fundamentos: List[str]) -> Dict[str, Any]:
         """Monta o dicionário final com os dados limpos e estruturados para os próximos agentes."""
@@ -90,7 +105,7 @@ class AgenteColetorParecer:
             "tipo_documento": "Parecer Jurídico",
             "tipo_acao": "Parecer Jurídico",
             "fundamentos_necessarios": fundamentos,
-            "fatos": fatos_consolidados, # 'fatos' aqui contém a consulta consolidada
+            "fatos": fatos_consolidados,
             "solicitante": self._obter_valor(dados, 'solicitante'),
             "assunto": self._obter_valor(dados, 'assunto'),
             "conclusao_previa": self._obter_valor(dados, 'conclusao_previa')
