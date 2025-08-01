@@ -1,4 +1,4 @@
-# agente_redator_habeas_corpus.py - Versão 2.0 (Com Ciclo de Feedback e Meta de 30k)
+# agente_redator_habeas_corpus.py - Versão 2.1 (Com Prompts Rígidos)
 
 import json
 import logging
@@ -12,13 +12,13 @@ from datetime import datetime
 class AgenteRedatorHabeasCorpus:
     """
     Agente Redator Especializado em Habeas Corpus.
-    v2.0: Aceita feedback do Agente Validador para melhorar rascunhos e
-    tem uma meta de geração de conteúdo de 30.000 caracteres.
+    v2.1: Utiliza prompts rígidos para garantir a fidelidade aos dados e evitar
+    a repetição desnecessária da qualificação das partes.
     """
     def __init__(self, api_key: str):
         if not api_key: raise ValueError("DEEPSEEK_API_KEY não configurada")
         self.client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-        print("✅ Agente Redator de HABEAS CORPUS (v2.0 com Feedback) inicializado.")
+        print("✅ Agente Redator de HABEAS CORPUS (v2.1 com Prompts Rígidos) inicializado.")
 
     async def _chamar_api_async(self, prompt: str, secao_nome: str) -> str:
         """Chama a API de forma assíncrona para gerar uma seção específica."""
@@ -40,16 +40,20 @@ class AgenteRedatorHabeasCorpus:
         """Cria ou melhora as seções do documento em paralelo."""
         
         instrucao_formato = "Sua resposta DEVE ser um bloco de código HTML bem formatado. NÃO use Markdown (como `**` ou `*`). Para ênfase, use apenas tags HTML como `<strong>` para negrito."
+        
+        # COMENTÁRIO: Instruções aprimoradas para evitar alucinação e repetição.
+        instrucao_fidelidade = "ATENÇÃO: Sua tarefa é redigir um texto jurídico. Você DEVE se basear ESTRITAMENTE nos dados fornecidos no JSON 'DADOS DO CASO' e na 'PESQUISA' jurídica. NÃO invente fatos que não estejam presentes nos dados."
+        instrucao_referencia = "IMPORTANTE: Após a qualificação inicial das partes no início do documento, refira-se a elas apenas pelo nome e pela sua condição (ex: 'o Paciente', 'a Autoridade Coatora'). NÃO repita a qualificação completa no corpo do texto."
 
         instrucao_melhoria = ""
         if recomendacoes:
-            instrucao_melhoria = f"\n\nINSTRUÇÕES PARA MELHORIA: A versão anterior foi considerada insatisfatória. Reescreva e expanda significativamente o conteúdo para atender a seguinte recomendação: '{' '.join(recomendacoes)}'. Use o rascunho anterior como referência do que NÃO fazer.\nRASCUNHO ANTERIOR:\n{documento_anterior}"
+            instrucao_melhoria = f"\n\nINSTRUÇÕES PARA MELHORIA: A versão anterior foi considerada insatisfatória. Reescreva e expanda o conteúdo para atender a seguinte recomendação: '{' '.join(recomendacoes)}'."
 
-        # COMENTÁRIO: Prompts modulares com requisitos de tamanho para atingir a meta de 30k.
+        # COMENTÁRIO: As novas instruções foram adicionadas a todos os prompts.
         prompts = {
-            "fatos": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a seção 'DOS FATOS E DO CONSTRANGIMENTO ILEGAL' de um Habeas Corpus. Seja extremamente detalhado, com no mínimo 10.000 caracteres. Descreva a prisão, o constrangimento ilegal, a autoridade coatora e o motivo pelo qual a prisão é ilegal. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS FATOS E DO CONSTRANGIMENTO ILEGAL</h2>.",
-            "direito": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a seção 'DO DIREITO E DO PEDIDO LIMINAR' de um Habeas Corpus. Seja detalhado, com no mínimo 15.000 caracteres. Foque no direito à liberdade (Art. 5º, LXVIII, CF) e nos artigos do Código de Processo Penal sobre as hipóteses de soltura e os requisitos da prisão preventiva. CONTEXTO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece com <h2>DO DIREITO E DO PEDIDO LIMINAR</h2>.",
-            "pedidos": f"{instrucao_formato}{instrucao_melhoria}\n\nRedija a seção 'DOS PEDIDOS' de um Habeas Corpus. Seja detalhado, com no mínimo 5.000 caracteres. Peça a concessão liminar da ordem para expedir o alvará de soltura e, no mérito, a confirmação da ordem. DADOS: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS PEDIDOS</h2>."
+            "fatos": f"{instrucao_formato}\n{instrucao_fidelidade}\n{instrucao_referencia}{instrucao_melhoria}\n\nRedija a seção 'DOS FATOS E DO CONSTRANGIMENTO ILEGAL' de um Habeas Corpus. Seja extremamente detalhado, com no mínimo 10.000 caracteres. Descreva a prisão, o constrangimento ilegal, a autoridade coatora e o motivo pelo qual a prisão é ilegal. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS FATOS E DO CONSTRANGIMENTO ILEGAL</h2>.",
+            "direito": f"{instrucao_formato}\n{instrucao_fidelidade}\n{instrucao_referencia}{instrucao_melhoria}\n\nRedija a seção 'DO DIREITO E DO PEDIDO LIMINAR' de um Habeas Corpus. Seja detalhado, com no mínimo 15.000 caracteres. Foque no direito à liberdade (Art. 5º, LXVIII, CF) e nos artigos do Código de Processo Penal sobre as hipóteses de soltura. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece com <h2>DO DIREITO E DO PEDIDO LIMINAR</h2>.",
+            "pedidos": f"{instrucao_formato}\n{instrucao_fidelidade}\n{instrucao_referencia}{instrucao_melhoria}\n\nRedija a seção 'DOS PEDIDOS' de um Habeas Corpus. Seja detalhado, com no mínimo 5.000 caracteres. Peça a concessão liminar da ordem para expedir o alvará de soltura e, no mérito, a confirmação da ordem. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS PEDIDOS</h2>."
         }
         
         tasks = [self._chamar_api_async(p, n) for n, p in prompts.items()]
@@ -68,7 +72,7 @@ class AgenteRedatorHabeasCorpus:
     {secao_direito}
     {secao_pedidos}
     <p style="margin-top:50px;">Nestes termos,<br>Pede deferimento.</p>
-    <p style="text-align:center;margin-top:50px;">[Local], {datetime.now().strftime('%d de %B de %Y')}.</p>
+    <p style="text-align:center;margin-top:50px;">[Local], {datetime.now().strftime('%d de August de %Y')}.</p>
     <p style="text-align:center;margin-top:80px;">_________________________________________<br>ADVOGADO<br>OAB/SP Nº XXX.XXX</p>
 </body></html>
         """
