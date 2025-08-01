@@ -1,4 +1,4 @@
-# agente_redator_queixa_crime.py - Versão 2.1 (Com Prompts Rígidos Anti-Alucinação)
+# agente_redator_queixa_crime.py - Versão 2.2 (Com Correção de Repetição)
 
 import json
 import logging
@@ -12,13 +12,13 @@ from datetime import datetime
 class AgenteRedatorQueixaCrime:
     """
     Agente Redator Especializado em Queixa-Crime.
-    v2.1: Utiliza prompts rígidos para garantir a fidelidade aos dados do formulário
-    e evitar a invenção de fatos ("alucinação").
+    v2.2: Utiliza prompts rígidos para garantir a fidelidade aos dados e evitar
+    a repetição desnecessária da qualificação das partes.
     """
     def __init__(self, api_key: str):
         if not api_key: raise ValueError("DEEPSEEK_API_KEY não configurada")
         self.client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-        print("✅ Agente Redator de QUEIXA-CRIME (v2.1 com Prompts Rígidos) inicializado.")
+        print("✅ Agente Redator de QUEIXA-CRIME (v2.2 com Correção de Repetição) inicializado.")
 
     async def _chamar_api_async(self, prompt: str, secao_nome: str) -> str:
         """Chama a API de forma assíncrona para gerar uma seção específica."""
@@ -41,19 +41,22 @@ class AgenteRedatorQueixaCrime:
         
         instrucao_formato = "Sua resposta DEVE ser um bloco de código HTML bem formatado. NÃO use Markdown (como `**` ou `*`). Para ênfase, use apenas tags HTML como `<strong>` para negrito."
         
-        # COMENTÁRIO: Adicionada a instrução crucial para evitar que a IA invente dados.
         instrucao_fidelidade = "ATENÇÃO: Sua tarefa é redigir um texto jurídico. Você DEVE se basear ESTRITAMENTE nos dados fornecidos no JSON 'DADOS DO CASO' e na 'PESQUISA' jurídica. Use seu conhecimento para expandir e detalhar a história, mas NÃO invente nomes, valores, datas ou qualquer fato que não esteja presente nos dados fornecidos."
+
+        # COMENTÁRIO: Nova instrução crucial para evitar a repetição da qualificação das partes.
+        instrucao_referencia = "IMPORTANTE: Após a qualificação inicial das partes no início do documento, refira-se a elas apenas pelo nome e pela sua condição (ex: 'a Querelante' ou 'o Querelado'). NÃO repita a qualificação completa (CPF, RG, nacionalidade, etc.) no corpo do texto."
 
         instrucao_melhoria = ""
         if recomendacoes:
             instrucao_melhoria = f"\n\nINSTRUÇÕES PARA MELHORIA: A versão anterior foi considerada insatisfatória. Reescreva e expanda significativamente o conteúdo para atender a seguinte recomendação: '{' '.join(recomendacoes)}'. Use o rascunho anterior como referência do que NÃO fazer.\nRASCUNHO ANTERIOR:\n{documento_anterior}"
 
+        # COMENTÁRIO: A 'instrucao_referencia' foi adicionada a todos os prompts.
         prompts = {
-            "fatos": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a seção 'DOS FATOS' de uma queixa-crime. Seja extremamente detalhado, com no mínimo 10.000 caracteres. Descreva o crime, as circunstâncias, o local e a data. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS FATOS</h2>.",
-            "direito_tipificacao": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção 'DA TIPIFICAÇÃO PENAL' para uma queixa-crime. Seja detalhado, com no mínimo 7.000 caracteres. Foque em tipificar o crime (ex: Calúnia, Art. 138 do Código Penal). DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece com <h3>Da Tipificação Penal</h3>.",
-            "direito_autoria": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção 'DA AUTORIA E MATERIALIDADE' para uma queixa-crime. Seja detalhado, com no mínimo 7.000 caracteres. Demonstre quem cometeu o crime e como o crime se materializou. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h3>Da Autoria e Materialidade</h3>.",
-            "direito_procedibilidade": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção 'DA PROCEDIBILIDADE' para uma queixa-crime. Seja detalhado, com no mínimo 7.000 caracteres. Explique a legitimidade da ação penal privada. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h3>Da Procedibilidade da Ação</h3>.",
-            "pedidos": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a seção 'DOS PEDIDOS' de uma queixa-crime. Seja detalhado, com no mínimo 5.000 caracteres. Peça o recebimento da queixa, a citação do querelado e a condenação. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS PEDIDOS</h2>."
+            "fatos": f"{instrucao_formato}\n\n{instrucao_fidelidade}\n{instrucao_referencia}{instrucao_melhoria}\n\nRedija a seção 'DOS FATOS' de uma queixa-crime. Seja extremamente detalhado, com no mínimo 10.000 caracteres. Descreva o crime, as circunstâncias, o local e a data. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS FATOS</h2>.",
+            "direito_tipificacao": f"{instrucao_formato}\n\n{instrucao_fidelidade}\n{instrucao_referencia}{instrucao_melhoria}\n\nRedija a subseção 'DA TIPIFICAÇÃO PENAL' para uma queixa-crime. Seja detalhado, com no mínimo 7.000 caracteres. Foque em tipificar o crime (ex: Calúnia, Art. 138 do Código Penal). DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece com <h3>Da Tipificação Penal</h3>.",
+            "direito_autoria": f"{instrucao_formato}\n\n{instrucao_fidelidade}\n{instrucao_referencia}{instrucao_melhoria}\n\nRedija a subseção 'DA AUTORIA E MATERIALIDADE' para uma queixa-crime. Seja detalhado, com no mínimo 7.000 caracteres. Demonstre quem cometeu o crime e como o crime se materializou. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h3>Da Autoria e Materialidade</h3>.",
+            "direito_procedibilidade": f"{instrucao_formato}\n\n{instrucao_fidelidade}\n{instrucao_referencia}{instrucao_melhoria}\n\nRedija a subseção 'DA PROCEDIBILIDADE' para uma queixa-crime. Seja detalhado, com no mínimo 7.000 caracteres. Explique a legitimidade da ação penal privada. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h3>Da Procedibilidade da Ação</h3>.",
+            "pedidos": f"{instrucao_formato}\n\n{instrucao_fidelidade}\n{instrucao_referencia}{instrucao_melhoria}\n\nRedija a seção 'DOS PEDIDOS' de uma queixa-crime. Seja detalhado, com no mínimo 5.000 caracteres. Peça o recebimento da queixa, a citação do querelado e a condenação. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS PEDIDOS</h2>."
         }
         
         tasks = [self._chamar_api_async(p, n) for n, p in prompts.items()]
@@ -74,7 +77,7 @@ class AgenteRedatorQueixaCrime:
     {secao_direito}
     {secao_pedidos}
     <p style="margin-top:50px;">Nestes termos,<br>Pede deferimento.</p>
-    <p style="text-align:center;margin-top:50px;">[Local], {datetime.now().strftime('%d de %B de %Y')}.</p>
+    <p style="text-align:center;margin-top:50px;">[Local], {datetime.now().strftime('%d de August de %Y')}.</p>
     <p style="text-align:center;margin-top:80px;">_________________________________________<br>ADVOGADO<br>OAB/SP Nº XXX.XXX</p>
 </body></html>
         """
