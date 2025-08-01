@@ -1,4 +1,4 @@
-# agente_coletor_estudo_de_caso.py - Novo Agente Especializado em Coletar Dados para Estudos de Caso
+# agente_coletor_estudo_de_caso.py - v2.0 (Extração de Fundamentos Aprimorada)
 
 import re
 import traceback
@@ -8,15 +8,12 @@ class AgenteColetorEstudoDeCaso:
     """
     Agente Especializado com uma única responsabilidade:
     - Receber os dados brutos de um formulário já identificado como "Estudo de Caso".
-    - Mapear os campos específicos de um estudo de caso.
-    - Consolidar os fatos de forma coesa.
-    - Extrair os fundamentos jurídicos relevantes para a pesquisa.
+    - Extrair os fundamentos jurídicos relevantes, criando frases de pesquisa curtas e contextuais.
     - Montar a estrutura de dados limpa para os próximos agentes.
     """
 
     def __init__(self):
-        print("📊 Inicializando Agente Coletor de Dados de ESTUDO DE CASO...")
-        # COMENTÁRIO: Este mapeamento contém apenas os campos relevantes para um estudo de caso.
+        print("📊 Inicializando Agente Coletor de Dados de ESTUDO DE CASO (v2.0)...")
         self.mapeamento_flexivel = {
             'titulo_caso': ['titulodecaso', 'titulodocaso'],
             'descricao_caso': ['descricaodocaso'],
@@ -66,27 +63,44 @@ class AgenteColetorEstudoDeCaso:
         return " ".join(narrativa)
 
     def _extrair_fundamentos_necessarios(self, dados: Dict[str, Any]) -> List[str]:
-        """Extrai os termos jurídicos chave para guiar a pesquisa."""
+        """
+        COMENTÁRIO: Lógica de extração de fundamentos totalmente refeita.
+        Agora, ela cria frases curtas e contextuais em vez de palavras soltas ou frases longas.
+        """
         fundamentos = set()
         
         titulo_caso = self._obter_valor(dados, 'titulo_caso', '')
         contexto_juridico = self._obter_valor(dados, 'contexto_juridico', '')
         pontos_relevantes = self._obter_valor(dados, 'pontos_relevantes', '')
         
-        # Cria 2 ou 3 pesquisas de alta qualidade em vez de muitas palavras soltas.
-        if titulo_caso and contexto_juridico:
-            fundamentos.add(f"{titulo_caso} {contexto_juridico}")
-        if pontos_relevantes:
-            # Extrai a primeira pergunta como um termo de pesquisa completo.
-            primeira_pergunta = pontos_relevantes.split('?')[0]
-            fundamentos.add(primeira_pergunta.strip())
-        if titulo_caso:
-            fundamentos.add(f"jurisprudência sobre {titulo_caso}")
+        texto_completo = f"{titulo_caso} {contexto_juridico} {pontos_relevantes}"
         
-        palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'ser', 'uma', 'por', 'são', 'qual', 'quais'}
-        fundamentos_filtrados = {f.strip(" .,'\"?") for f in fundamentos if f and f.lower() not in palavras_irrelevantes and len(f.strip()) > 2}
-            
-        return list(fundamentos_filtrados)[:5]
+        # Remove pontuação e texto dentro de parênteses para limpar o texto
+        texto_limpo = re.sub(r'\(.*?\)', '', texto_completo).replace(',', '').replace('.', '').replace('?', '')
+        
+        palavras_irrelevantes = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'ser', 'uma', 'por', 'são', 'qual', 'quais', 'os', 'as', 'dos', 'das', 'é', 'que', 'se', 'análise', 'sobre', 'para', 'sua', 'suas', 'seu', 'seus'}
+        palavras = [p for p in texto_limpo.split() if p.lower() not in palavras_irrelevantes and len(p) > 3]
+
+        # Adiciona siglas importantes (ex: LGPD, CLT)
+        siglas = re.findall(r'\b[A-Z]{3,}\b', f"{contexto_juridico}")
+        fundamentos.update(siglas)
+
+        # Cria frases de 2 e 3 palavras (bigramas e trigramas) a partir das palavras-chave
+        if len(palavras) >= 2:
+            for i in range(len(palavras) - 1):
+                fundamentos.add(" ".join(palavras[i:i+2]))
+        if len(palavras) >= 3:
+            for i in range(len(palavras) - 2):
+                fundamentos.add(" ".join(palavras[i:i+3]))
+        
+        # Se nenhuma frase foi criada, adiciona palavras-chave do assunto
+        if not fundamentos and titulo_caso:
+            fundamentos.update([p for p in titulo_caso.split() if p.lower() not in palavras_irrelevantes])
+
+        # Seleciona os fundamentos mais relevantes (os mais longos costumam ser mais específicos)
+        fundamentos_ordenados = sorted(list(fundamentos), key=len, reverse=True)
+        
+        return fundamentos_ordenados[:5] # Limita a no máximo 5 termos
 
     def _montar_estrutura_final(self, dados: Dict[str, Any], fatos_consolidados: str, fundamentos: List[str]) -> Dict[str, Any]:
         """Monta o dicionário final com os dados limpos e estruturados para os próximos agentes."""
