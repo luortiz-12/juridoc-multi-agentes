@@ -1,4 +1,4 @@
-# agente_redator_contratos.py - Versão 5.0 (Com Lógica de Cláusulas Condicionais)
+# agente_redator_contratos.py - Versão 5.1 (Com Lógica de Qualificação Corrigida)
 
 import json
 import logging
@@ -12,13 +12,12 @@ from datetime import datetime
 class AgenteRedatorContratos:
     """
     Agente Redator Otimizado e Especializado na redação de Contratos.
-    v5.0: Utiliza lógica condicional para incluir cláusulas de Propriedade Intelectual
-    e Confidencialidade apenas quando são relevantes para o tipo de contrato.
+    v5.1: Lógica de qualificação das partes aprimorada para ser mais robusta e evitar erros.
     """
     def __init__(self, api_key: str):
         if not api_key: raise ValueError("DEEPSEEK_API_KEY não configurada")
         self.client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-        print("✅ Agente Redator de CONTRATOS (Dinâmico v5.0) inicializado.")
+        print("✅ Agente Redator de CONTRATOS (Dinâmico v5.1) inicializado.")
 
     async def _chamar_api_async(self, prompt: str, secao_nome: str) -> str:
         """Chama a API de forma assíncrona para gerar uma seção específica do contrato."""
@@ -53,7 +52,6 @@ class AgenteRedatorContratos:
         tipo_contrato = dados_formulario.get('tipo_contrato_especifico', 'DE PRESTAÇÃO DE SERVIÇOS')
         pesquisa_formatada = pesquisas.get('pesquisa_formatada', 'Nenhuma pesquisa de referência foi encontrada.')
 
-        # COMENTÁRIO: Os prompts são definidos em um dicionário base.
         prompts = {
             "objeto": f"{instrucao_formato}\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA PRIMEIRA - DO OBJETO', detalhando o seguinte: {dados_formulario.get('objeto', '')}\n\nUse a seguinte pesquisa como referência:\n{pesquisa_formatada}",
             "valor": f"{instrucao_formato}\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA SEGUNDA - DO VALOR E DA FORMA DE PAGAMENTO', detalhando o valor de '{dados_formulario.get('valor', '')}' e a forma de pagamento: '{dados_formulario.get('pagamento', '')}'",
@@ -64,8 +62,6 @@ class AgenteRedatorContratos:
             "foro": f"{instrucao_formato}\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a 'CLÁUSULA NONA - DO FORO', especificando o foro de eleição como: '{dados_formulario.get('foro', '')}'",
         }
 
-        # COMENTÁRIO: Lógica condicional. As cláusulas de Propriedade Intelectual e Confidencialidade
-        # só são adicionadas se o tipo de contrato for um dos que tipicamente as exigem.
         contratos_com_pi_e_sigilo = ["prestação de serviços", "desenvolvimento de software", "franquia", "criação"]
         if any(termo in tipo_contrato.lower() for termo in contratos_com_pi_e_sigilo):
             print("  -> Tipo de contrato requer cláusulas de PI e Confidencialidade.")
@@ -82,10 +78,26 @@ class AgenteRedatorContratos:
         contratante = dados_formulario.get('contratante', {})
         contratado = dados_formulario.get('contratado', {})
         
-        # COMENTÁRIO: O template de qualificação foi ajustado para lidar com pessoa física (CPF/RG) ou jurídica (CNPJ).
-        qualificacao_contratante = f"<p><strong>CONTRATANTE:</strong> {contratante.get('nome', '')}, { 'pessoa física, portadora do CPF nº ' + contratante.get('cpf', '') + ' e do RG nº ' + contratante.get('rg', '') if contratante.get('cpf') else 'pessoa jurídica de direito privado, inscrita no CNPJ sob o nº ' + contratante.get('cnpj', '')}, com sede em {contratante.get('endereco', '')}.</p>"
-        qualificacao_contratado = f"<p><strong>CONTRATADO:</strong> {contratado.get('nome', '')}, { 'pessoa física, portadora do CPF nº ' + contratado.get('cpf', '') + ' e do RG nº ' + contratado.get('rg', '') if contratado.get('cpf') else 'pessoa jurídica de direito privado, inscrita no CNPJ sob o nº ' + contratado.get('cnpj', '')}, com sede em {contratado.get('endereco', '')}.</p>"
+        # COMENTÁRIO: A lógica de qualificação foi reescrita para ser mais robusta e evitar o erro 'TypeError'.
+        # Ela agora lida corretamente com a presença ou ausência de CPF/CNPJ.
+        
+        # Monta a qualificação do Contratante
+        nome_contratante = str(contratante.get('nome', ''))
+        endereco_contratante = str(contratante.get('endereco', ''))
+        if contratante.get('cpf'):
+            qualificacao_texto_contratante = f"pessoa física, portadora do CPF nº {contratante.get('cpf', '')} e do RG nº {contratante.get('rg', '')}"
+        else:
+            qualificacao_texto_contratante = f"pessoa jurídica de direito privado, inscrita no CNPJ sob o nº {contratante.get('cnpj', '')}"
+        qualificacao_contratante = f"<p><strong>CONTRATANTE:</strong> {nome_contratante.upper()}, {qualificacao_texto_contratante}, com sede em {endereco_contratante}.</p>"
 
+        # Monta a qualificação do Contratado
+        nome_contratado = str(contratado.get('nome', ''))
+        endereco_contratado = str(contratado.get('endereco', ''))
+        if contratado.get('cpf'):
+            qualificacao_texto_contratado = f"pessoa física, portadora do CPF nº {contratado.get('cpf', '')} e do RG nº {contratado.get('rg', '')}"
+        else:
+            qualificacao_texto_contratado = f"pessoa jurídica de direito privado, inscrita no CNPJ sob o nº {contratado.get('cnpj', '')}"
+        qualificacao_contratado = f"<p><strong>CONTRATADO:</strong> {nome_contratado.upper()}, {qualificacao_texto_contratado}, com sede em {endereco_contratado}.</p>"
 
         return f"""
 <!DOCTYPE html><html lang="pt-BR"><head><title>{tipo_contrato.title()}</title><style>body{{font-family:'Times New Roman',serif;line-height:1.6;text-align:justify;margin:3cm}}h1{{text-align:center;font-size:16pt;margin-bottom:2cm;}}h2{{font-size:14pt;margin-top:1.5cm;font-weight:bold;text-align:center;}}h3{{font-size:12pt;margin-top:1cm;font-weight:bold;}}p{{text-indent:2em;margin-bottom:15px}}</style></head>
