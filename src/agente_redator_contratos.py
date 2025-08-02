@@ -1,4 +1,4 @@
-# agente_redator_contratos.py - Versão 5.2 (Com Lógica de Qualificação e Prompts Corrigidos)
+# agente_redator_contratos.py - Versão 5.3 (Com Lógica de Qualificação e Cláusulas Corrigida)
 
 import json
 import logging
@@ -12,12 +12,12 @@ from datetime import datetime
 class AgenteRedatorContratos:
     """
     Agente Redator Otimizado e Especializado na redação de Contratos.
-    v5.2: Lógica de qualificação das partes e prompts aprimorados para evitar erros e alucinações.
+    v5.3: Lógica de qualificação das partes e de inclusão de cláusulas aprimorada para evitar erros e alucinações.
     """
     def __init__(self, api_key: str):
         if not api_key: raise ValueError("DEEPSEEK_API_KEY não configurada")
         self.client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-        print("✅ Agente Redator de CONTRATOS (Dinâmico v5.2) inicializado.")
+        print("✅ Agente Redator de CONTRATOS (Dinâmico v5.3) inicializado.")
 
     async def _chamar_api_async(self, prompt: str, secao_nome: str) -> str:
         """Chama a API de forma assíncrona para gerar uma seção específica do contrato."""
@@ -58,19 +58,25 @@ class AgenteRedatorContratos:
             "prazos": f"{instrucao_formato}\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA TERCEIRA - DOS PRAZOS', detalhando os seguintes prazos: '{dados_formulario.get('prazos', '')}'",
             "obrigacoes": f"{instrucao_formato}\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA QUARTA - DAS OBRIGAÇÕES DAS PARTES', detalhando as seguintes responsabilidades: '{dados_formulario.get('responsabilidades', '')}'. Crie subtítulos com '<strong>Obrigações do CONTRATANTE:</strong>' e '<strong>Obrigações do CONTRATADO:</strong>'.",
             "penalidades": f"{instrucao_formato}\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA QUINTA - DAS PENALIDADES', detalhando as seguintes penalidades: '{dados_formulario.get('penalidades', '')}'",
-            "rescisao": f"{instrucao_formato}\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA OITAVA - DA RESCISÃO', detalhando as condições e consequências da rescisão.",
-            "foro": f"{instrucao_formato}\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a 'CLÁUSULA NONA - DO FORO', especificando o foro de eleição como: '{dados_formulario.get('foro', '')}'",
         }
 
+        # COMENTÁRIO: Lógica condicional aprimorada para incluir cláusulas apenas quando necessário.
+        clausulas_a_gerar = ["objeto", "valor", "prazos", "obrigacoes", "penalidades"]
+        
         contratos_com_pi_e_sigilo = ["prestação de serviços", "desenvolvimento de software", "franquia", "criação"]
         if any(termo in tipo_contrato.lower() for termo in contratos_com_pi_e_sigilo):
             print("  -> Tipo de contrato requer cláusulas de PI e Confidencialidade.")
             prompts["propriedade"] = f"{instrucao_formato}\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA SEXTA - DA PROPRIEDADE INTELECTUAL', criando uma cláusula padrão que defina a quem pertence a propriedade intelectual do trabalho desenvolvido."
             prompts["confidencialidade"] = f"{instrucao_formato}\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a 'CLÁUSULA SÉTIMA - DA CONFIDENCIALIDADE', criando uma cláusula padrão que obrigue as partes a manter sigilo."
+            clausulas_a_gerar.extend(["propriedade", "confidencialidade"])
         else:
             print("  -> Tipo de contrato simples. Cláusulas de PI e Confidencialidade não serão geradas.")
 
-        tasks = [self._chamar_api_async(p, n) for n, p in prompts.items()]
+        prompts["rescisao"] = f"{instrucao_formato}\n{instrucao_fidelidade}{instrucao_melhoria}\n\nPara um '{tipo_contrato}', redija a 'CLÁUSULA DE RESCISÃO', detalhando as condições e consequências da rescisão."
+        prompts["foro"] = f"{instrucao_formato}\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a 'CLÁUSULA DO FORO', especificando o foro de eleição como: '{dados_formulario.get('foro', '')}'"
+        clausulas_a_gerar.extend(["rescisao", "foro"])
+
+        tasks = [self._chamar_api_async(prompts[nome], nome) for nome in clausulas_a_gerar]
         resultados = await asyncio.gather(*tasks)
         
         clausulas_html = "\n".join(resultados)
@@ -80,11 +86,11 @@ class AgenteRedatorContratos:
         
         # COMENTÁRIO: A lógica de qualificação foi reescrita para ser mais robusta e evitar o erro 'TypeError'.
         # Ela agora lida corretamente com a presença ou ausência de CPF/CNPJ e outros campos.
-        
         def montar_qualificacao(parte_dados, tipo_parte):
             nome = str(parte_dados.get('nome', ''))
             endereco = str(parte_dados.get('endereco', ''))
             
+            qualificacao_texto = ""
             if parte_dados.get('cpf'):
                 qualificacao_texto = f"pessoa física, portadora do CPF nº {parte_dados.get('cpf', '')}"
                 if parte_dados.get('rg'):
