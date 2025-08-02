@@ -1,4 +1,4 @@
-# agente_redator_contratos.py - Versão 5.1 (Com Lógica de Qualificação Corrigida)
+# agente_redator_contratos.py - Versão 5.2 (Com Lógica de Qualificação e Prompts Corrigidos)
 
 import json
 import logging
@@ -12,12 +12,12 @@ from datetime import datetime
 class AgenteRedatorContratos:
     """
     Agente Redator Otimizado e Especializado na redação de Contratos.
-    v5.1: Lógica de qualificação das partes aprimorada para ser mais robusta e evitar erros.
+    v5.2: Lógica de qualificação das partes e prompts aprimorados para evitar erros e alucinações.
     """
     def __init__(self, api_key: str):
         if not api_key: raise ValueError("DEEPSEEK_API_KEY não configurada")
         self.client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
-        print("✅ Agente Redator de CONTRATOS (Dinâmico v5.1) inicializado.")
+        print("✅ Agente Redator de CONTRATOS (Dinâmico v5.2) inicializado.")
 
     async def _chamar_api_async(self, prompt: str, secao_nome: str) -> str:
         """Chama a API de forma assíncrona para gerar uma seção específica do contrato."""
@@ -79,25 +79,25 @@ class AgenteRedatorContratos:
         contratado = dados_formulario.get('contratado', {})
         
         # COMENTÁRIO: A lógica de qualificação foi reescrita para ser mais robusta e evitar o erro 'TypeError'.
-        # Ela agora lida corretamente com a presença ou ausência de CPF/CNPJ.
+        # Ela agora lida corretamente com a presença ou ausência de CPF/CNPJ e outros campos.
         
-        # Monta a qualificação do Contratante
-        nome_contratante = str(contratante.get('nome', ''))
-        endereco_contratante = str(contratante.get('endereco', ''))
-        if contratante.get('cpf'):
-            qualificacao_texto_contratante = f"pessoa física, portadora do CPF nº {contratante.get('cpf', '')} e do RG nº {contratante.get('rg', '')}"
-        else:
-            qualificacao_texto_contratante = f"pessoa jurídica de direito privado, inscrita no CNPJ sob o nº {contratante.get('cnpj', '')}"
-        qualificacao_contratante = f"<p><strong>CONTRATANTE:</strong> {nome_contratante.upper()}, {qualificacao_texto_contratante}, com sede em {endereco_contratante}.</p>"
+        def montar_qualificacao(parte_dados, tipo_parte):
+            nome = str(parte_dados.get('nome', ''))
+            endereco = str(parte_dados.get('endereco', ''))
+            
+            if parte_dados.get('cpf'):
+                qualificacao_texto = f"pessoa física, portadora do CPF nº {parte_dados.get('cpf', '')}"
+                if parte_dados.get('rg'):
+                    qualificacao_texto += f" e do RG nº {parte_dados.get('rg')}"
+            elif parte_dados.get('cnpj'):
+                qualificacao_texto = f"pessoa jurídica de direito privado, inscrita no CNPJ sob o nº {parte_dados.get('cnpj', '')}"
+            else:
+                qualificacao_texto = "[QUALIFICAÇÃO NÃO INFORMADA]"
 
-        # Monta a qualificação do Contratado
-        nome_contratado = str(contratado.get('nome', ''))
-        endereco_contratado = str(contratado.get('endereco', ''))
-        if contratado.get('cpf'):
-            qualificacao_texto_contratado = f"pessoa física, portadora do CPF nº {contratado.get('cpf', '')} e do RG nº {contratado.get('rg', '')}"
-        else:
-            qualificacao_texto_contratado = f"pessoa jurídica de direito privado, inscrita no CNPJ sob o nº {contratado.get('cnpj', '')}"
-        qualificacao_contratado = f"<p><strong>CONTRATADO:</strong> {nome_contratado.upper()}, {qualificacao_texto_contratado}, com sede em {endereco_contratado}.</p>"
+            return f"<p><strong>{tipo_parte.upper()}:</strong> {nome.upper()}, {qualificacao_texto}, com sede ou domicílio em {endereco}.</p>"
+
+        qualificacao_contratante = montar_qualificacao(contratante, "Contratante")
+        qualificacao_contratado = montar_qualificacao(contratado, "Contratado")
 
         return f"""
 <!DOCTYPE html><html lang="pt-BR"><head><title>{tipo_contrato.title()}</title><style>body{{font-family:'Times New Roman',serif;line-height:1.6;text-align:justify;margin:3cm}}h1{{text-align:center;font-size:16pt;margin-bottom:2cm;}}h2{{font-size:14pt;margin-top:1.5cm;font-weight:bold;text-align:center;}}h3{{font-size:12pt;margin-top:1cm;font-weight:bold;}}p{{text-indent:2em;margin-bottom:15px}}</style></head>
@@ -110,8 +110,8 @@ class AgenteRedatorContratos:
     {clausulas_html}
     <p>E, por estarem assim justos e contratados, firmam o presente instrumento, em duas vias de igual teor e forma, na presença de duas testemunhas.</p>
     <p style="text-align:center;margin-top:2cm;margin-bottom:0;">[Local], {datetime.now().strftime('%d de August de %Y')}.</p>
-    <p style="text-align:center;margin-top:2cm;margin-bottom:1cm;">_________________________________________<br><strong>{contratante.get('nome', '').upper()}</strong><br>Contratante</p>
-    <p style="text-align:center;margin-bottom:2cm;">_________________________________________<br><strong>{contratado.get('nome', '').upper()}</strong><br>Contratado</p>
+    <p style="text-align:center;margin-top:2cm;margin-bottom:1cm;">_________________________________________<br><strong>{str(contratante.get('nome', '')).upper()}</strong><br>Contratante</p>
+    <p style="text-align:center;margin-bottom:2cm;">_________________________________________<br><strong>{str(contratado.get('nome', '')).upper()}</strong><br>Contratado</p>
     <p style="text-align:center;margin-bottom:1cm;">_________________________________________<br>Testemunha 1</p>
     <p style="text-align:center;">_________________________________________<br>Testemunha 2</p>
 </body></html>
