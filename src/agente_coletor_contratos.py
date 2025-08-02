@@ -1,4 +1,4 @@
-# agente_coletor_contratos.py - Novo Agente Especializado em Coletar Dados para Contratos
+# agente_coletor_contratos.py - v2.2 (Com Correção no Mapeamento de Campos)
 
 import re
 import traceback
@@ -8,39 +8,41 @@ class AgenteColetorContratos:
     """
     Agente Especializado com uma única responsabilidade:
     - Receber os dados brutos de um formulário já identificado como "Contrato".
-    - Mapear os campos específicos de um contrato.
-    - Extrair os fundamentos jurídicos relevantes para a pesquisa (focando no tipo e objeto do contrato).
-    - Montar a estrutura de dados limpa para os agentes de pesquisa e redação.
+    - Mapear os campos específicos de um contrato, incluindo os endereços.
+    - Montar a estrutura de dados limpa para os próximos agentes.
     """
 
     def __init__(self):
-        print("📊 Inicializando Agente Coletor de Dados de CONTRATOS...")
-        # COMENTÁRIO: Este mapeamento contém apenas os campos relevantes para um contrato.
+        print("📊 Inicializando Agente Coletor de Dados de CONTRATOS (v2.2)...")
+        # COMENTÁRIO: O mapeamento foi corrigido para não ter acentos ou caracteres especiais,
+        # correspondendo ao resultado da função de normalização.
         self.mapeamento_flexivel = {
             'tipo_contrato': ['tipodecontrato'],
             'contratante_nome': ['nomedocontratante', 'contratante'],
             'contratante_cpf': ['cpfdocontratante', 'cpfcontratante'],
             'contratante_rg': ['rgdocontratante', 'rgcontratante'],
             'contratante_cnpj': ['cnpjdacontratante', 'cnpjcontratante'],
-            'contratante_endereco': ['endereçodocontratante', 'endereçocontratante'],
+            'contratante_endereco': ['enderecodocontratante', 'enderecocontratante'],
             'contratado_nome': ['nomedocontratado', 'contratado'],
             'contratado_cpf': ['cpfdocontratado', 'cpfcontratado'],
             'contratado_rg': ['rgdocontratado', 'rgcontratado'],
             'contratado_cnpj': ['cnpjdacontratado', 'cnpjcontratado'],
-            'contratado_endereco': ['endereçodocontratado', 'endereçocontratado'],
+            'contratado_endereco': ['enderecodocontratado', 'enderecocontratado'],
             'objeto_contrato': ['objetodocontrato', 'objeto'],
             'valor_contrato': ['valordocontrato', 'valor'],
             'forma_pagamento': ['formadepagamento'],
             'prazos': ['prazos', 'prazosdepagamento'],
             'responsabilidades': ['responsabilidadesdaspartes'],
             'penalidades': ['penalidadespordescumprimento'],
-            'foro': ['forodeeleição', 'foro'],
+            'foro': ['forodeeleicao', 'foro'],
         }
         print("✅ Agente Coletor de CONTRATOS pronto.")
 
     def _normalizar_chave(self, chave: str) -> str:
         """Normaliza uma chave de dicionário para um formato padronizado."""
-        return re.sub(r'[^a-z0-9]', '', str(chave).lower())
+        # Remove acentos e caracteres especiais antes de remover o resto
+        chave_sem_acentos = ''.join(c for c in chave if c.isalnum() or c == '-')
+        return re.sub(r'[^a-z0-9]', '', chave_sem_acentos.lower())
 
     def _obter_valor(self, dados: Dict[str, Any], nome_interno: str, padrao: Any = None) -> Any:
         """Busca um valor no dicionário de dados usando a lista de chaves possíveis."""
