@@ -2,6 +2,7 @@
 
 import re
 import traceback
+import unicodedata # Importa a biblioteca para lidar com caracteres especiais
 from typing import Dict, Any, List
 
 class AgenteColetorContratos:
@@ -15,7 +16,7 @@ class AgenteColetorContratos:
     def __init__(self):
         print("📊 Inicializando Agente Coletor de Dados de CONTRATOS (v2.2)...")
         # COMENTÁRIO: O mapeamento foi corrigido para não ter acentos ou caracteres especiais,
-        # correspondendo ao resultado da função de normalização.
+        # correspondendo ao resultado da nova função de normalização.
         self.mapeamento_flexivel = {
             'tipo_contrato': ['tipodecontrato'],
             'contratante_nome': ['nomedocontratante', 'contratante'],
@@ -39,10 +40,17 @@ class AgenteColetorContratos:
         print("✅ Agente Coletor de CONTRATOS pronto.")
 
     def _normalizar_chave(self, chave: str) -> str:
-        """Normaliza uma chave de dicionário para um formato padronizado."""
-        # Remove acentos e caracteres especiais antes de remover o resto
-        chave_sem_acentos = ''.join(c for c in chave if c.isalnum() or c == '-')
-        return re.sub(r'[^a-z0-9]', '', chave_sem_acentos.lower())
+        """
+        COMENTÁRIO: Esta função foi reescrita para ser mais robusta.
+        Ela agora remove acentos e caracteres especiais de forma inteligente antes de limpar o resto.
+        """
+        # Converte para minúsculas
+        chave = chave.lower()
+        # Remove acentos (ex: 'endereço' -> 'endereco')
+        nfkd_form = unicodedata.normalize('NFKD', chave)
+        chave_ascii = "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+        # Remove tudo que não for letra ou número
+        return re.sub(r'[^a-z0-9]', '', chave_ascii)
 
     def _obter_valor(self, dados: Dict[str, Any], nome_interno: str, padrao: Any = None) -> Any:
         """Busca um valor no dicionário de dados usando a lista de chaves possíveis."""
