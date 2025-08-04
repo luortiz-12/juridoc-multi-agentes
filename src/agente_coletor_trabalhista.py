@@ -16,6 +16,7 @@ class AgenteColetorTrabalhista:
 
     def __init__(self):
         print("📊 Inicializando Agente Coletor de Dados TRABALHISTA...")
+        # COMENTÁRIO: Este mapeamento contém apenas os campos relevantes para uma petição trabalhista.
         self.mapeamento_flexivel = {
             'autor_nome': ['clientenome'],
             'autor_qualificacao': ['qualificacaocliente'],
