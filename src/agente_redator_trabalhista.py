@@ -46,6 +46,8 @@ class AgenteRedatorTrabalhista:
 
         # COMENTÁRIO: Esta é a nova instrução crucial para evitar que a IA invente dados.
         instrucao_fidelidade = "ATENÇÃO: Sua tarefa é redigir um texto jurídico. Você DEVE se basear ESTRITAMENTE nos dados fornecidos no JSON 'DADOS DO CASO' e na 'PESQUISA' jurídica. Use seu conhecimento e criatividade para expandir e detalhar a história, conectando os fatos com os fundamentos legais encontrados na pesquisa. NÃO invente nomes, valores, datas ou qualquer fato que contradiga os dados fornecidos."
+        
+        instrucao_referencia = "IMPORTANTE: Após a qualificação inicial das partes no início do documento, refira-se a elas apenas pelo nome e pela sua condição (ex: 'o Reclamante' ou 'a Reclamada'). NÃO repita a qualificação completa (CPF, RG, nacionalidade, etc.) no corpo do texto."
 
         instrucao_melhoria = ""
         if recomendacoes:
