@@ -1,4 +1,4 @@
-# agente_pesquisador_jurisprudencia.py - Novo Agente Especializado em Pesquisa de Jurisprudência
+# agente_pesquisador_jurisprudencia.py - v2.1 (Com Pesquisa Aprofundada)
 
 import asyncio
 import aiohttp
@@ -10,23 +10,26 @@ from bs4 import BeautifulSoup
 
 class AgentePesquisadorJurisprudencia:
     """
-    Agente Especializado com uma única responsabilidade:
-    - Receber uma lista de termos-chave.
-    - Realizar uma pesquisa aprofundada e persistente por jurisprudência.
-    - Extrair o conteúdo relevante e retorná-lo de forma estruturada.
+    Agente Especializado em Pesquisa de Jurisprudência.
+    v2.1: Realiza uma pesquisa mais aprofundada, buscando garantir no mínimo 10 resultados positivos.
     """
     def __init__(self):
-        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA...")
+        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v2.1)...")
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
         }
+        # COMENTÁRIO: As configurações foram ajustadas para uma pesquisa mais aprofundada.
+        # A meta de sucessos foi aumentada para 10 e, para suportar isso,
+        # o número de resultados do Google também foi aumentado.
         self.config = {
             'tamanho_minimo_conteudo': 500,
-            'min_sucessos_por_termo': 4,
-            'google_search_results': 10,
+            'min_sucessos_por_termo': 10,
+            'google_search_results': 20,
         }
-        # COMENTÁRIO: A lista de sites é focada em tribunais e portais jurídicos de alta reputação.
         self.sites_prioritarios = ['stj.jus.br', 'stf.jus.br', 'tst.jus.br', 'conjur.com.br', 'migalhas.com.br']
         print("✅ Sistema de pesquisa de JURISPRUDÊNCIA inicializado.")
 
@@ -88,7 +91,6 @@ class AgentePesquisadorJurisprudencia:
         tasks = [self._pesquisar_termo_async(termo) for termo in termos]
         resultados_por_termo = await asyncio.gather(*tasks)
         
-        # Aplaina a lista de resultados
         todos_os_resultados = [item for sublist in resultados_por_termo for item in sublist]
         return todos_os_resultados
 
