@@ -5,7 +5,11 @@ import traceback
 from typing import Dict, Any, List
 from datetime import datetime
 
+<<<<<<< HEAD
 # Importa todos os agentes necessários
+=======
+# COMENTÁRIO: Importamos o novo agente identificador e todos os coletores especializados.
+>>>>>>> parent of fe5ac5e (agente de pesquisa jurisprudencia)
 from agente_identificador import AgenteIdentificador
 from agente_coletor_civel import AgenteColetorCivel
 from agente_coletor_trabalhista import AgenteColetorTrabalhista
@@ -40,6 +44,7 @@ class OrquestradorPrincipal:
         
         print("✅ Chave da API encontrada pelo Orquestrador.")
 
+        # COMENTÁRIO: Inicializamos o novo agente identificador e um dicionário com todos os coletores.
         self.agente_identificador = AgenteIdentificador()
         self.coletores = {
             "Ação Cível": AgenteColetorCivel(),
@@ -55,6 +60,7 @@ class OrquestradorPrincipal:
         self.pesquisa_juridica_contratos = AgentePesquisaContratos()
         self.agente_pesquisador_jurisprudencia = AgentePesquisadorJurisprudencia()
         
+        # Inicializa todos os agentes redatores num dicionário para fácil acesso.
         self.redatores = {
             "Ação Cível": AgenteRedatorCivel(api_key=deepseek_api_key),
             "Ação Trabalhista": AgenteRedatorTrabalhista(api_key=deepseek_api_key),
@@ -115,6 +121,10 @@ class OrquestradorPrincipal:
                 raise ValueError(f"Nenhum agente coletor encontrado para o tipo: {tipo_documento}")
             print(f"  -> Acionando Agente: {agente_coletor_ativo.__class__.__name__}")
             resultado_coletor = agente_coletor_ativo.coletar_e_processar(dados_entrada)
+<<<<<<< HEAD
+=======
+            if resultado_coletor.get("status") == "erro": return resultado_coletor
+>>>>>>> parent of fe5ac5e (agente de pesquisa jurisprudencia)
             dados_estruturados = resultado_coletor.get('dados_estruturados', {})
             print("[RESUMO COLETOR]")
             print(f"  -> Fundamentos para Pesquisa: {dados_estruturados.get('fundamentos_necessarios', [])}")

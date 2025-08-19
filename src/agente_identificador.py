@@ -1,4 +1,4 @@
-# agente_identificador.py - v2.0 (Suporte a Pesquisa de Jurisprudência)
+# agente_identificador.py - Novo Agente Especializado em Identificar o Tipo de Documento
 
 import re
 from typing import Dict, Any, Tuple
@@ -12,11 +12,10 @@ class AgenteIdentificador:
     """
 
     def __init__(self):
-        print("🔎 Inicializando Agente Identificador v2.0...")
-        # COMENTÁRIO: Adicionada a regra para identificar a Pesquisa de Jurisprudência.
-        # A ordem aqui define a prioridade.
+        print("🔎 Inicializando Agente Identificador...")
+        # COMENTÁRIO: Este mapeamento contém apenas as chaves ÚNICAS que nos permitem
+        # identificar o tipo de documento. Não precisamos de todos os campos aqui.
         self.mapeamento_identificacao = {
-            "Pesquisa de Jurisprudência": ['tipodedocumento', 'termopesquisa'],
             "Estudo de Caso": ['titulodecaso', 'descricaodocaso', 'contextojuridico'],
             "Contrato": ['contratante', 'objetodocontrato', 'objeto', 'tipodecontrato'],
             "Parecer Jurídico": ['solicitante', 'consulta'],
@@ -39,16 +38,8 @@ class AgenteIdentificador:
             dados_normalizados = {self._normalizar_chave(k): v for k, v in dados_brutos_n8n.items()}
             dados_relevantes = {k for k, v in dados_normalizados.items() if v is not None and str(v).strip() != ""}
 
-            # COMENTÁRIO: Lógica aprimorada para verificar o valor do campo 'tipo-de-documento'.
-            # Esta é a verificação mais confiável e tem prioridade.
-            tipo_documento_valor = str(dados_normalizados.get('tipodedocumento', '')).lower()
-            if 'jurisprudencia' in tipo_documento_valor:
-                print("  -> Identificado pelo valor do campo 'tipo-de-documento': jurisprudencia")
-                print("✅ Tipo de Documento Identificado: Pesquisa de Jurisprudência")
-                print("--- FIM DA IDENTIFICAÇÃO ---")
-                return {"status": "sucesso", "tipo_documento": "Pesquisa de Jurisprudência"}
-
-            # COMENTÁRIO: A verificação por nomes de campos continua como uma alternativa.
+            # COMENTÁRIO: O agente agora itera sobre as suas regras de identificação.
+            # A ordem aqui define a prioridade.
             for tipo, chaves_identificadoras in self.mapeamento_identificacao.items():
                 if any(chave in dados_relevantes for chave in chaves_identificadoras):
                     print(f"  -> Chaves encontradas que correspondem a: {tipo}")
@@ -66,3 +57,4 @@ class AgenteIdentificador:
         except Exception as e:
             print(f"❌ Erro crítico no Agente Identificador: {e}")
             return {"status": "erro", "erro": f"Falha ao identificar o tipo de documento: {e}"}
+
