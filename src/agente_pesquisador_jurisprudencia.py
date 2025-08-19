@@ -1,20 +1,21 @@
-# agente_pesquisador_jurisprudencia.py - v2.2 (Com Estratégia de Pesquisa Aprimorada)
+# agente_pesquisador_jurisprudencia.py - v2.3 (Com Pesquisa via DuckDuckGo)
 
 import asyncio
 import aiohttp
 import re
 from datetime import datetime
 from typing import Dict, Any, List
-from googlesearch import search
+# COMENTÁRIO: Trocamos a biblioteca 'googlesearch' pela 'duckduckgo_search', que é mais estável.
+from duckduckgo_search import DDGS
 from bs4 import BeautifulSoup
 
 class AgentePesquisadorJurisprudencia:
     """
     Agente Especializado em Pesquisa de Jurisprudência.
-    v2.2: Utiliza uma estratégia de pesquisa mais ampla e inteligente para contornar bloqueios.
+    v2.3: Utiliza o DuckDuckGo para a busca, garantindo maior estabilidade e menos bloqueios.
     """
     def __init__(self):
-        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v2.2)...")
+        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v2.3)...")
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
@@ -25,8 +26,6 @@ class AgentePesquisadorJurisprudencia:
             'min_sucessos_por_termo': 10,
             'google_search_results': 20,
         }
-        # COMENTÁRIO: A lista de sites foi diversificada para incluir portais jurídicos mais acessíveis,
-        # que é a mesma estratégia do nosso agente de pesquisa que já funciona bem.
         self.sites_prioritarios = ['conjur.com.br', 'migalhas.com.br', 'stj.jus.br', 'stf.jus.br', 'tst.jus.br']
         print("✅ Sistema de pesquisa de JURISPRUDÊNCIA inicializado.")
 
@@ -58,20 +57,32 @@ class AgentePesquisadorJurisprudencia:
             print(f"❌ Falha (Erro: {type(e).__name__}): {url}")
             return None
 
+    def _buscar_urls_ddg(self, query: str, num_results: int) -> List[str]:
+        """Função síncrona para buscar URLs usando DuckDuckGo."""
+        urls = []
+        try:
+            with DDGS() as ddgs:
+                results = ddgs.text(query, max_results=num_results)
+                if results:
+                    urls = [r['href'] for r in results]
+        except Exception as e:
+            print(f"⚠️ Falha na busca do DuckDuckGo: {e}")
+        return urls
+
     async def _pesquisar_termo_async(self, termo: str) -> List[Dict[str, Any]]:
         """Busca um único termo e extrai o conteúdo até atingir a meta."""
         print(f"\n📚 Buscando jurisprudência para o termo: '{termo}'...")
         site_query = " OR ".join([f"site:{site}" for site in self.sites_prioritarios])
-        # COMENTÁRIO: A query do Google foi aprimorada para ser mais específica.
         query = f'jurisprudência ementa acórdão sobre "{termo}" {site_query}'
         
         resultados_sucesso = []
         try:
+            # COMENTÁRIO: A busca agora é feita com a função do DuckDuckGo.
             loop = asyncio.get_event_loop()
-            urls_google = await loop.run_in_executor(None, lambda: list(search(query, num_results=self.config['google_search_results'], lang="pt")))
+            urls_encontradas = await loop.run_in_executor(None, self._buscar_urls_ddg, query, self.config['google_search_results'])
             
             async with aiohttp.ClientSession() as session:
-                for url in urls_google:
+                for url in urls_encontradas:
                     if len(resultados_sucesso) >= self.config['min_sucessos_por_termo']:
                         break
                     resultado = await self._extrair_conteudo_url_async(session, url)
@@ -81,7 +92,7 @@ class AgentePesquisadorJurisprudencia:
             print(f"🎯 Pesquisa para '{termo}' concluída com {len(resultados_sucesso)} extrações bem-sucedidas.")
             return resultados_sucesso
         except Exception as e:
-            print(f"⚠️ Falha crítica na busca do Google para '{termo}': {e}")
+            print(f"⚠️ Falha crítica na busca para '{termo}': {e}")
             return resultados_sucesso
 
     async def pesquisar_jurisprudencia_async(self, termos: List[str]) -> List[Dict[str, Any]]:
