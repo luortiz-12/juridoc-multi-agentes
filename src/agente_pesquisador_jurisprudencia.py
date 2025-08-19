@@ -1,8 +1,9 @@
-# agente_pesquisador_jurisprudencia.py - v2.4 (Com Estratégia de Pesquisa Aprimorada)
+# agente_pesquisador_jurisprudencia.py - v3.0 (Com Filtro de Relevância por IA)
 
 import asyncio
 import aiohttp
 import re
+import openai
 from datetime import datetime
 from typing import Dict, Any, List
 from duckduckgo_search import DDGS
@@ -11,27 +12,54 @@ from bs4 import BeautifulSoup
 class AgentePesquisadorJurisprudencia:
     """
     Agente Especializado em Pesquisa de Jurisprudência.
-    v2.4: Utiliza uma estratégia de pesquisa mais ampla e inteligente para contornar bloqueios.
+    v3.0: Utiliza uma pesquisa ampla na web e um filtro de IA (DeepSeek) para
+    garantir a relevância e a qualidade dos resultados extraídos.
     """
-    def __init__(self):
-        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v2.4)...")
+    def __init__(self, api_key: str):
+        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v3.0 com Filtro de IA)...")
+        if not api_key:
+            raise ValueError("A chave da API da DeepSeek é necessária para o filtro de relevância.")
+        
+        # COMENTÁRIO: O agente agora precisa da chave da API para usar o filtro de IA.
+        self.client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+        
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
         }
         self.config = {
             'tamanho_minimo_conteudo': 500,
             'min_sucessos_por_termo': 10,
-            'google_search_results': 20,
+            'search_results_per_request': 25, # Aumentado para ter mais candidatos
         }
-        # COMENTÁRIO: A lista de sites foi reordenada e diversificada para priorizar portais jurídicos
-        # mais acessíveis, que é a mesma estratégia do nosso agente de pesquisa que já funciona bem.
-        self.sites_prioritarios = ['conjur.com.br', 'migalhas.com.br', 'stj.jus.br', 'stf.jus.br', 'tst.jus.br', 'ambito-juridico.com.br']
         print("✅ Sistema de pesquisa de JURISPRUDÊNCIA inicializado.")
 
-    async def _extrair_conteudo_url_async(self, session, url: str) -> Dict[str, Any]:
-        """Extrai conteúdo de uma URL de forma assíncrona."""
+    async def _validar_relevancia_com_ia_async(self, texto: str, termo_pesquisa: str) -> bool:
+        """Usa a IA da DeepSeek para validar se o conteúdo extraído é relevante."""
+        try:
+            prompt = f"""
+            Analise o seguinte texto extraído de uma página da web e determine se ele é uma JURISPRUDÊNCIA (decisão judicial, acórdão, ementa) relevante para o termo de pesquisa "{termo_pesquisa}".
+            Responda APENAS com "SIM" se for uma jurisprudência relevante, ou "NÃO" caso contrário (se for uma notícia, um artigo de blog, uma página de login, etc.).
+
+            TEXTO PARA ANÁLISE:
+            ---
+            {texto[:2000]}
+            ---
+            """
+            response = await asyncio.to_thread(
+                self.client.chat.completions.create,
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=10,
+                temperature=0.0
+            )
+            resposta = response.choices[0].message.content.strip().upper()
+            return "SIM" in resposta
+        except Exception as e:
+            print(f"⚠️ Erro na validação com IA: {e}")
+            return False # Assume como irrelevante em caso de erro
+
+    async def _extrair_e_validar_async(self, session, url: str, termo_pesquisa: str) -> Dict[str, Any]:
+        """Extrai o conteúdo de uma URL e depois valida sua relevância com a IA."""
         print(f"→ Tentando extrair de: {url}")
         try:
             async with session.get(url, headers=self.headers, timeout=15, ssl=False) as response:
@@ -49,8 +77,14 @@ class AgentePesquisadorJurisprudencia:
                         print(f"⚠️ Descartado (curto): {url}")
                         return None
 
-                    print(f"✔ SUCESSO: Conteúdo extraído de {url} ({len(texto_limpo)} caracteres)")
-                    return { "url": url, "texto": texto_limpo, "titulo": soup.title.string.strip() if soup.title else "N/A" }
+                    # COMENTÁRIO: Etapa de validação com IA.
+                    print(f"  -> Validando relevância do conteúdo com IA...")
+                    if await self._validar_relevancia_com_ia_async(texto_limpo, termo_pesquisa):
+                        print(f"✔ SUCESSO (IA APROVOU): Conteúdo extraído de {url} ({len(texto_limpo)} caracteres)")
+                        return { "url": url, "texto": texto_limpo, "titulo": soup.title.string.strip() if soup.title else "N/A" }
+                    else:
+                        print(f"⚠️ Descartado (IA Reprovou como irrelevante): {url}")
+                        return None
                 else:
                     print(f"❌ Falha (Status {response.status}): {url}")
                     return None
@@ -63,7 +97,6 @@ class AgentePesquisadorJurisprudencia:
         urls = []
         try:
             with DDGS() as ddgs:
-                # Adicionado region='br-pt' para focar em resultados do Brasil
                 results = ddgs.text(query, region='br-pt', max_results=num_results)
                 if results:
                     urls = [r['href'] for r in results]
@@ -74,19 +107,20 @@ class AgentePesquisadorJurisprudencia:
     async def _pesquisar_termo_async(self, termo: str) -> List[Dict[str, Any]]:
         """Busca um único termo e extrai o conteúdo até atingir a meta."""
         print(f"\n📚 Buscando jurisprudência para o termo: '{termo}'...")
-        site_query = " OR ".join([f"site:{site}" for site in self.sites_prioritarios])
-        query = f'jurisprudência ementa acórdão sobre "{termo}" {site_query}'
+        # COMENTÁRIO: A restrição a sites específicos foi removida para uma pesquisa mais ampla.
+        # A IA agora é responsável por garantir a qualidade e a relevância.
+        query = f'jurisprudência ementa acórdão sobre "{termo}"'
         
         resultados_sucesso = []
         try:
             loop = asyncio.get_event_loop()
-            urls_encontradas = await loop.run_in_executor(None, self._buscar_urls_ddg, query, self.config['google_search_results'])
+            urls_encontradas = await loop.run_in_executor(None, self._buscar_urls_ddg, query, self.config['search_results_per_request'])
             
             async with aiohttp.ClientSession() as session:
                 for url in urls_encontradas:
                     if len(resultados_sucesso) >= self.config['min_sucessos_por_termo']:
                         break
-                    resultado = await self._extrair_conteudo_url_async(session, url)
+                    resultado = await self._extrair_e_validar_async(session, url, termo)
                     if resultado:
                         resultados_sucesso.append(resultado)
             
