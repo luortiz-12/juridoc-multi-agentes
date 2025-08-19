@@ -1,21 +1,20 @@
-# agente_pesquisador_jurisprudencia.py - v2.3 (Com Pesquisa via DuckDuckGo)
+# agente_pesquisador_jurisprudencia.py - v2.4 (Com Estratégia de Pesquisa Aprimorada)
 
 import asyncio
 import aiohttp
 import re
 from datetime import datetime
 from typing import Dict, Any, List
-# COMENTÁRIO: Trocamos a biblioteca 'googlesearch' pela 'duckduckgo_search', que é mais estável.
 from duckduckgo_search import DDGS
 from bs4 import BeautifulSoup
 
 class AgentePesquisadorJurisprudencia:
     """
     Agente Especializado em Pesquisa de Jurisprudência.
-    v2.3: Utiliza o DuckDuckGo para a busca, garantindo maior estabilidade e menos bloqueios.
+    v2.4: Utiliza uma estratégia de pesquisa mais ampla e inteligente para contornar bloqueios.
     """
     def __init__(self):
-        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v2.3)...")
+        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v2.4)...")
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
@@ -26,7 +25,9 @@ class AgentePesquisadorJurisprudencia:
             'min_sucessos_por_termo': 10,
             'google_search_results': 20,
         }
-        self.sites_prioritarios = ['conjur.com.br', 'migalhas.com.br', 'stj.jus.br', 'stf.jus.br', 'tst.jus.br']
+        # COMENTÁRIO: A lista de sites foi reordenada e diversificada para priorizar portais jurídicos
+        # mais acessíveis, que é a mesma estratégia do nosso agente de pesquisa que já funciona bem.
+        self.sites_prioritarios = ['conjur.com.br', 'migalhas.com.br', 'stj.jus.br', 'stf.jus.br', 'tst.jus.br', 'ambito-juridico.com.br']
         print("✅ Sistema de pesquisa de JURISPRUDÊNCIA inicializado.")
 
     async def _extrair_conteudo_url_async(self, session, url: str) -> Dict[str, Any]:
@@ -62,7 +63,8 @@ class AgentePesquisadorJurisprudencia:
         urls = []
         try:
             with DDGS() as ddgs:
-                results = ddgs.text(query, max_results=num_results)
+                # Adicionado region='br-pt' para focar em resultados do Brasil
+                results = ddgs.text(query, region='br-pt', max_results=num_results)
                 if results:
                     urls = [r['href'] for r in results]
         except Exception as e:
@@ -77,7 +79,6 @@ class AgentePesquisadorJurisprudencia:
         
         resultados_sucesso = []
         try:
-            # COMENTÁRIO: A busca agora é feita com a função do DuckDuckGo.
             loop = asyncio.get_event_loop()
             urls_encontradas = await loop.run_in_executor(None, self._buscar_urls_ddg, query, self.config['google_search_results'])
             
