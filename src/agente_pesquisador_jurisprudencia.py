@@ -1,9 +1,10 @@
-# agente_pesquisador_jurisprudencia.py - v3.0 (Com Filtro de Relevância por IA)
+# agente_pesquisador_jurisprudencia.py - v3.1 (Com Correção de Inicialização)
 
 import asyncio
 import aiohttp
 import re
 import openai
+import os
 from datetime import datetime
 from typing import Dict, Any, List
 from duckduckgo_search import DDGS
@@ -12,15 +13,21 @@ from bs4 import BeautifulSoup
 class AgentePesquisadorJurisprudencia:
     """
     Agente Especializado em Pesquisa de Jurisprudência.
-    v3.0: Utiliza uma pesquisa ampla na web e um filtro de IA (DeepSeek) para
-    garantir a relevância e a qualidade dos resultados extraídos.
+    v3.1: Lógica de inicialização corrigida para buscar a chave da API de forma autônoma.
     """
-    def __init__(self, api_key: str):
-        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v3.0 com Filtro de IA)...")
-        if not api_key:
-            raise ValueError("A chave da API da DeepSeek é necessária para o filtro de relevância.")
+    # COMENTÁRIO: A assinatura do __init__ foi alterada. O api_key agora é opcional.
+    def __init__(self, api_key: str = None):
+        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v3.1 com Filtro de IA)...")
         
-        # COMENTÁRIO: O agente agora precisa da chave da API para usar o filtro de IA.
+        # COMENTÁRIO: Esta é a nova lógica. Se a chave não for passada diretamente,
+        # o agente tenta obtê-la a partir das variáveis de ambiente.
+        # Isto resolve o erro de inicialização no orquestrador.
+        if not api_key:
+            api_key = os.getenv('DEEPSEEK_API_KEY')
+        
+        if not api_key:
+            raise ValueError("A chave da API da DeepSeek é necessária para o filtro de relevância e não foi encontrada.")
+        
         self.client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
         
         self.headers = {
@@ -29,7 +36,7 @@ class AgentePesquisadorJurisprudencia:
         self.config = {
             'tamanho_minimo_conteudo': 500,
             'min_sucessos_por_termo': 10,
-            'search_results_per_request': 25, # Aumentado para ter mais candidatos
+            'search_results_per_request': 25,
         }
         print("✅ Sistema de pesquisa de JURISPRUDÊNCIA inicializado.")
 
@@ -56,7 +63,7 @@ class AgentePesquisadorJurisprudencia:
             return "SIM" in resposta
         except Exception as e:
             print(f"⚠️ Erro na validação com IA: {e}")
-            return False # Assume como irrelevante em caso de erro
+            return False
 
     async def _extrair_e_validar_async(self, session, url: str, termo_pesquisa: str) -> Dict[str, Any]:
         """Extrai o conteúdo de uma URL e depois valida sua relevância com a IA."""
@@ -77,7 +84,6 @@ class AgentePesquisadorJurisprudencia:
                         print(f"⚠️ Descartado (curto): {url}")
                         return None
 
-                    # COMENTÁRIO: Etapa de validação com IA.
                     print(f"  -> Validando relevância do conteúdo com IA...")
                     if await self._validar_relevancia_com_ia_async(texto_limpo, termo_pesquisa):
                         print(f"✔ SUCESSO (IA APROVOU): Conteúdo extraído de {url} ({len(texto_limpo)} caracteres)")
@@ -107,8 +113,6 @@ class AgentePesquisadorJurisprudencia:
     async def _pesquisar_termo_async(self, termo: str) -> List[Dict[str, Any]]:
         """Busca um único termo e extrai o conteúdo até atingir a meta."""
         print(f"\n📚 Buscando jurisprudência para o termo: '{termo}'...")
-        # COMENTÁRIO: A restrição a sites específicos foi removida para uma pesquisa mais ampla.
-        # A IA agora é responsável por garantir a qualidade e a relevância.
         query = f'jurisprudência ementa acórdão sobre "{termo}"'
         
         resultados_sucesso = []
