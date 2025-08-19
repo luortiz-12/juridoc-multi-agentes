@@ -1,4 +1,4 @@
-# agente_pesquisador_jurisprudencia.py - v3.1 (Com Correção de Inicialização)
+# agente_pesquisador_jurisprudencia.py - v3.2 (Com Pesquisa Focada em Sites Jurídicos)
 
 import asyncio
 import aiohttp
@@ -13,15 +13,11 @@ from bs4 import BeautifulSoup
 class AgentePesquisadorJurisprudencia:
     """
     Agente Especializado em Pesquisa de Jurisprudência.
-    v3.1: Lógica de inicialização corrigida para buscar a chave da API de forma autônoma.
+    v3.2: Utiliza uma pesquisa focada em sites jurídicos pré-definidos para garantir a relevância dos resultados.
     """
-    # COMENTÁRIO: A assinatura do __init__ foi alterada. O api_key agora é opcional.
     def __init__(self, api_key: str = None):
-        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v3.1 com Filtro de IA)...")
+        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v3.2 com Filtro de IA)...")
         
-        # COMENTÁRIO: Esta é a nova lógica. Se a chave não for passada diretamente,
-        # o agente tenta obtê-la a partir das variáveis de ambiente.
-        # Isto resolve o erro de inicialização no orquestrador.
         if not api_key:
             api_key = os.getenv('DEEPSEEK_API_KEY')
         
@@ -38,6 +34,8 @@ class AgentePesquisadorJurisprudencia:
             'min_sucessos_por_termo': 10,
             'search_results_per_request': 25,
         }
+        # COMENTÁRIO: A lista de sites prioritários foi reintroduzida para focar a pesquisa.
+        self.sites_prioritarios = ['conjur.com.br', 'migalhas.com.br', 'stj.jus.br', 'stf.jus.br', 'tst.jus.br', 'ambito-juridico.com.br']
         print("✅ Sistema de pesquisa de JURISPRUDÊNCIA inicializado.")
 
     async def _validar_relevancia_com_ia_async(self, texto: str, termo_pesquisa: str) -> bool:
@@ -113,7 +111,9 @@ class AgentePesquisadorJurisprudencia:
     async def _pesquisar_termo_async(self, termo: str) -> List[Dict[str, Any]]:
         """Busca um único termo e extrai o conteúdo até atingir a meta."""
         print(f"\n📚 Buscando jurisprudência para o termo: '{termo}'...")
-        query = f'jurisprudência ementa acórdão sobre "{termo}"'
+        # COMENTÁRIO: A query agora inclui a restrição aos sites prioritários.
+        site_query = " OR ".join([f"site:{site}" for site in self.sites_prioritarios])
+        query = f'jurisprudência ementa acórdão sobre "{termo}" {site_query}'
         
         resultados_sucesso = []
         try:
