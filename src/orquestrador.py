@@ -5,11 +5,7 @@ import traceback
 from typing import Dict, Any, List
 from datetime import datetime
 
-<<<<<<< HEAD
-# Importa todos os agentes necessários
-=======
 # COMENTÁRIO: Importamos o novo agente identificador e todos os coletores especializados.
->>>>>>> parent of fe5ac5e (agente de pesquisa jurisprudencia)
 from agente_identificador import AgenteIdentificador
 from agente_coletor_civel import AgenteColetorCivel
 from agente_coletor_trabalhista import AgenteColetorTrabalhista
@@ -21,8 +17,6 @@ from agente_coletor_estudo_de_caso import AgenteColetorEstudoDeCaso
 
 from pesquisa_juridica import PesquisaJuridica
 from agente_pesquisa_contratos import AgentePesquisaContratos
-from agente_pesquisador_jurisprudencia import AgentePesquisadorJurisprudencia
-
 from agente_redator_trabalhista import AgenteRedatorTrabalhista
 from agente_redator_civel import AgenteRedatorCivel
 from agente_redator_queixa_crime import AgenteRedatorQueixaCrime
@@ -30,8 +24,6 @@ from agente_redator_habeas_corpus import AgenteRedatorHabeasCorpus
 from agente_redator_parecer import AgenteRedatorParecer
 from agente_redator_contratos import AgenteRedatorContratos
 from agente_redator_estudo_de_caso import AgenteRedatorEstudoDeCaso
-from agente_redator_jurisprudencia import AgenteRedatorJurisprudencia
-
 from agente_validador import AgenteValidador
 
 class OrquestradorPrincipal:
@@ -58,7 +50,6 @@ class OrquestradorPrincipal:
         
         self.pesquisa_juridica_peticoes = PesquisaJuridica()
         self.pesquisa_juridica_contratos = AgentePesquisaContratos()
-        self.agente_pesquisador_jurisprudencia = AgentePesquisadorJurisprudencia()
         
         # Inicializa todos os agentes redatores num dicionário para fácil acesso.
         self.redatores = {
@@ -69,42 +60,16 @@ class OrquestradorPrincipal:
             "Queixa-Crime": AgenteRedatorQueixaCrime(api_key=deepseek_api_key),
             "Habeas Corpus": AgenteRedatorHabeasCorpus(api_key=deepseek_api_key),
             "Estudo de Caso": AgenteRedatorEstudoDeCaso(api_key=deepseek_api_key),
-            "Pesquisa de Jurisprudência": AgenteRedatorJurisprudencia(),
         }
         
         self.agente_validador = AgenteValidador()
         
         print("Orquestrador Principal inicializado com todos os agentes configurados.")
     
-    # COMENTÁRIO: Esta é a nova função que estava em falta.
-    # Ela lida exclusivamente com o fluxo de pesquisa de jurisprudência.
-    def processar_pesquisa_jurisprudencia(self, dados_entrada: Dict[str, Any]) -> Dict[str, Any]:
-        try:
-            print("\n--- FLUXO DE PESQUISA DE JURISPRUDÊNCIA INICIADO ---")
-            
-            termos_pesquisa_str = dados_entrada.get("termo-pesquisa", "")
-            termos_pesquisa = [termo.strip() for termo in termos_pesquisa_str.split(',') if termo.strip()]
-            print(f"  -> Termos a serem pesquisados: {termos_pesquisa}")
-
-            resultados = self.agente_pesquisador_jurisprudencia.pesquisar(termos_pesquisa)
-            
-            agente_redator_jurisprudencia = self.redatores.get("Pesquisa de Jurisprudência")
-            resultado_formatado = agente_redator_jurisprudencia.formatar_resultados(termos_pesquisa, resultados)
-            
-            print("✅ FLUXO DE PESQUISA DE JURISPRUDÊNCIA FINALIZADO!")
-            return {"status": "sucesso", "documento_final": resultado_formatado.get("documento_html")}
-        except Exception as e:
-            traceback.print_exc()
-            return {"status": "erro", "erro": f"Erro no fluxo de pesquisa de jurisprudência: {e}"}
-
     def processar_solicitacao_completa(self, dados_entrada: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        COMENTÁRIO: Esta função continua a ser responsável por todos os outros documentos,
-        e o seu funcionamento não foi alterado.
-        """
         try:
             print("\n" + "="*60)
-            print("🚀 INICIANDO NOVO FLUXO DE GERAÇÃO DE DOCUMENTO �")
+            print("🚀 INICIANDO NOVO FLUXO DE GERAÇÃO DE DOCUMENTO 🚀")
             print("="*60)
 
             # ETAPA 1: AGENTE IDENTIFICADOR
@@ -121,10 +86,7 @@ class OrquestradorPrincipal:
                 raise ValueError(f"Nenhum agente coletor encontrado para o tipo: {tipo_documento}")
             print(f"  -> Acionando Agente: {agente_coletor_ativo.__class__.__name__}")
             resultado_coletor = agente_coletor_ativo.coletar_e_processar(dados_entrada)
-<<<<<<< HEAD
-=======
             if resultado_coletor.get("status") == "erro": return resultado_coletor
->>>>>>> parent of fe5ac5e (agente de pesquisa jurisprudencia)
             dados_estruturados = resultado_coletor.get('dados_estruturados', {})
             print("[RESUMO COLETOR]")
             print(f"  -> Fundamentos para Pesquisa: {dados_estruturados.get('fundamentos_necessarios', [])}")
