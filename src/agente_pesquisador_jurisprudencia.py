@@ -1,4 +1,4 @@
-# agente_pesquisador_jurisprudencia.py - v3.8 (Com Pesquisa Obrigatória por Domínio)
+# agente_pesquisador_jurisprudencia.py - v3.9 (Com Query Única e Abrangente)
 
 import asyncio
 import aiohttp
@@ -15,11 +15,11 @@ from urllib.parse import urlparse
 class AgentePesquisadorJurisprudencia:
     """
     Agente Especializado em Pesquisa de Jurisprudência.
-    v3.8: Garante que a pesquisa seja tentada em todos os domínios prioritários
+    v3.9: Utiliza uma única query de busca abrangente para maior eficiência
     e extrai o conteúdo completo dos artigos encontrados.
     """
     def __init__(self, api_key: str = None):
-        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v3.8)...")
+        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v3.9)...")
         
         if not api_key:
             api_key = os.getenv('DEEPSEEK_API_KEY')
@@ -33,7 +33,6 @@ class AgentePesquisadorJurisprudencia:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36"
         ]
         
         self.headers = {
@@ -42,8 +41,8 @@ class AgentePesquisadorJurisprudencia:
         }
         self.config = {
             'tamanho_minimo_conteudo': 500,
-            # COMENTÁRIO: A pesquisa agora busca 3 resultados por domínio, tornando a busca mais distribuída.
-            'search_results_per_domain': 3,
+            'min_sucessos_por_termo': 4,
+            'google_search_results': 20,
         }
         self.sites_prioritarios = ['stj.jus.br', 'stf.jus.br', 'tst.jus.br', 'conjur.com.br', 'migalhas.com.br', 'ambito-juridico.com.br']
         print("✅ Sistema de pesquisa de JURISPRUDÊNCIA inicializado.")
@@ -99,7 +98,6 @@ class AgentePesquisadorJurisprudencia:
                     print(f"  -> Validando relevância do conteúdo com IA...")
                     if await self._validar_relevancia_com_ia_async(texto_limpo, termo_pesquisa):
                         print(f"✔ SUCESSO (IA APROVOU): Conteúdo extraído de {url} ({len(texto_limpo)} caracteres)")
-                        # COMENTÁRIO: Retorna o 'texto_limpo' completo, sem limitar o tamanho.
                         return { "url": url, "texto": texto_limpo, "titulo": soup.title.string.strip() if soup.title else "N/A" }
                     else:
                         print(f"⚠️ Descartado (IA Reprovou como irrelevante): {url}")
@@ -111,39 +109,37 @@ class AgentePesquisadorJurisprudencia:
             print(f"❌ Falha (Erro: {type(e).__name__}): {url}")
             return None
 
-    async def _pesquisar_dominio_async(self, session, termo: str, dominio: str) -> List[Dict[str, Any]]:
-        """Pesquisa um termo específico dentro de um único domínio."""
-        query = f'jurisprudência ementa acórdão sobre "{termo}" site:{dominio}'
+    async def _pesquisar_termo_async(self, termo: str) -> List[Dict[str, Any]]:
+        """
+        COMENTÁRIO: A lógica foi reescrita para usar uma única query de busca com todos os domínios,
+        tornando a pesquisa mais eficiente e similar a uma busca manual.
+        """
+        print(f"\n📚 Buscando jurisprudência para o termo: '{termo}' em todos os domínios (query única)...")
+        
+        # Monta a query única com todos os domínios prioritários
+        dominios_query = " OR ".join([f"site:{site}" for site in self.sites_prioritarios])
+        query = f'"{termo}" jurisprudência {dominios_query}'
+        
         resultados_sucesso = []
         try:
             loop = asyncio.get_event_loop()
-            urls_encontradas = await loop.run_in_executor(None, lambda: list(search(query, num_results=self.config['search_results_per_domain'], lang="pt")))
+            # Aumenta o número de resultados para ter mais chances de atingir a meta
+            num_results_to_fetch = self.config['min_sucessos_por_termo'] * 2
+            urls_encontradas = await loop.run_in_executor(None, lambda: list(search(query, num_results=num_results_to_fetch, lang="pt")))
             
-            tasks = [self._extrair_e_validar_async(session, url, termo) for url in urls_encontradas]
-            resultados_tasks = await asyncio.gather(*tasks)
-            
-            resultados_sucesso = [res for res in resultados_tasks if res]
-            return resultados_sucesso
-        except Exception as e:
-            print(f"⚠️ Falha crítica na busca do Google para o domínio {dominio}: {e}")
-            return []
+            async with aiohttp.ClientSession() as session:
+                tasks = [self._extrair_e_validar_async(session, url, termo) for url in urls_encontradas]
+                resultados_tasks = await asyncio.gather(*tasks)
 
-    async def _pesquisar_termo_async(self, termo: str) -> List[Dict[str, Any]]:
-        """
-        COMENTÁRIO: A lógica foi reescrita. Agora, ele cria uma tarefa de pesquisa para cada
-        domínio prioritário e as executa em paralelo, garantindo que todos sejam tentados.
-        """
-        print(f"\n📚 Buscando jurisprudência para o termo: '{termo}' em todos os domínios prioritários...")
-        
-        async with aiohttp.ClientSession() as session:
-            tasks = [self._pesquisar_dominio_async(session, termo, site) for site in self.sites_prioritarios]
-            resultados_por_dominio = await asyncio.gather(*tasks)
-        
-        # Junta os resultados de todos os domínios em uma única lista
-        todos_os_resultados = [item for sublist in resultados_por_dominio for item in sublist]
-        
-        print(f"🎯 Pesquisa para '{termo}' concluída com {len(todos_os_resultados)} extrações bem-sucedidas no total.")
-        return todos_os_resultados
+            # Filtra apenas os resultados bem-sucedidos e limita à meta
+            resultados_sucesso = [res for res in resultados_tasks if res][:self.config['min_sucessos_por_termo']]
+            
+            print(f"🎯 Pesquisa para '{termo}' concluiu com {len(resultados_sucesso)} extrações bem-sucedidas.")
+            return resultados_sucesso
+
+        except Exception as e:
+            print(f"⚠️ Falha crítica na busca do Google: {e}")
+            return []
 
     async def pesquisar_jurisprudencia_async(self, termos: List[str]) -> List[Dict[str, Any]]:
         """Cria e executa todas as tarefas de pesquisa em paralelo."""
