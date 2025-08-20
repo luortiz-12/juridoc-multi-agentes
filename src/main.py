@@ -211,7 +211,45 @@ def analisar_dados():
             "erro": str(e),
             "timestamp": datetime.now().isoformat()
         }), 500
+# COMENTÁRIO: Este é o NOVO endpoint, adicionado especificamente para a pesquisa de jurisprudência.
+# Ele é completamente separado do fluxo de geração de documentos.
+@app.route('/api/pesquisar-jurisprudencia', methods=['POST'])
+def pesquisar_jurisprudencia():
+    """
+    Endpoint dedicado para a nova funcionalidade de pesquisa de jurisprudência.
+    """
+    try:
+        inicio_tempo = datetime.now()
+        print(f"\n{'='*80}")
+        print(f"⚖️  NOVA SOLICITAÇÃO DE PESQUISA DE JURISPRUDÊNCIA - {inicio_tempo.strftime('%d/%m/%Y %H:%M:%S')}")
+        print(f"{'='*80}")
 
+        dados_entrada = request.get_json()
+        if not dados_entrada:
+            return jsonify({"status": "erro", "erro": "Nenhum termo de pesquisa fornecido"}), 400
+
+        print("📋 Dados recebidos do formulário:")
+        print(json.dumps(dados_entrada, indent=2, ensure_ascii=False))
+
+        # Chama o método específico no orquestrador para este fluxo.
+        resultado_orquestrador = orquestrador.processar_pesquisa_jurisprudencia(dados_entrada)
+
+        tempo_total = (datetime.now() - inicio_tempo).total_seconds()
+
+        if resultado_orquestrador.get("status") == "sucesso":
+            documento_final_html = resultado_orquestrador.get("documento_final")
+            print(f"\n✅ PESQUISA REALIZADA COM SUCESSO! (Tempo total: {tempo_total:.1f}s)")
+            return jsonify({"documento_html": documento_final_html})
+        else:
+            print(f"\n❌ ERRO REPORTADO PELO ORQUESTRADOR:")
+            print(json.dumps(resultado_orquestrador, indent=2, ensure_ascii=False))
+            return jsonify(resultado_orquestrador), 500
+
+    except Exception as e:
+        erro_detalhado = traceback.format_exc()
+        print(f"\n❌ ERRO CRÍTICO NA PESQUISA DE JURISPRUDÊNCIA: {erro_detalhado}")
+        return jsonify({"status": "erro", "erro": str(e)}), 500
+    
 if __name__ == '__main__':
     print("🚀 Iniciando JuriDoc Completo v2.0...")
     print("📋 Sistema com 4 agentes especializados")

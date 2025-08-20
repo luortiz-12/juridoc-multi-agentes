@@ -25,6 +25,8 @@ from agente_redator_parecer import AgenteRedatorParecer
 from agente_redator_contratos import AgenteRedatorContratos
 from agente_redator_estudo_de_caso import AgenteRedatorEstudoDeCaso
 from agente_validador import AgenteValidador
+from agente_pesquisador_jurisprudencia import AgentePesquisadorJurisprudencia
+from agente_redator_jurisprudencia import AgenteRedatorJurisprudencia
 
 class OrquestradorPrincipal:
     def __init__(self):
@@ -63,6 +65,9 @@ class OrquestradorPrincipal:
         }
         
         self.agente_validador = AgenteValidador()
+        # COMENTÁRIO: Inicializamos os novos agentes para a pesquisa de jurisprudência.
+        self.agente_pesquisador_jurisprudencia = AgentePesquisadorJurisprudencia()
+        self.agente_redator_jurisprudencia = AgenteRedatorJurisprudencia()
         
         print("Orquestrador Principal inicializado com todos os agentes configurados.")
     
@@ -78,74 +83,95 @@ class OrquestradorPrincipal:
             if resultado_identificador.get("status") == "erro": return resultado_identificador
             tipo_documento = resultado_identificador.get("tipo_documento", "Ação Cível")
             print(f"  -> Documento identificado como: {tipo_documento}")
+            
+            # COMENTÁRIO: Este é o novo "desvio" no fluxo, agora com a indentação correta.
+            if tipo_documento == "Pesquisa de Jurisprudência":
+                print("\n--- FLUXO DE PESQUISA DE JURISPRUDÊNCIA INICIADO ---")
 
-            # ETAPA 2: AGENTE COLETOR DE DADOS ESPECIALIZADO
-            print("\n--- ETAPA 2: Coleta de Dados Especializada ---")
-            agente_coletor_ativo = self.coletores.get(tipo_documento)
-            if not agente_coletor_ativo:
-                raise ValueError(f"Nenhum agente coletor encontrado para o tipo: {tipo_documento}")
-            print(f"  -> Acionando Agente: {agente_coletor_ativo.__class__.__name__}")
-            resultado_coletor = agente_coletor_ativo.coletar_e_processar(dados_entrada)
-            if resultado_coletor.get("status") == "erro": return resultado_coletor
-            dados_estruturados = resultado_coletor.get('dados_estruturados', {})
-            print("[RESUMO COLETOR]")
-            print(f"  -> Fundamentos para Pesquisa: {dados_estruturados.get('fundamentos_necessarios', [])}")
+                # Extrai os termos do formulário
+                termos_pesquisa_str = dados_entrada.get("termo-pesquisa", "")
+                termos_pesquisa = [termo.strip() for termo in termos_pesquisa_str.split(',') if termo.strip()]
+                print(f"  -> Termos a serem pesquisados: {termos_pesquisa}")
 
-            # ETAPA 3: AGENTE DE PESQUISA ESPECIALIZADO
-            print("\n--- ETAPA 3: Pesquisa Jurídica ---")
-            if tipo_documento == "Contrato":
-                agente_pesquisa_ativo = self.pesquisa_juridica_contratos
+                # Chama o Agente de Pesquisa de Jurisprudência
+                resultados = self.agente_pesquisador_jurisprudencia.pesquisar(termos_pesquisa)
+
+                # Chama o Agente para Formatar o Resultado
+                resultado_formatado = self.agente_redator_jurisprudencia.formatar_resultados(termos_pesquisa, resultados)
+
+                print("✅ FLUXO DE PESQUISA DE JURISPRUDÊNCIA FINALIZADO!")
+                return {"status": "sucesso", "documento_final": resultado_formatado.get("documento_html")}
+            
+            # COMENTÁRIO: O fluxo original para todos os outros documentos permanece inalterado dentro deste 'else'.
             else:
-                agente_pesquisa_ativo = self.pesquisa_juridica_peticoes
-            print(f"  -> Acionando Agente: {agente_pesquisa_ativo.__class__.__name__}")
-            resultado_pesquisa = agente_pesquisa_ativo.pesquisar_fundamentacao_completa(
-                fundamentos=dados_estruturados.get('fundamentos_necessarios', []),
-                tipo_acao=tipo_documento
-            )
+                print("\n--- FLUXO DE GERAÇÃO DE DOCUMENTO COMPLETO INICIADO ---")
+                # ETAPA 2: AGENTE COLETOR DE DADOS ESPECIALIZADO
+                print("\n--- ETAPA 2: Coleta de Dados Especializada ---")
+                agente_coletor_ativo = self.coletores.get(tipo_documento)
+                if not agente_coletor_ativo:
+                    raise ValueError(f"Nenhum agente coletor encontrado para o tipo: {tipo_documento}")
+                print(f"  -> Acionando Agente: {agente_coletor_ativo.__class__.__name__}")
+                resultado_coletor = agente_coletor_ativo.coletar_e_processar(dados_entrada)
+                if resultado_coletor.get("status") == "erro": return resultado_coletor
+                dados_estruturados = resultado_coletor.get('dados_estruturados', {})
+                print("[RESUMO COLETOR]")
+                print(f"  -> Fundamentos para Pesquisa: {dados_estruturados.get('fundamentos_necessarios', [])}")
 
-            # ETAPA 4: AGENTE REDATOR ESPECIALIZADO (COM CICLO DE FEEDBACK)
-            print("\n--- ETAPA 4: Redação e Validação Iterativa ---")
-            agente_redator_ativo = self.redatores.get(tipo_documento)
-            if not agente_redator_ativo:
-                raise ValueError(f"Nenhum agente redator encontrado para o tipo: {tipo_documento}")
-            print(f"  -> Acionando Agente: {agente_redator_ativo.__class__.__name__}")
-
-            max_tentativas = 3
-            documento_atual = ""
-            recomendacoes = []
-            
-            for tentativa_atual in range(1, max_tentativas + 1):
-                print(f"\n--- TENTATIVA DE REDAÇÃO Nº {tentativa_atual} ---")
-                resultado_redacao = agente_redator_ativo.redigir_peticao_completa(
-                    dados_estruturados=dados_estruturados,
-                    pesquisa_juridica=resultado_pesquisa,
-                    documento_anterior=documento_atual,
-                    recomendacoes=recomendacoes
+                # ETAPA 3: AGENTE DE PESQUISA ESPECIALIZADO
+                print("\n--- ETAPA 3: Pesquisa Jurídica ---")
+                if tipo_documento == "Contrato":
+                    agente_pesquisa_ativo = self.pesquisa_juridica_contratos
+                else:
+                    agente_pesquisa_ativo = self.pesquisa_juridica_peticoes
+                print(f"  -> Acionando Agente: {agente_pesquisa_ativo.__class__.__name__}")
+                resultado_pesquisa = agente_pesquisa_ativo.pesquisar_fundamentacao_completa(
+                    fundamentos=dados_estruturados.get('fundamentos_necessarios', []),
+                    tipo_acao=tipo_documento
                 )
-                if resultado_redacao.get("status") == "erro": return resultado_redacao
-                documento_atual = resultado_redacao.get('documento_html', '')
-                
-                print(f"\n--- VALIDAÇÃO DA TENTATIVA Nº {tentativa_atual} ---")
-                resultado_validacao = self.agente_validador.validar_e_formatar(documento_atual, dados_estruturados)
-                
-                if resultado_validacao.get("status") == "aprovado":
-                    print("✅ Documento APROVADO pelo Agente Validador.")
-                    break
-                
-                recomendacoes = resultado_validacao.get("recomendacoes", [])
-                print(f"❌ Documento REPROVADO. Recomendações para a próxima tentativa: {recomendacoes}")
-                if tentativa_atual == max_tentativas:
-                    print("⚠️ Número máximo de tentativas atingido. Usando a melhor versão disponível.")
 
-            documento_final = resultado_validacao.get('documento_validado', documento_atual)
-            
-            print("\n" + "="*60)
-            print("✅ PROCESSAMENTO COMPLETO FINALIZADO!")
-            print("="*60)
-            return {
-                "status": "sucesso",
-                "documento_final": documento_final,
-            }
+                # ETAPA 4: AGENTE REDATOR ESPECIALIZADO (COM CICLO DE FEEDBACK)
+                print("\n--- ETAPA 4: Redação e Validação Iterativa ---")
+                agente_redator_ativo = self.redatores.get(tipo_documento)
+                if not agente_redator_ativo:
+                    raise ValueError(f"Nenhum agente redator encontrado para o tipo: {tipo_documento}")
+                print(f"  -> Acionando Agente: {agente_redator_ativo.__class__.__name__}")
+
+                max_tentativas = 3
+                documento_atual = ""
+                recomendacoes = []
+                
+                for tentativa_atual in range(1, max_tentativas + 1):
+                    print(f"\n--- TENTATIVA DE REDAÇÃO Nº {tentativa_atual} ---")
+                    resultado_redacao = agente_redator_ativo.redigir_peticao_completa(
+                        dados_estruturados=dados_estruturados,
+                        pesquisa_juridica=resultado_pesquisa,
+                        documento_anterior=documento_atual,
+                        recomendacoes=recomendacoes
+                    )
+                    if resultado_redacao.get("status") == "erro": return resultado_redacao
+                    documento_atual = resultado_redacao.get('documento_html', '')
+                    
+                    print(f"\n--- VALIDAÇÃO DA TENTATIVA Nº {tentativa_atual} ---")
+                    resultado_validacao = self.agente_validador.validar_e_formatar(documento_atual, dados_estruturados)
+                    
+                    if resultado_validacao.get("status") == "aprovado":
+                        print("✅ Documento APROVADO pelo Agente Validador.")
+                        break
+                    
+                    recomendacoes = resultado_validacao.get("recomendacoes", [])
+                    print(f"❌ Documento REPROVADO. Recomendações para a próxima tentativa: {recomendacoes}")
+                    if tentativa_atual == max_tentativas:
+                        print("⚠️ Número máximo de tentativas atingido. Usando a melhor versão disponível.")
+
+                documento_final = resultado_validacao.get('documento_validado', documento_atual)
+                
+                print("\n" + "="*60)
+                print("✅ PROCESSAMENTO COMPLETO FINALIZADO!")
+                print("="*60)
+                return {
+                    "status": "sucesso",
+                    "documento_final": documento_final,
+                }
             
         except Exception as e:
             traceback.print_exc()

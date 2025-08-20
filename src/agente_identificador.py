@@ -16,6 +16,7 @@ class AgenteIdentificador:
         # COMENTÁRIO: Este mapeamento contém apenas as chaves ÚNICAS que nos permitem
         # identificar o tipo de documento. Não precisamos de todos os campos aqui.
         self.mapeamento_identificacao = {
+            "Pesquisa de Jurisprudência": ['termopesquisa'],
             "Estudo de Caso": ['titulodecaso', 'descricaodocaso', 'contextojuridico'],
             "Contrato": ['contratante', 'objetodocontrato', 'objeto', 'tipodecontrato'],
             "Parecer Jurídico": ['solicitante', 'consulta'],
