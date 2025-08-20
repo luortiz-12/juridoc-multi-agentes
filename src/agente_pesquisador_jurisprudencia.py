@@ -1,4 +1,4 @@
-# agente_pesquisador_jurisprudencia.py - v4.1 (Com Pesquisa Persistente e Filtro Inteligente)
+# agente_pesquisador_jurisprudencia.py - v4.2 (Com Pesquisa Paginada e Persistente)
 
 import asyncio
 import aiohttp
@@ -15,11 +15,11 @@ from urllib.parse import urlparse
 class AgentePesquisadorJurisprudencia:
     """
     Agente Especializado em Pesquisa de Jurisprudência.
-    v4.1: Implementa um ciclo de pesquisa persistente com timeout,
-    filtra URLs de busca e tem um critério de conteúdo mais flexível.
+    v4.2: Implementa um ciclo de pesquisa persistente com paginação no Google,
+    garantindo uma busca contínua por novos links até atingir a meta ou o timeout.
     """
     def __init__(self, api_key: str = None):
-        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v4.1)...")
+        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v4.2)...")
         
         if not api_key:
             api_key = os.getenv('DEEPSEEK_API_KEY')
@@ -39,13 +39,13 @@ class AgentePesquisadorJurisprudencia:
             'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
         }
         self.config = {
-            # COMENTÁRIO: Tamanho mínimo reduzido para capturar ementas mais curtas.
             'tamanho_minimo_conteudo': 300,
             'min_sucessos_por_termo': 10,
-            'google_search_results': 15,
-            'timeout_geral_pesquisa': 120, # Timeout de 120 segundos
+            'google_search_results': 10, # Resultados por página
+            'timeout_geral_pesquisa': 120,
         }
-        self.sites_prioritarios = ['stj.jus.br', 'stf.jus.br', 'tst.jus.br', 'conjur.com.br', 'migalhas.com.br', 'ambito-juridico.com.br']
+        # COMENTÁRIO: O site 'jusbrasil.com.br' foi adicionado à lista de fontes prioritárias.
+        self.sites_prioritarios = ['jusbrasil.com.br', 'stj.jus.br', 'stf.jus.br', 'tst.jus.br', 'conjur.com.br', 'migalhas.com.br', 'ambito-juridico.com.br']
         print("✅ Sistema de pesquisa de JURISPRUDÊNCIA inicializado.")
 
     async def _validar_relevancia_com_ia_async(self, texto: str, termo_pesquisa: str) -> bool:
@@ -113,7 +113,7 @@ class AgentePesquisadorJurisprudencia:
     async def _pesquisar_termo_async(self, termo: str) -> List[Dict[str, Any]]:
         """
         COMENTÁRIO: Lógica principal aprimorada. Agora ele busca em rodadas contínuas
-        até atingir a meta de sucessos ou o tempo limite.
+        e "vira a página" do Google a cada rodada.
         """
         print(f"\n📚 Buscando jurisprudência para o termo: '{termo}' (modo persistente)...")
         
@@ -121,6 +121,7 @@ class AgentePesquisadorJurisprudencia:
         urls_ja_vistas = set()
         tempo_limite = timedelta(seconds=self.config['timeout_geral_pesquisa'])
         inicio_pesquisa = datetime.now()
+        start_index = 0 # COMENTÁRIO: Índice para a paginação do Google.
 
         try:
             loop = asyncio.get_event_loop()
@@ -130,21 +131,25 @@ class AgentePesquisadorJurisprudencia:
                     print(f"🎯 Meta de {self.config['min_sucessos_por_termo']} sucessos atingida para '{termo}'.")
                     break
 
-                print(f"  -> Nova rodada de busca... (Sucessos até agora: {len(resultados_sucesso)}/{self.config['min_sucessos_por_termo']})")
+                print(f"  -> Nova rodada de busca (página {start_index // 10 + 1})... (Sucessos: {len(resultados_sucesso)}/{self.config['min_sucessos_por_termo']})")
                 
                 dominios_query = " OR ".join([f"site:{site}" for site in self.sites_prioritarios])
                 query = f'"{termo}" jurisprudência ementa acórdão {dominios_query}'
                 
-                urls_encontradas = await loop.run_in_executor(None, lambda: list(search(query, num_results=self.config['google_search_results'], lang="pt")))
+                # COMENTÁRIO: O parâmetro 'start' é usado para buscar a próxima página de resultados.
+                urls_encontradas = await loop.run_in_executor(None, lambda: list(search(query, num_results=self.config['google_search_results'], lang="pt", start=start_index)))
                 
-                # COMENTÁRIO: Filtro para descartar URLs de busca e URLs já vistas.
+                if not urls_encontradas:
+                    print("  -> Google não retornou mais links. Encerrando busca para este termo.")
+                    break
+
                 urls_novas = [url for url in urls_encontradas if url not in urls_ja_vistas and "/busca?" not in url]
+                urls_ja_vistas.update(urls_novas)
                 
                 if not urls_novas:
-                    print("  -> Não foram encontrados novos links. Encerrando busca para este termo.")
-                    break
-                
-                urls_ja_vistas.update(urls_novas)
+                    print("  -> Não foram encontrados novos links nesta página. Tentando a próxima...")
+                    start_index += self.config['google_search_results']
+                    continue
 
                 async with aiohttp.ClientSession() as session:
                     tasks = [self._extrair_e_validar_async(session, url, termo) for url in urls_novas]
@@ -153,7 +158,9 @@ class AgentePesquisadorJurisprudencia:
                 novos_sucessos = [res for res in resultados_tasks if res]
                 resultados_sucesso.extend(novos_sucessos)
                 
-                await asyncio.sleep(1) # Pequena pausa para não sobrecarregar
+                # Prepara para a próxima página na próxima iteração
+                start_index += self.config['google_search_results']
+                await asyncio.sleep(1)
 
             else:
                 print(f"⏰ Tempo limite de {self.config['timeout_geral_pesquisa']}s atingido para o termo '{termo}'.")
