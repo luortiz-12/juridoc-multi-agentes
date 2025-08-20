@@ -45,18 +45,18 @@ class AgenteRedatorCivel:
         instrucao_formato = "REGRAS DE FORMATAÇÃO ESTRITAS: Sua resposta deve ser APENAS o conteúdo HTML para a seção solicitada. Use exclusivamente as seguintes tags: <h2> para o título principal da seção (ex: <h2>DOS FATOS</h2>), <h3> para subtítulos internos, <p> para parágrafos, e <strong> para texto em negrito. É PROIBIDO o uso de qualquer outra tag, como <div>, <blockquote>, <ul>, <li>, <em>, ou formatação Markdown (`**`)."
         # COMENTÁRIO: A instrução de fidelidade foi reforçada para ser ainda mais explícita.
         instrucao_fidelidade = "ATENÇÃO: Você DEVE se basear ESTRITAMENTE nos dados fornecidos no JSON 'DADOS DO CASO'. NÃO invente nomes, valores, datas, produtos ou qualquer outro fato que não esteja presente nos dados. Sua tarefa é expandir e detalhar a história fornecida, não criar uma nova."
-
+        instrucao_qualificacao = "ATENÇÃO: Você não deve repetir a qualificaçõe completa do cliente e da parte nos fatos ou no corpo do texto a não ser no inicio, dapois isso se refre pelo primeiro nome em negrito ou pelo termo ClIENTE ou PARTE CONTRARIA."
         instrucao_melhoria = ""
         if recomendacoes:
             instrucao_melhoria = f"\n\nINSTRUÇÕES PARA MELHORIA: A versão anterior foi considerada insatisfatória. Reescreva e expanda o conteúdo para atender a seguinte recomendação: '{' '.join(recomendacoes)}'."
 
         # COMENTÁRIO: Adicionada a meta de caracteres em cada prompt.
         prompts = {
-            "fatos": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a seção 'DOS FATOS' de uma petição cível. Seja extremamente detalhado, com no mínimo 10.000 caracteres. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS FATOS</h2>.",
+            "fatos": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_qualificacao}{instrucao_melhoria}\n\nRedija a seção 'DOS FATOS' de uma petição cível. Seja extremamente detalhado, com no mínimo 10.000 caracteres. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS FATOS</h2>.",
             "legislacao": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção 'DA FUNDAMENTAÇÃO LEGAL' para uma petição cível. Seja detalhado, com no mínimo 7.000 caracteres. Fundamente com base na legislação pesquisada. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('legislacao_formatada', 'N/A')}. Comece com <h3>Da Fundamentação Legal</h3>.",
             "jurisprudencia": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção sobre a 'JURISPRUDÊNCIA APLICÁVEL' para uma petição cível. Seja detalhado, com no mínimo 7.000 caracteres. Cite precedentes da pesquisa. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('jurisprudencia_formatada', 'N/A')}. Comece com <h3>Da Jurisprudência Aplicável</h3>.",
             "doutrina": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a subseção sobre a 'ANÁLISE DOUTRINÁRIA' para uma petição cível. Seja detalhado, com no mínimo 7.000 caracteres. Use a pesquisa. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. PESQUISA: {pesquisas.get('doutrina_formatada', 'N/A')}. Comece com <h3>Da Análise Doutrinária</h3>.",
-            "pedidos": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_melhoria}\n\nRedija a seção 'DOS PEDIDOS' de uma petição cível. Seja detalhado, com no mínimo 5.000 caracteres. Baseie-se estritamente no campo 'pedidos' dos dados. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS PEDIDOS</h2>."
+            "pedidos": f"{instrucao_formato}\n\n{instrucao_fidelidade}{instrucao_qualificacao}{instrucao_melhoria}\n\nRedija a seção 'DOS PEDIDOS' de uma petição cível. Seja detalhado, com no mínimo 5.000 caracteres. Baseie-se estritamente no campo 'pedidos' dos dados. DADOS DO CASO: {json.dumps(dados_formulario, ensure_ascii=False)}. Comece com <h2>DOS PEDIDOS</h2>."
         }
         
         tasks = [self._chamar_api_async(p, n) for n, p in prompts.items()]
