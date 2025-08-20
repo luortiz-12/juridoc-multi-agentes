@@ -70,6 +70,29 @@ class OrquestradorPrincipal:
         self.agente_redator_jurisprudencia = AgenteRedatorJurisprudencia()
         
         print("Orquestrador Principal inicializado com todos os agentes configurados.")
+
+        # COMENTÁRIO: Esta é a nova função que estava em falta.
+        # Ela lida exclusivamente com o fluxo de pesquisa de jurisprudência.
+    def processar_pesquisa_jurisprudencia(self, dados_entrada: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            print("\n--- FLUXO DE PESQUISA DE JURISPRUDÊNCIA INICIADO ---")
+            
+            # Extrai os termos do formulário
+            termos_pesquisa_str = dados_entrada.get("termo-pesquisa", "")
+            termos_pesquisa = [termo.strip() for termo in termos_pesquisa_str.split(',') if termo.strip()]
+            print(f"  -> Termos a serem pesquisados: {termos_pesquisa}")
+
+            # Chama o Agente de Pesquisa de Jurisprudência
+            resultados = self.agente_pesquisador_jurisprudencia.pesquisar(termos_pesquisa)
+
+            # Chama o Agente para Formatar o Resultado
+            resultado_formatado = self.agente_redator_jurisprudencia.formatar_resultados(termos_pesquisa, resultados)
+            
+            print("✅ FLUXO DE PESQUISA DE JURISPRUDÊNCIA FINALIZADO!")
+            return {"status": "sucesso", "documento_final": resultado_formatado.get("documento_html")}
+        except Exception as e:
+            traceback.print_exc()
+            return {"status": "erro", "erro": f"Erro no fluxo de pesquisa de jurisprudência: {e}"}
     
     def processar_solicitacao_completa(self, dados_entrada: Dict[str, Any]) -> Dict[str, Any]:
         try:
