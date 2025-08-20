@@ -38,9 +38,9 @@ class AgentePesquisadorJurisprudencia:
             'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
         }
         self.config = {
-            'tamanho_minimo_conteudo': 300,
+            'tamanho_minimo_conteudo': 10,
             'min_sucessos_por_termo': 10,
-            'google_search_results': 200, # Pede uma lista grande de uma só vez
+            'google_search_results': 2000, # Pede uma lista grande de uma só vez
             'timeout_geral_pesquisa': 120,
         }
         self.sites_prioritarios = ['jusbrasil.com.br', 'stj.jus.br', 'stf.jus.br', 'tst.jus.br', 'conjur.com.br', 'migalhas.com.br', 'ambito-juridico.com.br']
