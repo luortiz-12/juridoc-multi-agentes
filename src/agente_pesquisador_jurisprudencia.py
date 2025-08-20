@@ -1,4 +1,4 @@
-# agente_pesquisador_jurisprudencia.py - v4.2 (Com Pesquisa Paginada e Persistente)
+# agente_pesquisador_jurisprudencia.py - v4.3 (Com Lógica de Busca Corrigida)
 
 import asyncio
 import aiohttp
@@ -15,11 +15,10 @@ from urllib.parse import urlparse
 class AgentePesquisadorJurisprudencia:
     """
     Agente Especializado em Pesquisa de Jurisprudência.
-    v4.2: Implementa um ciclo de pesquisa persistente com paginação no Google,
-    garantindo uma busca contínua por novos links até atingir a meta ou o timeout.
+    v4.3: Lógica de busca no Google corrigida para remover o parâmetro 'start' incompatível.
     """
     def __init__(self, api_key: str = None):
-        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v4.2)...")
+        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v4.3)...")
         
         if not api_key:
             api_key = os.getenv('DEEPSEEK_API_KEY')
@@ -41,10 +40,9 @@ class AgentePesquisadorJurisprudencia:
         self.config = {
             'tamanho_minimo_conteudo': 300,
             'min_sucessos_por_termo': 10,
-            'google_search_results': 10, # Resultados por página
+            'google_search_results': 200, # Pede uma lista grande de uma só vez
             'timeout_geral_pesquisa': 120,
         }
-        # COMENTÁRIO: O site 'jusbrasil.com.br' foi adicionado à lista de fontes prioritárias.
         self.sites_prioritarios = ['jusbrasil.com.br', 'stj.jus.br', 'stf.jus.br', 'tst.jus.br', 'conjur.com.br', 'migalhas.com.br', 'ambito-juridico.com.br']
         print("✅ Sistema de pesquisa de JURISPRUDÊNCIA inicializado.")
 
@@ -112,60 +110,45 @@ class AgentePesquisadorJurisprudencia:
 
     async def _pesquisar_termo_async(self, termo: str) -> List[Dict[str, Any]]:
         """
-        COMENTÁRIO: Lógica principal aprimorada. Agora ele busca em rodadas contínuas
-        e "vira a página" do Google a cada rodada.
+        COMENTÁRIO: Lógica principal corrigida. Agora ele busca uma lista grande de URLs de uma só vez
+        e depois processa essa lista.
         """
-        print(f"\n📚 Buscando jurisprudência para o termo: '{termo}' (modo persistente)...")
+        print(f"\n📚 Buscando jurisprudência para o termo: '{termo}'...")
         
         resultados_sucesso = []
         urls_ja_vistas = set()
-        tempo_limite = timedelta(seconds=self.config['timeout_geral_pesquisa'])
-        inicio_pesquisa = datetime.now()
-        start_index = 0 # COMENTÁRIO: Índice para a paginação do Google.
-
+        
         try:
             loop = asyncio.get_event_loop()
             
-            while datetime.now() - inicio_pesquisa < tempo_limite:
-                if len(resultados_sucesso) >= self.config['min_sucessos_por_termo']:
-                    print(f"🎯 Meta de {self.config['min_sucessos_por_termo']} sucessos atingida para '{termo}'.")
-                    break
+            dominios_query = " OR ".join([f"site:{site}" for site in self.sites_prioritarios])
+            query = f'"{termo}" jurisprudência ementa acórdão {dominios_query}'
+            
+            # COMENTÁRIO: A chamada ao 'search' foi corrigida, removendo o parâmetro 'start'.
+            # Ele agora pede uma lista grande de resultados de uma só vez.
+            urls_encontradas = await loop.run_in_executor(None, lambda: list(search(query, num_results=self.config['google_search_results'], lang="pt")))
+            
+            if not urls_encontradas:
+                print("  -> Google não retornou links. Encerrando busca para este termo.")
+                return []
 
-                print(f"  -> Nova rodada de busca (página {start_index // 10 + 1})... (Sucessos: {len(resultados_sucesso)}/{self.config['min_sucessos_por_termo']})")
+            urls_novas = [url for url in urls_encontradas if url not in urls_ja_vistas and "/busca?" not in url]
+            urls_ja_vistas.update(urls_novas)
+
+            async with aiohttp.ClientSession() as session:
+                tasks = []
+                for url in urls_novas:
+                    # Adiciona a tarefa à lista para ser executada em paralelo
+                    tasks.append(self._extrair_e_validar_async(session, url, termo))
                 
-                dominios_query = " OR ".join([f"site:{site}" for site in self.sites_prioritarios])
-                query = f'"{termo}" jurisprudência ementa acórdão {dominios_query}'
-                
-                # COMENTÁRIO: O parâmetro 'start' é usado para buscar a próxima página de resultados.
-                urls_encontradas = await loop.run_in_executor(None, lambda: list(search(query, num_results=self.config['google_search_results'], lang="pt", start=start_index)))
-                
-                if not urls_encontradas:
-                    print("  -> Google não retornou mais links. Encerrando busca para este termo.")
-                    break
+                # Executa todas as tarefas de extração e validação em paralelo
+                resultados_tasks = await asyncio.gather(*tasks)
 
-                urls_novas = [url for url in urls_encontradas if url not in urls_ja_vistas and "/busca?" not in url]
-                urls_ja_vistas.update(urls_novas)
-                
-                if not urls_novas:
-                    print("  -> Não foram encontrados novos links nesta página. Tentando a próxima...")
-                    start_index += self.config['google_search_results']
-                    continue
+                # Filtra apenas os resultados bem-sucedidos e limita à meta
+                resultados_sucesso = [res for res in resultados_tasks if res][:self.config['min_sucessos_por_termo']]
 
-                async with aiohttp.ClientSession() as session:
-                    tasks = [self._extrair_e_validar_async(session, url, termo) for url in urls_novas]
-                    resultados_tasks = await asyncio.gather(*tasks)
-
-                novos_sucessos = [res for res in resultados_tasks if res]
-                resultados_sucesso.extend(novos_sucessos)
-                
-                # Prepara para a próxima página na próxima iteração
-                start_index += self.config['google_search_results']
-                await asyncio.sleep(1)
-
-            else:
-                print(f"⏰ Tempo limite de {self.config['timeout_geral_pesquisa']}s atingido para o termo '{termo}'.")
-
-            return resultados_sucesso[:self.config['min_sucessos_por_termo']]
+            print(f"🎯 Pesquisa para '{termo}' concluída com {len(resultados_sucesso)} extrações bem-sucedidas.")
+            return resultados_sucesso
 
         except Exception as e:
             print(f"⚠️ Falha crítica na busca: {e}")
