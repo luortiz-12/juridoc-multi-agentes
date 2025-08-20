@@ -1,4 +1,4 @@
-# agente_pesquisador_jurisprudencia.py - v3.9 (Com Query Única e Abrangente)
+# agente_pesquisador_jurisprudencia.py - v4.0 (Com Estratégia Anti-Bloqueio via Google Cache)
 
 import asyncio
 import aiohttp
@@ -15,11 +15,11 @@ from urllib.parse import urlparse
 class AgentePesquisadorJurisprudencia:
     """
     Agente Especializado em Pesquisa de Jurisprudência.
-    v3.9: Utiliza uma única query de busca abrangente para maior eficiência
-    e extrai o conteúdo completo dos artigos encontrados.
+    v4.0: Utiliza o cache do Google para acessar o conteúdo das páginas,
+    reduzindo drasticamente a probabilidade de ser bloqueado (erro 403).
     """
     def __init__(self, api_key: str = None):
-        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v3.9)...")
+        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v4.0)...")
         
         if not api_key:
             api_key = os.getenv('DEEPSEEK_API_KEY')
@@ -32,7 +32,6 @@ class AgentePesquisadorJurisprudencia:
         self.user_agents = [
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
         ]
         
         self.headers = {
@@ -44,7 +43,15 @@ class AgentePesquisadorJurisprudencia:
             'min_sucessos_por_termo': 4,
             'google_search_results': 20,
         }
-        self.sites_prioritarios = ['stj.jus.br', 'stf.jus.br', 'tst.jus.br', 'conjur.com.br', 'migalhas.com.br', 'ambito-juridico.com.br']
+        self.sites_prioritarios = ['stj.jus.br',
+    'stf.jus.br',
+    'tst.jus.br',
+    'jusbrasil.com.br',   # ADICIONADO
+    'conjur.com.br',
+    'migalhas.com.br',
+    'ambito-juridico.com.br',
+    'ibdfam.org.br'
+]
         print("✅ Sistema de pesquisa de JURISPRUDÊNCIA inicializado.")
 
     async def _validar_relevancia_com_ia_async(self, texto: str, termo_pesquisa: str) -> bool:
@@ -74,13 +81,17 @@ class AgentePesquisadorJurisprudencia:
 
     async def _extrair_e_validar_async(self, session, url: str, termo_pesquisa: str) -> Dict[str, Any]:
         """Extrai o conteúdo de uma URL e depois valida sua relevância com a IA."""
-        print(f"→ Tentando extrair de: {url}")
+        
+        # COMENTÁRIO: Esta é a nova estratégia anti-bloqueio.
+        # Em vez de acessar a URL diretamente, acessamos a versão em cache do Google.
+        cached_url = f"http://webcache.googleusercontent.com/search?q=cache:{url}"
+        
+        print(f"→ Tentando extrair de (via cache): {url}")
         try:
             request_headers = self.headers.copy()
             request_headers['User-Agent'] = random.choice(self.user_agents)
-            request_headers['Referer'] = 'https://www.google.com/'
 
-            async with session.get(url, headers=request_headers, timeout=15, ssl=False) as response:
+            async with session.get(cached_url, headers=request_headers, timeout=20, ssl=False) as response:
                 if response.status == 200:
                     raw_html = await response.read()
                     html = raw_html.decode('utf-8', errors='ignore')
@@ -110,20 +121,15 @@ class AgentePesquisadorJurisprudencia:
             return None
 
     async def _pesquisar_termo_async(self, termo: str) -> List[Dict[str, Any]]:
-        """
-        COMENTÁRIO: A lógica foi reescrita para usar uma única query de busca com todos os domínios,
-        tornando a pesquisa mais eficiente e similar a uma busca manual.
-        """
+        """Busca um único termo e extrai o conteúdo até atingir a meta."""
         print(f"\n📚 Buscando jurisprudência para o termo: '{termo}' em todos os domínios (query única)...")
         
-        # Monta a query única com todos os domínios prioritários
         dominios_query = " OR ".join([f"site:{site}" for site in self.sites_prioritarios])
-        query = f'"{termo}" jurisprudência {dominios_query}'
+        query = f'"{termo}" jurisprudência ementa acórdão {dominios_query}'
         
         resultados_sucesso = []
         try:
             loop = asyncio.get_event_loop()
-            # Aumenta o número de resultados para ter mais chances de atingir a meta
             num_results_to_fetch = self.config['min_sucessos_por_termo'] * 2
             urls_encontradas = await loop.run_in_executor(None, lambda: list(search(query, num_results=num_results_to_fetch, lang="pt")))
             
@@ -131,7 +137,6 @@ class AgentePesquisadorJurisprudencia:
                 tasks = [self._extrair_e_validar_async(session, url, termo) for url in urls_encontradas]
                 resultados_tasks = await asyncio.gather(*tasks)
 
-            # Filtra apenas os resultados bem-sucedidos e limita à meta
             resultados_sucesso = [res for res in resultados_tasks if res][:self.config['min_sucessos_por_termo']]
             
             print(f"🎯 Pesquisa para '{termo}' concluiu com {len(resultados_sucesso)} extrações bem-sucedidas.")
