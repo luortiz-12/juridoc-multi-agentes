@@ -1,4 +1,4 @@
-# agente_pesquisador_jurisprudencia.py - v4.0 (Com Estratégia Anti-Bloqueio via Google Cache)
+# agente_pesquisador_jurisprudencia.py - v4.1 (Com Pesquisa Persistente e Filtro Inteligente)
 
 import asyncio
 import aiohttp
@@ -6,7 +6,7 @@ import re
 import openai
 import os
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any, List
 from googlesearch import search
 from bs4 import BeautifulSoup
@@ -15,11 +15,11 @@ from urllib.parse import urlparse
 class AgentePesquisadorJurisprudencia:
     """
     Agente Especializado em Pesquisa de Jurisprudência.
-    v4.0: Utiliza o cache do Google para acessar o conteúdo das páginas,
-    reduzindo drasticamente a probabilidade de ser bloqueado (erro 403).
+    v4.1: Implementa um ciclo de pesquisa persistente com timeout,
+    filtra URLs de busca e tem um critério de conteúdo mais flexível.
     """
     def __init__(self, api_key: str = None):
-        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v4.0)...")
+        print("⚖️  Inicializando Agente de Pesquisa de JURISPRUDÊNCIA (v4.1)...")
         
         if not api_key:
             api_key = os.getenv('DEEPSEEK_API_KEY')
@@ -39,23 +39,17 @@ class AgentePesquisadorJurisprudencia:
             'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
         }
         self.config = {
-            'tamanho_minimo_conteudo': 500,
-            'min_sucessos_por_termo': 4,
-            'google_search_results': 20,
+            # COMENTÁRIO: Tamanho mínimo reduzido para capturar ementas mais curtas.
+            'tamanho_minimo_conteudo': 300,
+            'min_sucessos_por_termo': 10,
+            'google_search_results': 15,
+            'timeout_geral_pesquisa': 120, # Timeout de 120 segundos
         }
-        self.sites_prioritarios = ['stj.jus.br',
-    'stf.jus.br',
-    'tst.jus.br',
-    'jusbrasil.com.br',   # ADICIONADO
-    'conjur.com.br',
-    'migalhas.com.br',
-    'ambito-juridico.com.br',
-    'ibdfam.org.br'
-]
+        self.sites_prioritarios = ['stj.jus.br', 'stf.jus.br', 'tst.jus.br', 'conjur.com.br', 'migalhas.com.br', 'ambito-juridico.com.br']
         print("✅ Sistema de pesquisa de JURISPRUDÊNCIA inicializado.")
 
     async def _validar_relevancia_com_ia_async(self, texto: str, termo_pesquisa: str) -> bool:
-        """Usa a IA da DeepSeek para validar se o conteúdo extraído é relevante."""
+        # ... (código de validação com IA permanece o mesmo)
         try:
             prompt = f"""
             Analise o seguinte texto e determine se ele é uma JURISPRUDÊNCIA (decisão judicial, acórdão, ementa) relevante para o termo de pesquisa "{termo_pesquisa}".
@@ -80,12 +74,8 @@ class AgentePesquisadorJurisprudencia:
             return False
 
     async def _extrair_e_validar_async(self, session, url: str, termo_pesquisa: str) -> Dict[str, Any]:
-        """Extrai o conteúdo de uma URL e depois valida sua relevância com a IA."""
-        
-        # COMENTÁRIO: Esta é a nova estratégia anti-bloqueio.
-        # Em vez de acessar a URL diretamente, acessamos a versão em cache do Google.
+        # ... (código de extração via Google Cache permanece o mesmo)
         cached_url = f"http://webcache.googleusercontent.com/search?q=cache:{url}"
-        
         print(f"→ Tentando extrair de (via cache): {url}")
         try:
             request_headers = self.headers.copy()
@@ -121,30 +111,58 @@ class AgentePesquisadorJurisprudencia:
             return None
 
     async def _pesquisar_termo_async(self, termo: str) -> List[Dict[str, Any]]:
-        """Busca um único termo e extrai o conteúdo até atingir a meta."""
-        print(f"\n📚 Buscando jurisprudência para o termo: '{termo}' em todos os domínios (query única)...")
-        
-        dominios_query = " OR ".join([f"site:{site}" for site in self.sites_prioritarios])
-        query = f'"{termo}" jurisprudência ementa acórdão {dominios_query}'
+        """
+        COMENTÁRIO: Lógica principal aprimorada. Agora ele busca em rodadas contínuas
+        até atingir a meta de sucessos ou o tempo limite.
+        """
+        print(f"\n📚 Buscando jurisprudência para o termo: '{termo}' (modo persistente)...")
         
         resultados_sucesso = []
+        urls_ja_vistas = set()
+        tempo_limite = timedelta(seconds=self.config['timeout_geral_pesquisa'])
+        inicio_pesquisa = datetime.now()
+
         try:
             loop = asyncio.get_event_loop()
-            num_results_to_fetch = self.config['min_sucessos_por_termo'] * 2
-            urls_encontradas = await loop.run_in_executor(None, lambda: list(search(query, num_results=num_results_to_fetch, lang="pt")))
             
-            async with aiohttp.ClientSession() as session:
-                tasks = [self._extrair_e_validar_async(session, url, termo) for url in urls_encontradas]
-                resultados_tasks = await asyncio.gather(*tasks)
+            while datetime.now() - inicio_pesquisa < tempo_limite:
+                if len(resultados_sucesso) >= self.config['min_sucessos_por_termo']:
+                    print(f"🎯 Meta de {self.config['min_sucessos_por_termo']} sucessos atingida para '{termo}'.")
+                    break
 
-            resultados_sucesso = [res for res in resultados_tasks if res][:self.config['min_sucessos_por_termo']]
-            
-            print(f"🎯 Pesquisa para '{termo}' concluiu com {len(resultados_sucesso)} extrações bem-sucedidas.")
-            return resultados_sucesso
+                print(f"  -> Nova rodada de busca... (Sucessos até agora: {len(resultados_sucesso)}/{self.config['min_sucessos_por_termo']})")
+                
+                dominios_query = " OR ".join([f"site:{site}" for site in self.sites_prioritarios])
+                query = f'"{termo}" jurisprudência ementa acórdão {dominios_query}'
+                
+                urls_encontradas = await loop.run_in_executor(None, lambda: list(search(query, num_results=self.config['google_search_results'], lang="pt")))
+                
+                # COMENTÁRIO: Filtro para descartar URLs de busca e URLs já vistas.
+                urls_novas = [url for url in urls_encontradas if url not in urls_ja_vistas and "/busca?" not in url]
+                
+                if not urls_novas:
+                    print("  -> Não foram encontrados novos links. Encerrando busca para este termo.")
+                    break
+                
+                urls_ja_vistas.update(urls_novas)
+
+                async with aiohttp.ClientSession() as session:
+                    tasks = [self._extrair_e_validar_async(session, url, termo) for url in urls_novas]
+                    resultados_tasks = await asyncio.gather(*tasks)
+
+                novos_sucessos = [res for res in resultados_tasks if res]
+                resultados_sucesso.extend(novos_sucessos)
+                
+                await asyncio.sleep(1) # Pequena pausa para não sobrecarregar
+
+            else:
+                print(f"⏰ Tempo limite de {self.config['timeout_geral_pesquisa']}s atingido para o termo '{termo}'.")
+
+            return resultados_sucesso[:self.config['min_sucessos_por_termo']]
 
         except Exception as e:
-            print(f"⚠️ Falha crítica na busca do Google: {e}")
-            return []
+            print(f"⚠️ Falha crítica na busca: {e}")
+            return resultados_sucesso
 
     async def pesquisar_jurisprudencia_async(self, termos: List[str]) -> List[Dict[str, Any]]:
         """Cria e executa todas as tarefas de pesquisa em paralelo."""
